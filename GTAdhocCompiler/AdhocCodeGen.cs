@@ -4,10 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace GTAdhocCompiler.Instructions
+namespace GTAdhocCompiler
 {
-    public abstract class InstructionBase
+    public class AdhocCodeGen
     {
-        public int LineNumber { get; set; }
     }
 }

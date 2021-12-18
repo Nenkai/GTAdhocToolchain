@@ -6,8 +6,10 @@ using System.Threading.Tasks;
 
 namespace GTAdhocCompiler.Instructions
 {
-    public class FunctionConst : InstructionBase
+    /// <summary>
+    /// Pops 2 pointers off the stack, and copies the second item to the first item
+    /// </summary>
+    public class InsAssignPop : InstructionBase
     {
-        public List<AdhocSymbol> Parameters { get; set; } = new List<AdhocSymbol>();
     }
 }

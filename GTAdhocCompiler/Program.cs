@@ -3,47 +3,25 @@ using System.Collections.Generic;
 using System.IO;
 
 using Esprima;
+using Esprima.Utils;
 
 using Newtonsoft.Json;
 
-namespace Esprima.Sample
+using GTAdhocCompiler;
+
+namespace GTAdhocCompiler
 {
     public class Program
     {
         public static void Main(string[] args)
         {
-            string source = @"
-""use strict"";
-let t = 5;
-
-";
-            var scanner = new Scanner(source);
-            Tokenize(scanner);
-            Parse(source, Console.Out);
-        }
-
-        private static void Tokenize(Scanner scanner)
-        {
-            var tokens = new List<Token>();
-            Token token;
-
-            do
-            {
-                scanner.ScanComments();
-                token = scanner.Lex();
-                tokens.Add(token);
-            } while (token.Type != TokenType.EOF);
-
-            Console.WriteLine(JsonConvert.SerializeObject(tokens, Formatting.Indented));
-        }
-
-        private static void Parse(string source, TextWriter output)
-        {
-            var parser = new JavaScriptParser(source);
+            var source = File.ReadAllText(@"D:\Modding_Research\Gran_Turismo\Gran_Turismo_Sport_Closed_Beta_1.08\CUSA07836-app\EXTRACTED\SCRIPTS\WWW\GT7SP\ADHOC\GET_CAR_PARAMETER.AD.src");
+            var parser = new AdhocAbstractSyntaxTree(source);
             var program = parser.ParseScript();
 
-            program.WriteJson(output);
-            Console.WriteLine();
+
+            var compiler = new AdhocScriptCompiler();
+            compiler.Compile(program);
         }
     }
 }
