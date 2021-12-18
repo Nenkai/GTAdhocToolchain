@@ -6,10 +6,8 @@ using System.Threading.Tasks;
 
 namespace GTAdhocCompiler.Instructions
 {
-    public class InsVariableEvaluation : InstructionBase
+    public class InsNilConst : InstructionBase
     {
-        public List<AdhocSymbol> VariableSymbols { get; set; } = new();
 
-        public int StackIndex { get; set; }
     }
 }

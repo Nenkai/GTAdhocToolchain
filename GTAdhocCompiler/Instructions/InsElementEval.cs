@@ -6,10 +6,11 @@ using System.Threading.Tasks;
 
 namespace GTAdhocCompiler.Instructions
 {
-    public class InsVariableEvaluation : InstructionBase
+    /// <summary>
+    /// Represents an array or map element evaluation instruction.
+    /// </summary>
+    public class InsElementEval : InstructionBase
     {
-        public List<AdhocSymbol> VariableSymbols { get; set; } = new();
 
-        public int StackIndex { get; set; }
     }
 }

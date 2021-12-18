@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace GTAdhocCompiler.Instructions
 {
-    public class FunctionConst : InstructionBase
+    public class InsFunctionConst : InstructionBase
     {
         public List<AdhocSymbol> Parameters { get; set; } = new List<AdhocSymbol>();
     }

@@ -16,11 +16,11 @@ namespace GTAdhocCompiler
             CompileStatements(script.Body);
 
             // Done, finish up Main
-            AddInstruction(new InsSetState(1));
-            AddInstruction(new InsLeaveScope()); // FIX ME MAYBE
+            AddInstruction(new InsSetState(1), 0);
+            AddInstruction(new InsLeaveScope(), 0); // FIX ME MAYBE
 
             // Script done.
-            AddInstruction(new InsSetState(0));
+            AddInstruction(new InsSetState(0), 0);
         }
 
         public void CompileStatements(Node node)
@@ -57,6 +57,12 @@ namespace GTAdhocCompiler
                 case BlockStatement blockStatement:
                     CompileStatements(blockStatement.Body);
                     break;
+                case ExpressionStatement expStatement:
+                    CompileExpressionStatement(expStatement);
+                    break;
+                default:
+                    ThrowCompilationError(node, "Statement not supported");
+                    break;
             }
         }
 
@@ -70,7 +76,7 @@ namespace GTAdhocCompiler
 
             // Create jump
             InsJumpIfFalse jmp = new InsJumpIfFalse();
-            AddInstruction(jmp);
+            AddInstruction(jmp, 0);
 
             // Apply block
             CompileStatement(result);
@@ -80,9 +86,8 @@ namespace GTAdhocCompiler
 
         public void CompileFunction(Script script, FunctionDeclaration decl)
         {
-            var funcInst = new FunctionConst();
-            funcInst.LineNumber = decl.Location.Start.Line;
-            AddInstruction(funcInst);
+            var funcInst = new InsFunctionConst();
+            AddInstruction(funcInst, decl.Location.Start.Line);
 
             foreach (Expression param in decl.Params)
             {
@@ -92,7 +97,7 @@ namespace GTAdhocCompiler
                     funcInst.Parameters.Add(paramSymb);
                 }
                 else
-                    ThrowCompilationError("Function definition parameters must all be identifiers.");
+                    ThrowCompilationError(decl, "Function definition parameters must all be identifiers.");
             }
 
             var funcBody = decl.Body;
@@ -101,7 +106,7 @@ namespace GTAdhocCompiler
                 CompileStatements(block);
             }
             else
-                ThrowCompilationError("Expected function body to be block statement.");
+                ThrowCompilationError(funcBody, "Expected function body to be block statement.");
         }
 
         public void CompileReturnStatement(ReturnStatement retStatement)
@@ -109,7 +114,7 @@ namespace GTAdhocCompiler
             if (retStatement.Argument is not null) // Return has argument?
                 CompileExpression(retStatement.Argument);
 
-            AddInstruction(new InsSetState(1));
+            AddInstruction(new InsSetState(1), 0);
         }
 
         public void CompileVariableDeclaration(VariableDeclaration varDeclaration)
@@ -125,7 +130,7 @@ namespace GTAdhocCompiler
             // Now write the id
             if (id is null)
             {
-                ThrowCompilationError("Variable declaration for id is null.");
+                ThrowCompilationError(varDeclaration, "Variable declaration for id is null.");
             }
 
             if (id is Identifier idIdentifier)
@@ -136,22 +141,22 @@ namespace GTAdhocCompiler
                 varPush.VariableSymbol = varSymb;
                 // varPush.StackIndex = 
 
-                AddInstruction(varPush);
+                AddInstruction(varPush, idIdentifier.Location.Start.Line);
             }
             else
             {
-                ThrowCompilationError("Variable declaration for id is not an identifier.");
+                ThrowCompilationError(varDeclaration, "Variable declaration for id is not an identifier.");
             }
 
             // Perform assignment
-            MainInstructions.Add(new InsAssignPop());
+            AddInstruction(new InsAssignPop(), 0);
         }
 
         public void CompileImport(ImportDeclaration import)
         {
             if (import.Specifiers.Count == 0)
             {
-                ThrowCompilationError("Import declaration is empty.");
+                ThrowCompilationError(import, "Import declaration is empty.");
             }
 
             string importNamespace = "";
@@ -175,7 +180,7 @@ namespace GTAdhocCompiler
             AdhocSymbol nilSymbol = RegisterSymbol("nil");
 
             var importIns = new InsImport(namespaceSymbol, targetNamespace);
-            AddInstruction(importIns);
+            AddInstruction(importIns, import.Location.Start.Line);
         }
 
         private void CompileExpression(Expression exp)
@@ -191,6 +196,9 @@ namespace GTAdhocCompiler
                 case UnaryExpression unaryExpression:
                     CompileUnaryExpression(unaryExpression);
                     break;
+                case AttributeMemberExpression attributeMemberException:
+                    CompileAttributeMemberExpression(attributeMemberException);
+                    break;
                 case StaticMemberExpression staticMemberExpression:
                     CompileStaticMemberExpression(staticMemberExpression);
                     break;
@@ -200,11 +208,28 @@ namespace GTAdhocCompiler
                 case Literal literal:
                     CompileLiteral(literal);
                     break;
+                case ComputedMemberExpression comp:
+                    CompileComputedMemberExpression(comp);
+                    break;
+                case AssignmentExpression assignExp:
+                    CompileAssignmentExpression(assignExp);
+                    break;
                 default:
-                    throw new NotImplementedException();
+                    ThrowCompilationError(exp, "Expression not supported");
                     break;
             }
         }
+
+        private void CompileExpressionStatement(ExpressionStatement expStatement)
+        {
+            CompileExpression(expStatement.Expression);
+        }
+
+        private void CompileAssignmentExpression(AssignmentExpression assignExpression)
+        {
+            ;
+        }
+
 
         /// <summary>
         /// Compiles an identifier. var test = otherVariable;
@@ -220,16 +245,62 @@ namespace GTAdhocCompiler
             AdhocSymbol symb = RegisterSymbol(identifier.Name);
 
             var varEval = new InsVariableEvaluation();
-            varEval.VariableSymbol = symb;
+            varEval.VariableSymbols.Add(symb); // Only one
             // varEval.StackIndex = 
-            AddInstruction(varEval);
+            AddInstruction(varEval, identifier.Location.Start.Line);
         }
 
-        private void CompileStaticMemberExpression(StaticMemberExpression staticExp)
+        /// <summary>
+        /// Compiles array or map access or anything that can be indexed
+        /// </summary>
+        private void CompileComputedMemberExpression(ComputedMemberExpression computedMember)
         {
-            // ORG.inSession();
+            CompileExpression(computedMember.Object);
+            CompileExpression(computedMember.Property);
+
+            InsElementEval eval = new InsElementEval();
+            AddInstruction(eval, 0);
+        }
+
+        // ORG.inSession();
+        private void CompileAttributeMemberExpression(AttributeMemberExpression staticExp)
+        {
             CompileExpression(staticExp.Object); // ORG
             CompileExpression(staticExp.Property); // inSession
+        }
+
+        // pdistd::MPjson::Encode
+        private void CompileStaticMemberExpression(StaticMemberExpression staticExp)
+        {
+            // Recursively build the namespace path
+            List<string> pathParts = new(4);
+            BuildStaticPath(staticExp, ref pathParts);
+
+            InsVariableEvaluation eval = new InsVariableEvaluation();
+            foreach (string part in pathParts)
+            {
+                AdhocSymbol symb = RegisterSymbol(part);
+                eval.VariableSymbols.Add(symb);
+            }
+
+            AddInstruction(eval, staticExp.Location.Start.Line);
+            void BuildStaticPath(StaticMemberExpression exp, ref List<string> pathParts)
+            {
+                if (exp.Object is StaticMemberExpression obj)
+                {
+                    BuildStaticPath(obj, ref pathParts);
+                }
+                else if (exp.Object is Identifier identifier)
+                {
+                    pathParts.Add(identifier.Name);
+                }
+
+                if (exp.Property is Identifier propIdentifier)
+                {
+                    pathParts.Add(propIdentifier.Name);
+                    return;
+                }
+            }
         }
 
         private void CompileCall(CallExpression call)
@@ -243,9 +314,7 @@ namespace GTAdhocCompiler
             }
             
             var callIns = new InsCall(call.Arguments.Count);
-            AddInstruction(callIns);
-
-            
+            AddInstruction(callIns, call.Location.Start.Line);
         }
 
         private void CompileBinaryExpression(BinaryExpression binExp)
@@ -253,18 +322,19 @@ namespace GTAdhocCompiler
             CompileExpression(binExp.Left);
             CompileExpression(binExp.Right);
 
-            AdhocSymbol opSymbol;
+            AdhocSymbol opSymbol = null;
             switch (binExp.Operator)
             {
                 case BinaryOperator.Equal:
                     opSymbol = RegisterSymbol("==");
                     break;
                 default:
-                    throw new NotImplementedException("Binary operator not implemented");
+                    ThrowCompilationError(binExp, "Binary operator not implemented");
+                    break;
             }
 
             InsBinaryOperator binOpIns = new InsBinaryOperator(opSymbol);
-            AddInstruction(binOpIns);
+            AddInstruction(binOpIns, binExp.Location.Start.Line);
         }
 
         private void CompileUnaryExpression(UnaryExpression unaryExp)
@@ -279,7 +349,7 @@ namespace GTAdhocCompiler
 
             AdhocSymbol symb = RegisterSymbol(op);
             InsUnaryOperator unaryIns = new InsUnaryOperator(symb);
-            AddInstruction(unaryIns);
+            AddInstruction(unaryIns, unaryExp.Location.Start.Line);
         }
 
         private void CompileLiteral(Literal literal)
@@ -289,7 +359,11 @@ namespace GTAdhocCompiler
                 case TokenType.StringLiteral:
                     AdhocSymbol str = RegisterSymbol(literal.StringValue);
                     InsStringConst strIns = new InsStringConst(str);
-                    AddInstruction(strIns);
+                    AddInstruction(strIns, literal.Location.Start.Line);
+                    break;
+                case TokenType.NilLiteral:
+                    InsNilConst nil = new InsNilConst();
+                    AddInstruction(nil, literal.Location.Start.Line);
                     break;
                 default:
                     throw new NotImplementedException("Not implemented literal");
@@ -301,8 +375,9 @@ namespace GTAdhocCompiler
             return MainInstructions.Count;
         }
 
-        private void AddInstruction(InstructionBase ins)
+        private void AddInstruction(InstructionBase ins, int lineNumber)
         {
+            ins.LineNumber = lineNumber;
             MainInstructions.Add(ins);
         }
 
@@ -351,9 +426,9 @@ namespace GTAdhocCompiler
             return symbol;
         }
 
-        private void ThrowCompilationError(string message)
+        private void ThrowCompilationError(Node node, string message)
         {
-
+            throw new AdhocCompilationException($"{message}. Line {node.Location.Start.Line}:{node.Location.Start.Column}");
         }
     }
 }

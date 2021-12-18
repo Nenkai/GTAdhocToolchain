@@ -8,5 +8,10 @@ namespace GTAdhocCompiler
 {
     public class AdhocCompilationException : Exception
     {
+        public AdhocCompilationException(string message)
+            : base(message)
+        {
+
+        }
     }
 }
