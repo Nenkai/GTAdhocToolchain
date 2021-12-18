@@ -15,7 +15,10 @@ namespace GTAdhocCompiler
     {
         public static void Main(string[] args)
         {
-            var source = File.ReadAllText(@"D:\Modding_Research\Gran_Turismo\Gran_Turismo_Sport_Closed_Beta_1.08\CUSA07836-app\EXTRACTED\SCRIPTS\WWW\GT7SP\ADHOC\GET_CAR_PARAMETER.AD.src");
+            if (args.Length != 1)
+                return;
+
+            var source = File.ReadAllText(args[0]);
             var parser = new AdhocAbstractSyntaxTree(source);
             var program = parser.ParseScript();
 
