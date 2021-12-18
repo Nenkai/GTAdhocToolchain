@@ -195,7 +195,7 @@ namespace GTAdhocCompiler
                     CompileStaticMemberExpression(staticMemberExpression);
                     break;
                 case BinaryExpression binExpression:
-                    throw new NotImplementedException();
+                    CompileBinaryExpression(binExpression);
                     break;
                 case Literal literal:
                     CompileLiteral(literal);
@@ -246,6 +246,25 @@ namespace GTAdhocCompiler
             AddInstruction(callIns);
 
             
+        }
+
+        private void CompileBinaryExpression(BinaryExpression binExp)
+        {
+            CompileExpression(binExp.Left);
+            CompileExpression(binExp.Right);
+
+            AdhocSymbol opSymbol;
+            switch (binExp.Operator)
+            {
+                case BinaryOperator.Equal:
+                    opSymbol = RegisterSymbol("==");
+                    break;
+                default:
+                    throw new NotImplementedException("Binary operator not implemented");
+            }
+
+            InsBinaryOperator binOpIns = new InsBinaryOperator(opSymbol);
+            AddInstruction(binOpIns);
         }
 
         private void CompileUnaryExpression(UnaryExpression unaryExp)
