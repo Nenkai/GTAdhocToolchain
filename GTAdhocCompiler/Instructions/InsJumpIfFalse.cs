@@ -11,6 +11,8 @@ namespace GTAdhocCompiler.Instructions
     /// </summary>
     public class InsJumpIfFalse : InstructionBase
     {
+        public override string InstructionName => "JUMP_IF_FALSE";
+
         public int JumpIndex { get; set; }
     }
 }

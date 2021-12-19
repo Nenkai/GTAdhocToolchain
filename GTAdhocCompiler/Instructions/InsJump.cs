@@ -11,6 +11,8 @@ namespace GTAdhocCompiler.Instructions
     /// </summary>
     public class InsJump : InstructionBase
     {
+        public override string InstructionName => "JUMP";
+
         public int InstructionIndex { get; set; }
     }
 }

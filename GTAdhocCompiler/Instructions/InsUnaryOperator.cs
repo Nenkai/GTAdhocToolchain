@@ -11,6 +11,8 @@ namespace GTAdhocCompiler.Instructions
     /// </summary>
     public class InsUnaryOperator : InstructionBase
     {
+        public override string InstructionName => "UNARY_OPERATOR";
+
         public AdhocSymbol Operator { get; set; }
 
         public InsUnaryOperator(AdhocSymbol opSymbol)

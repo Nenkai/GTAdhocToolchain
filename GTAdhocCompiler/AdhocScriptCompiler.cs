@@ -4,61 +4,62 @@ using Esprima.Ast;
 
 using GTAdhocCompiler.Instructions;
 
+
 namespace GTAdhocCompiler
 {
-    public class AdhocScriptCompiler
+    public class AdhocScriptCompiler : AdhocInstructionBlock
     {
-        public List<InstructionBase> MainInstructions { get; set; } = new();
         public Dictionary<string, AdhocSymbol> Symbols { get; set; } = new();
 
         public void Compile(Script script)
         {
-            CompileStatements(script.Body);
+            // "this" is main + declarations
+            CompileStatements(this, script.Body);
 
             // Done, finish up Main
-            AddInstruction(new InsSetState(1), 0);
-            AddInstruction(new InsLeaveScope(), 0); // FIX ME MAYBE
+            this.AddInstruction(new InsSetState(1), 0);
+            this.AddInstruction(new InsLeaveScope(), 0); // FIX ME MAYBE
 
             // Script done.
-            AddInstruction(new InsSetState(0), 0);
+            this.AddInstruction(new InsSetState(0), 0);
         }
 
-        public void CompileStatements(Node node)
+        public void CompileStatements(AdhocInstructionBlock block, Node node)
         {
             foreach (var n in node.ChildNodes)
-                CompileStatement(n);
+                CompileStatement(block, n);
         }
 
-        public void CompileStatements(NodeList<Statement> nodes)
+        public void CompileStatements(AdhocInstructionBlock block, NodeList<Statement> nodes)
         {
             foreach (var n in nodes)
-                CompileStatement(n);
+                CompileStatement(block, n);
         }
 
-        public void CompileStatement(Node node)
+        public void CompileStatement(AdhocInstructionBlock block, Node node)
         {
             switch (node)
             {
                 case FunctionDeclaration funcDecl:
-                    CompileFunction(null, funcDecl);
+                    CompileFunction(block, funcDecl);
                     break;
                 case VariableDeclaration variableDecl:
-                    CompileVariableDeclaration(variableDecl);
+                    CompileVariableDeclaration(block, variableDecl);
                     break;
                 case ReturnStatement retStatement:
-                    CompileReturnStatement(retStatement);
+                    CompileReturnStatement(block, retStatement);
                     break;
                 case ImportDeclaration importDecl:
-                    CompileImport(importDecl);
+                    CompileImport(block, importDecl);
                     break;
                 case IfStatement ifStatement:
-                    CompileIfStatement(ifStatement);
+                    CompileIfStatement(block, ifStatement);
                     break;
                 case BlockStatement blockStatement:
-                    CompileStatements(blockStatement.Body);
+                    CompileStatements(block, blockStatement.Body);
                     break;
                 case ExpressionStatement expStatement:
-                    CompileExpressionStatement(expStatement);
+                    CompileExpressionStatement(block, expStatement);
                     break;
                 default:
                     ThrowCompilationError(node, "Statement not supported");
@@ -66,28 +67,31 @@ namespace GTAdhocCompiler
             }
         }
 
-        public void CompileIfStatement(IfStatement ifStatement)
+        public void CompileIfStatement(AdhocInstructionBlock block, IfStatement ifStatement)
         {
             Expression condition = ifStatement.Test;
             Statement result = ifStatement.Consequent;
             Statement alt = ifStatement.Alternate;
 
-            CompileExpression(condition);
+            CompileExpression(block, condition);
 
             // Create jump
             InsJumpIfFalse jmp = new InsJumpIfFalse();
-            AddInstruction(jmp, 0);
+            block.AddInstruction(jmp, 0);
 
             // Apply block
-            CompileStatement(result);
+            CompileStatement(block, result);
 
-            jmp.JumpIndex = GetLastFunctionInstructionIndex();
+            jmp.JumpIndex = block.GetLastInstructionIndex();
         }
 
-        public void CompileFunction(Script script, FunctionDeclaration decl)
+        public void CompileFunction(AdhocInstructionBlock block, FunctionDeclaration decl)
         {
             var funcInst = new InsFunctionConst();
-            AddInstruction(funcInst, decl.Location.Start.Line);
+            if (decl.Id is not null)
+                funcInst.Name = RegisterSymbol(decl.Id.Name);
+
+            block.AddInstruction(funcInst, decl.Location.Start.Line);
 
             foreach (Expression param in decl.Params)
             {
@@ -101,23 +105,25 @@ namespace GTAdhocCompiler
             }
 
             var funcBody = decl.Body;
-            if (funcBody is BlockStatement block)
+            if (funcBody is BlockStatement blockStatement)
             {
-                CompileStatements(block);
+                AdhocInstructionBlock functionBlock = new AdhocInstructionBlock();
+                funcInst.Instructions = functionBlock.Instructions;
+                CompileStatements(functionBlock, blockStatement);
             }
             else
                 ThrowCompilationError(funcBody, "Expected function body to be block statement.");
         }
 
-        public void CompileReturnStatement(ReturnStatement retStatement)
+        public void CompileReturnStatement(AdhocInstructionBlock block, ReturnStatement retStatement)
         {
             if (retStatement.Argument is not null) // Return has argument?
-                CompileExpression(retStatement.Argument);
+                CompileExpression(block, retStatement.Argument);
 
-            AddInstruction(new InsSetState(1), 0);
+            block.AddInstruction(new InsSetState(1), 0);
         }
 
-        public void CompileVariableDeclaration(VariableDeclaration varDeclaration)
+        public void CompileVariableDeclaration(AdhocInstructionBlock block, VariableDeclaration varDeclaration)
         {
             NodeList<VariableDeclarator> declarators = varDeclaration.Declarations;
             VariableDeclarator declarator = declarators[0];
@@ -125,7 +131,7 @@ namespace GTAdhocCompiler
             Expression? initValue = declarator.Init;
             Expression? id = declarator.Id;
 
-            CompileExpression(initValue);
+            CompileExpression(block, initValue);
 
             // Now write the id
             if (id is null)
@@ -141,7 +147,7 @@ namespace GTAdhocCompiler
                 varPush.VariableSymbol = varSymb;
                 // varPush.StackIndex = 
 
-                AddInstruction(varPush, idIdentifier.Location.Start.Line);
+                block.AddInstruction(varPush, idIdentifier.Location.Start.Line);
             }
             else
             {
@@ -149,10 +155,10 @@ namespace GTAdhocCompiler
             }
 
             // Perform assignment
-            AddInstruction(new InsAssignPop(), 0);
+            block.AddInstruction(new InsAssignPop(), 0);
         }
 
-        public void CompileImport(ImportDeclaration import)
+        public void CompileImport(AdhocInstructionBlock block, ImportDeclaration import)
         {
             if (import.Specifiers.Count == 0)
             {
@@ -180,42 +186,42 @@ namespace GTAdhocCompiler
             AdhocSymbol nilSymbol = RegisterSymbol("nil");
 
             var importIns = new InsImport(namespaceSymbol, targetNamespace);
-            AddInstruction(importIns, import.Location.Start.Line);
+            block.AddInstruction(importIns, import.Location.Start.Line);
         }
 
-        private void CompileExpression(Expression exp)
+        private void CompileExpression(AdhocInstructionBlock block, Expression exp)
         {
             switch (exp)
             {
                 case Identifier initIdentifier:
-                    CompileIdentifier(initIdentifier);
+                    CompileIdentifier(block, initIdentifier);
                     break;
                 case CallExpression callExp:
-                    CompileCall(callExp);
+                    CompileCall(block, callExp);
                     break;
                 case UnaryExpression unaryExpression:
-                    CompileUnaryExpression(unaryExpression);
+                    CompileUnaryExpression(block, unaryExpression);
                     break;
                 case AttributeMemberExpression attributeMemberException:
-                    CompileAttributeMemberExpression(attributeMemberException);
+                    CompileAttributeMemberExpression(block, attributeMemberException);
                     break;
                 case StaticMemberExpression staticMemberExpression:
-                    CompileStaticMemberExpression(staticMemberExpression);
+                    CompileStaticMemberExpression(block, staticMemberExpression);
                     break;
                 case BinaryExpression binExpression:
-                    CompileBinaryExpression(binExpression);
+                    CompileBinaryExpression(block, binExpression);
                     break;
                 case Literal literal:
-                    CompileLiteral(literal);
+                    CompileLiteral(block, literal);
                     break;
                 case ComputedMemberExpression comp:
-                    CompileComputedMemberExpression(comp);
+                    CompileComputedMemberExpression(block, comp);
                     break;
                 case AssignmentExpression assignExp:
-                    CompileAssignmentExpression(assignExp);
+                    CompileAssignmentExpression(block, assignExp);
                     break;
                 case ConditionalExpression condExp:
-                    CompileConditionalExpression(condExp);
+                    CompileConditionalExpression(block, condExp);
                     break;
                 default:
                     ThrowCompilationError(exp, "Expression not supported");
@@ -223,52 +229,52 @@ namespace GTAdhocCompiler
             }
         }
 
-        private void CompileExpressionStatement(ExpressionStatement expStatement)
+        private void CompileExpressionStatement(AdhocInstructionBlock block, ExpressionStatement expStatement)
         {
-            CompileExpression(expStatement.Expression);
+            CompileExpression(block, expStatement.Expression);
         }
 
        
-        private void CompileAssignmentExpression(AssignmentExpression assignExpression)
+        private void CompileAssignmentExpression(AdhocInstructionBlock block, AssignmentExpression assignExpression)
         {
-            CompileExpression(assignExpression.Right);
+            CompileExpression(block, assignExpression.Right);
         }
 
         /// <summary>
         /// test ? consequent : alternate;
         /// </summary>
         /// <param name="condExpression"></param>
-        private void CompileConditionalExpression(ConditionalExpression condExpression)
+        private void CompileConditionalExpression(AdhocInstructionBlock block, ConditionalExpression condExpression)
         {
             // Compile condition
-            CompileExpression(condExpression.Test);
+            CompileExpression(block, condExpression.Test);
 
             InsJumpIfFalse alternateJump = new InsJumpIfFalse();
-            AddInstruction(alternateJump, 0);
+            block.AddInstruction(alternateJump, 0);
 
-            CompileExpression(condExpression.Consequent);
+            CompileExpression(block, condExpression.Consequent);
 
             // This jump will skip the alternate statement if the consequent path is taken
             InsJump altSkipJump = new InsJump();
-            AddInstruction(altSkipJump, 0);
+            block.AddInstruction(altSkipJump, 0);
             InsAssignPop pop = new InsAssignPop(); // Also needed
-            AddInstruction(pop, 0);
+            block.AddInstruction(pop, 0);
 
             // Update alternate jump index now that we've compiled the consequent
-            alternateJump.JumpIndex = GetLastFunctionInstructionIndex();
+            alternateJump.JumpIndex = block.GetLastInstructionIndex();
 
             // Proceed to compile alternate/no match statement
-            CompileExpression(condExpression.Alternate);
+            CompileExpression(block, condExpression.Alternate);
 
             // Done completely, update alt skip jump to end of condition instruction block
-            altSkipJump.InstructionIndex = GetLastFunctionInstructionIndex();
+            altSkipJump.InstructionIndex = block.GetLastInstructionIndex();
         }
 
         /// <summary>
         /// Compiles an identifier. var test = otherVariable;
         /// </summary>
         /// <param name="identifier"></param>
-        private void CompileIdentifier(Identifier identifier)
+        private void CompileIdentifier(AdhocInstructionBlock block, Identifier identifier)
         {
             if (identifier.ChildNodes.Count == 0) // Direct assignment to something?
             {
@@ -280,30 +286,30 @@ namespace GTAdhocCompiler
             var varEval = new InsVariableEvaluation();
             varEval.VariableSymbols.Add(symb); // Only one
             // varEval.StackIndex = 
-            AddInstruction(varEval, identifier.Location.Start.Line);
+            block.AddInstruction(varEval, identifier.Location.Start.Line);
         }
 
         /// <summary>
         /// Compiles array or map access or anything that can be indexed
         /// </summary>
-        private void CompileComputedMemberExpression(ComputedMemberExpression computedMember)
+        private void CompileComputedMemberExpression(AdhocInstructionBlock block, ComputedMemberExpression computedMember)
         {
-            CompileExpression(computedMember.Object);
-            CompileExpression(computedMember.Property);
+            CompileExpression(block, computedMember.Object);
+            CompileExpression(block, computedMember.Property);
 
             InsElementEval eval = new InsElementEval();
-            AddInstruction(eval, 0);
+            block.AddInstruction(eval, 0);
         }
 
         // ORG.inSession();
-        private void CompileAttributeMemberExpression(AttributeMemberExpression staticExp)
+        private void CompileAttributeMemberExpression(AdhocInstructionBlock block, AttributeMemberExpression staticExp)
         {
-            CompileExpression(staticExp.Object); // ORG
-            CompileExpression(staticExp.Property); // inSession
+            CompileExpression(block, staticExp.Object); // ORG
+            CompileExpression(block, staticExp.Property); // inSession
         }
 
         // pdistd::MPjson::Encode
-        private void CompileStaticMemberExpression(StaticMemberExpression staticExp)
+        private void CompileStaticMemberExpression(AdhocInstructionBlock block, StaticMemberExpression staticExp)
         {
             // Recursively build the namespace path
             List<string> pathParts = new(4);
@@ -316,7 +322,7 @@ namespace GTAdhocCompiler
                 eval.VariableSymbols.Add(symb);
             }
 
-            AddInstruction(eval, staticExp.Location.Start.Line);
+            block.AddInstruction(eval, staticExp.Location.Start.Line);
             void BuildStaticPath(StaticMemberExpression exp, ref List<string> pathParts)
             {
                 if (exp.Object is StaticMemberExpression obj)
@@ -336,46 +342,75 @@ namespace GTAdhocCompiler
             }
         }
 
-        private void CompileCall(CallExpression call)
+        private void CompileCall(AdhocInstructionBlock block, CallExpression call)
         {
             // Get the function variable
-            CompileExpression(call.Callee);
+            CompileExpression(block, call.Callee);
 
             for (int i = 0; i < call.Arguments.Count; i++)
             {
-                CompileExpression(call.Arguments[i]);
+                CompileExpression(block, call.Arguments[i]);
             }
             
             var callIns = new InsCall(call.Arguments.Count);
-            AddInstruction(callIns, call.Location.Start.Line);
+            block.AddInstruction(callIns, call.Location.Start.Line);
         }
 
-        private void CompileBinaryExpression(BinaryExpression binExp)
+        private void CompileBinaryExpression(AdhocInstructionBlock block, BinaryExpression binExp)
         {
-            CompileExpression(binExp.Left);
-            CompileExpression(binExp.Right);
+            CompileExpression(block, binExp.Left);
 
-            AdhocSymbol opSymbol = null;
-            switch (binExp.Operator)
+            // Check for logical operators that checks between both conditions
+            if (binExp.Operator == BinaryOperator.LogicalAnd || binExp.Operator == BinaryOperator.LogicalOr)
             {
-                case BinaryOperator.Equal:
-                    opSymbol = RegisterSymbol("==");
-                    break;
-                case BinaryOperator.NotEqual:
-                    opSymbol = RegisterSymbol("!=");
-                    break;
-                default:
-                    ThrowCompilationError(binExp, "Binary operator not implemented");
-                    break;
-            }
+                if (binExp.Operator == BinaryOperator.LogicalOr)
+                {
+                    InsLogicalOr orIns = new InsLogicalOr();
+                    block.AddInstruction(orIns, 0);
 
-            InsBinaryOperator binOpIns = new InsBinaryOperator(opSymbol);
-            AddInstruction(binOpIns, binExp.Location.Start.Line);
+                    CompileExpression(block, binExp.Right);
+                    orIns.InstructionJumpIndex = block.GetLastInstructionIndex();
+                }
+                else if (binExp.Operator == BinaryOperator.LogicalAnd)
+                {
+                    InsLogicalAnd andIns = new InsLogicalAnd();
+                    block.AddInstruction(andIns, 0);
+
+                    CompileExpression(block, binExp.Right);
+                    andIns.InstructionJumpIndex = block.GetLastInstructionIndex();
+                }
+                else
+                {
+                    throw new InvalidOperationException();
+                }
+                
+            }
+            else
+            {
+                CompileExpression(block, binExp.Right);
+
+                AdhocSymbol opSymbol = null;
+                switch (binExp.Operator)
+                {
+                    case BinaryOperator.Equal:
+                        opSymbol = RegisterSymbol("==");
+                        break;
+                    case BinaryOperator.NotEqual:
+                        opSymbol = RegisterSymbol("!=");
+                        break;
+                    default:
+                        ThrowCompilationError(binExp, "Binary operator not implemented");
+                        break;
+                }
+
+                InsBinaryOperator binOpIns = new InsBinaryOperator(opSymbol);
+                block.AddInstruction(binOpIns, binExp.Location.Start.Line);
+            }
         }
 
-        private void CompileUnaryExpression(UnaryExpression unaryExp)
+        private void CompileUnaryExpression(AdhocInstructionBlock block, UnaryExpression unaryExp)
         {
-            CompileExpression(unaryExp.Argument);
+            CompileExpression(block, unaryExp.Argument);
 
             string op = unaryExp.Operator switch
             {
@@ -385,36 +420,25 @@ namespace GTAdhocCompiler
 
             AdhocSymbol symb = RegisterSymbol(op);
             InsUnaryOperator unaryIns = new InsUnaryOperator(symb);
-            AddInstruction(unaryIns, unaryExp.Location.Start.Line);
+            block.AddInstruction(unaryIns, unaryExp.Location.Start.Line);
         }
 
-        private void CompileLiteral(Literal literal)
+        private void CompileLiteral(AdhocInstructionBlock block, Literal literal)
         {
             switch (literal.TokenType)
             {
                 case TokenType.StringLiteral:
                     AdhocSymbol str = RegisterSymbol(literal.StringValue);
                     InsStringConst strIns = new InsStringConst(str);
-                    AddInstruction(strIns, literal.Location.Start.Line);
+                    block.AddInstruction(strIns, literal.Location.Start.Line);
                     break;
                 case TokenType.NilLiteral:
                     InsNilConst nil = new InsNilConst();
-                    AddInstruction(nil, literal.Location.Start.Line);
+                    block.AddInstruction(nil, literal.Location.Start.Line);
                     break;
                 default:
                     throw new NotImplementedException("Not implemented literal");
             }
-        }
-
-        private int GetLastFunctionInstructionIndex()
-        {
-            return MainInstructions.Count;
-        }
-
-        private void AddInstruction(InstructionBase ins, int lineNumber)
-        {
-            ins.LineNumber = lineNumber;
-            MainInstructions.Add(ins);
         }
 
         private AdhocSymbol RegisterSymbol(string symbolName)

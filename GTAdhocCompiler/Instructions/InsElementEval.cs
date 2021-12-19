@@ -11,6 +11,6 @@ namespace GTAdhocCompiler.Instructions
     /// </summary>
     public class InsElementEval : InstructionBase
     {
-
+        public override string InstructionName => "ELEMENT_EVAL";
     }
 }

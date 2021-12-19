@@ -8,6 +8,8 @@ namespace GTAdhocCompiler.Instructions
 {
     public class InsSetState : InstructionBase
     {
+        public override string InstructionName => "SET_STATE";
+
         public int State { get; set; }
 
         public InsSetState(int state)

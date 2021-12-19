@@ -11,5 +11,6 @@ namespace GTAdhocCompiler.Instructions
     /// </summary>
     public class InsPop : InstructionBase
     {
+        public override string InstructionName => "POP";
     }
 }

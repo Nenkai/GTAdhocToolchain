@@ -8,6 +8,8 @@ namespace GTAdhocCompiler.Instructions
 {
     public abstract class InstructionBase
     {
+        public abstract string InstructionName { get; }
+
         public int LineNumber { get; set; }
     }
 }

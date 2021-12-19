@@ -11,6 +11,8 @@ namespace GTAdhocCompiler.Instructions
     /// </summary>
     public class InsCall : InstructionBase
     {
+        public override string InstructionName => "CALL";
+
         public int ArgumentCount { get; set; }
 
         public InsCall(int argumentCount)

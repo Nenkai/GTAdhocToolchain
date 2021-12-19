@@ -8,6 +8,6 @@ namespace GTAdhocCompiler.Instructions
 {
     public class InsNilConst : InstructionBase
     {
-
+        public override string InstructionName => "NIL_CONST";
     }
 }

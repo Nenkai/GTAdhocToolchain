@@ -11,6 +11,8 @@ namespace GTAdhocCompiler.Instructions
     /// </summary>
     public class InsLeaveScope : InstructionBase
     {
+        public override string InstructionName => "LEAVE";
+
         public int RewindIndex { get; set; }
     }
 }
