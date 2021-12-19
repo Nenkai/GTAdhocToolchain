@@ -214,6 +214,9 @@ namespace GTAdhocCompiler
                 case AssignmentExpression assignExp:
                     CompileAssignmentExpression(assignExp);
                     break;
+                case ConditionalExpression condExp:
+                    CompileConditionalExpression(condExp);
+                    break;
                 default:
                     ThrowCompilationError(exp, "Expression not supported");
                     break;
@@ -225,11 +228,41 @@ namespace GTAdhocCompiler
             CompileExpression(expStatement.Expression);
         }
 
+       
         private void CompileAssignmentExpression(AssignmentExpression assignExpression)
         {
-            ;
+            CompileExpression(assignExpression.Right);
         }
 
+        /// <summary>
+        /// test ? consequent : alternate;
+        /// </summary>
+        /// <param name="condExpression"></param>
+        private void CompileConditionalExpression(ConditionalExpression condExpression)
+        {
+            // Compile condition
+            CompileExpression(condExpression.Test);
+
+            InsJumpIfFalse alternateJump = new InsJumpIfFalse();
+            AddInstruction(alternateJump, 0);
+
+            CompileExpression(condExpression.Consequent);
+
+            // This jump will skip the alternate statement if the consequent path is taken
+            InsJump altSkipJump = new InsJump();
+            AddInstruction(altSkipJump, 0);
+            InsAssignPop pop = new InsAssignPop(); // Also needed
+            AddInstruction(pop, 0);
+
+            // Update alternate jump index now that we've compiled the consequent
+            alternateJump.JumpIndex = GetLastFunctionInstructionIndex();
+
+            // Proceed to compile alternate/no match statement
+            CompileExpression(condExpression.Alternate);
+
+            // Done completely, update alt skip jump to end of condition instruction block
+            altSkipJump.InstructionIndex = GetLastFunctionInstructionIndex();
+        }
 
         /// <summary>
         /// Compiles an identifier. var test = otherVariable;
@@ -327,6 +360,9 @@ namespace GTAdhocCompiler
             {
                 case BinaryOperator.Equal:
                     opSymbol = RegisterSymbol("==");
+                    break;
+                case BinaryOperator.NotEqual:
+                    opSymbol = RegisterSymbol("!=");
                     break;
                 default:
                     ThrowCompilationError(binExp, "Binary operator not implemented");
