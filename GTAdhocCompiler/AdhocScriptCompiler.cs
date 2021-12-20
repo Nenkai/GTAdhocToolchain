@@ -65,6 +65,11 @@ namespace GTAdhocCompiler
                 case ExpressionStatement expStatement:
                     CompileExpressionStatement(block, expStatement);
                     break;
+                case SwitchStatement switchStatement:
+                    CompileSwitch(block, switchStatement);
+                    break;
+                case BreakStatement breakStatement:
+                    break;
                 default:
                     ThrowCompilationError(node, "Statement not supported");
                     break;
@@ -137,6 +142,88 @@ namespace GTAdhocCompiler
             InsLeaveScope leave = new InsLeaveScope();
             block.AddInstruction(leave, 0);
         }
+
+        public void CompileSwitch(AdhocInstructionBlock block, SwitchStatement switchStatement)
+        {
+            CompileExpression(block, switchStatement.Discriminant); // switch (type)
+
+            // Create a label for the temporary switch variable
+            AdhocSymbol labelSymb = SymbolMap.RegisterSymbol("case#0");
+            InsVariablePush variablePush = new InsVariablePush();
+            variablePush.VariableSymbols.Add(labelSymb);
+            block.AddInstruction(variablePush, switchStatement.Discriminant.Location.Start.Line);
+            block.AddInstruction(InsAssignPop.Default, 0);
+
+            Dictionary<SwitchCase, InsJumpIfTrue> caseBodyJumps = new();
+            Dictionary<SwitchCase, InsJump> caseLeaveJumps = new();
+            InsJump defaultJump = null;
+
+            // Write switch table jumps
+            for (int i = 0; i < switchStatement.Cases.Count; i++)
+            {
+                SwitchCase swCase = switchStatement.Cases[i];
+                if (swCase.Test != null) // Actual case
+                {
+                    // Get temp variable
+                    InsVariableEvaluation tempVar = new InsVariableEvaluation();
+                    tempVar.VariableSymbols.Add(labelSymb);
+                    block.AddInstruction(tempVar, swCase.Location.Start.Line);
+
+                    // Write what we are comparing to
+                    CompileExpression(block, swCase.Test);
+
+                    // Equal check
+                    InsBinaryOperator eqOp = new InsBinaryOperator(SymbolMap.RegisterSymbol("=="));
+                    block.Instructions.Add(eqOp);
+
+                    // Write the jump
+                    InsJumpIfTrue jit = new InsJumpIfTrue();
+                    caseBodyJumps.Add(swCase, jit); // To write the instruction index later on
+                    block.AddInstruction(jit, 0);
+                }
+                else // Default
+                {
+                    if (defaultJump is not null)
+                        ThrowCompilationError(swCase, "Switch already has a default statement.");
+
+                    InsJump jmp = new InsJump();
+                    defaultJump = jmp;
+                    block.AddInstruction(defaultJump, swCase.Location.Start.Line);
+                }
+            }
+
+            // Write bodies
+            for (int i = 0; i < switchStatement.Cases.Count; i++)
+            {
+                SwitchCase swCase = switchStatement.Cases[i];
+                InsJump leaveJump = new InsJump();
+
+                // Update body jump location
+                if (swCase.Test != null)
+                    caseBodyJumps[swCase].JumpIndex = block.GetLastInstructionIndex();
+                else
+                    defaultJump.JumpInstructionIndex = block.GetLastInstructionIndex();
+                caseLeaveJumps.Add(swCase, leaveJump);
+
+                foreach (var statement in swCase.Consequent)
+                    CompileStatement(block, statement);
+
+                block.AddInstruction(leaveJump, 0);
+            }
+
+            // Update exit jumps
+            for (int i = 0; i < switchStatement.Cases.Count; i++)
+            {
+                SwitchCase swCase = switchStatement.Cases[i];
+                caseLeaveJumps[swCase].JumpInstructionIndex = block.GetLastInstructionIndex();
+            }
+
+            // Leave switch block.
+            InsLeaveScope leave = new InsLeaveScope();
+            block.AddInstruction(leave, 0);
+        }
+
+
 
         public void CompileFunction(AdhocInstructionBlock block, FunctionDeclaration decl)
         {
@@ -667,9 +754,8 @@ namespace GTAdhocCompiler
                 };
 
                 AdhocSymbol symb = SymbolMap.RegisterSymbol(op);
-                InsUnaryAssignOperator unaryIns = new InsUnaryAssignOperator(symb);
+                InsUnaryOperator unaryIns = new InsUnaryOperator(symb);
                 block.AddInstruction(unaryIns, unaryExp.Location.Start.Line);
-                block.AddInstruction(InsPop.Default, 0);
             }
         }
 

@@ -130,6 +130,8 @@ namespace GTAdhocCompiler
                     WriteLogicalOr(instruction as InsLogicalOr); break;
                 case AdhocInstructionType.JUMP_IF_FALSE:
                     WriteJumpIfFalse(instruction as InsJumpIfFalse); break;
+                case AdhocInstructionType.JUMP_IF_TRUE:
+                    WriteJumpIfTrue(instruction as InsJumpIfTrue); break;
                 case AdhocInstructionType.JUMP:
                     WriteJump(instruction as InsJump); break;
                 case AdhocInstructionType.STRING_CONST:
@@ -181,6 +183,11 @@ namespace GTAdhocCompiler
         private void WriteJumpIfFalse(InsJumpIfFalse jif) // unrelated but gif is pronounced like the name of this parameter (:
         {
             stream.WriteInt32(jif.JumpIndex);
+        }
+
+        private void WriteJumpIfTrue(InsJumpIfTrue jit) // unrelated but gif is pronounced like the name of this parameter (:
+        {
+            stream.WriteInt32(jit.JumpIndex);
         }
 
         private void WriteJump(InsJump jump)
