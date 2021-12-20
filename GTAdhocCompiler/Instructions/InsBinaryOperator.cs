@@ -11,6 +11,8 @@ namespace GTAdhocCompiler.Instructions
     /// </summary>
     public class InsBinaryOperator : InstructionBase
     {
+        public override AdhocInstructionType InstructionType => AdhocInstructionType.BINARY_OPERATOR;
+
         public override string InstructionName => "BINARY_OPERATOR";
 
         public AdhocSymbol Operator { get; set; }

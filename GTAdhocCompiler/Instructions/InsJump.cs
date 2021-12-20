@@ -11,8 +11,10 @@ namespace GTAdhocCompiler.Instructions
     /// </summary>
     public class InsJump : InstructionBase
     {
+        public override AdhocInstructionType InstructionType => AdhocInstructionType.JUMP;
+
         public override string InstructionName => "JUMP";
 
-        public int InstructionIndex { get; set; }
+        public int JumpInstructionIndex { get; set; }
     }
 }

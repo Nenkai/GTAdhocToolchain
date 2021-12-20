@@ -11,8 +11,10 @@ namespace GTAdhocCompiler.Instructions
     /// </summary>
     public class InsLeaveScope : InstructionBase
     {
+        public override AdhocInstructionType InstructionType => AdhocInstructionType.LEAVE;
+
         public override string InstructionName => "LEAVE";
 
-        public int RewindIndex { get; set; }
+        public int StackRewindIndex { get; set; }
     }
 }

@@ -11,6 +11,8 @@ namespace GTAdhocCompiler.Instructions
     /// </summary>
     public class InsLogicalAnd : InstructionBase
     {
+        public override AdhocInstructionType InstructionType => AdhocInstructionType.LOGICAL_AND;
+
         public override string InstructionName => "LOGICAL_AND";
 
         /// <summary>

@@ -11,6 +11,8 @@ namespace GTAdhocCompiler.Instructions
     /// </summary>
     public class InsElementEval : InstructionBase
     {
+        public override AdhocInstructionType InstructionType => AdhocInstructionType.ELEMENT_EVAL;
+
         public override string InstructionName => "ELEMENT_EVAL";
     }
 }

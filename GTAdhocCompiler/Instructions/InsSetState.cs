@@ -8,11 +8,13 @@ namespace GTAdhocCompiler.Instructions
 {
     public class InsSetState : InstructionBase
     {
+        public override AdhocInstructionType InstructionType => AdhocInstructionType.SET_STATE;
+
         public override string InstructionName => "SET_STATE";
 
-        public int State { get; set; }
+        public byte State { get; set; }
 
-        public InsSetState(int state)
+        public InsSetState(byte state)
         {
             State = state;
         }

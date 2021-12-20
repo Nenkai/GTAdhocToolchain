@@ -9,16 +9,13 @@ namespace GTAdhocCompiler
 {
     public class AdhocScriptCompiler : AdhocInstructionBlock
     {
-        public Dictionary<string, AdhocSymbol> Symbols { get; set; } = new();
+        public AdhocSymbolMap SymbolMap { get; set; } = new();
 
         public void Compile(Script script)
         {
             // "this" is main + declarations
             CompileStatements(this, script.Body);
 
-            // Done, finish up Main
-            this.AddInstruction(new InsSetState(1), 0);
-            this.AddInstruction(new InsLeaveScope(), 0); // FIX ME MAYBE
 
             // Script done.
             this.AddInstruction(new InsSetState(0), 0);
@@ -34,6 +31,10 @@ namespace GTAdhocCompiler
         {
             foreach (var n in nodes)
                 CompileStatement(block, n);
+
+            // Exiting scope
+            InsLeaveScope t = new InsLeaveScope();
+            block.Instructions.Add(t);
         }
 
         public void CompileStatement(AdhocInstructionBlock block, Node node)
@@ -87,29 +88,41 @@ namespace GTAdhocCompiler
 
         public void CompileFunction(AdhocInstructionBlock block, FunctionDeclaration decl)
         {
-            var funcInst = new InsFunctionConst();
+            var funcInst = new InsFunctionDefine();
             if (decl.Id is not null)
-                funcInst.Name = RegisterSymbol(decl.Id.Name);
-
-            block.AddInstruction(funcInst, decl.Location.Start.Line);
+                funcInst.Name = SymbolMap.RegisterSymbol(decl.Id.Name);
 
             foreach (Expression param in decl.Params)
             {
                 if (param is Identifier paramIdent)
                 {
-                    AdhocSymbol paramSymb = RegisterSymbol(paramIdent.Name);
-                    funcInst.Parameters.Add(paramSymb);
+                    AdhocSymbol paramSymb = SymbolMap.RegisterSymbol(paramIdent.Name);
+                    funcInst.FunctionBlock.Parameters.Add(paramSymb);
+
+                    // Function param is uninitialized, push nil
+                    block.AddInstruction(InsNilConst.Empty, decl.Location.Start.Line);
+                }
+                else if (param is AssignmentExpression assignmentExpression)
+                {
+                    if (assignmentExpression.Left is not Identifier || assignmentExpression.Right is not Literal)
+                        ThrowCompilationError(decl, "Function parameter assignment must be an identifier to a literal. (value = 0)");
+
+                    AdhocSymbol paramSymb = SymbolMap.RegisterSymbol((assignmentExpression.Left as Identifier).Name);
+                    funcInst.FunctionBlock.Parameters.Add(paramSymb);
+
+                    // Push default value
+                    CompileLiteral(block, assignmentExpression.Right as Literal);
                 }
                 else
                     ThrowCompilationError(decl, "Function definition parameters must all be identifiers.");
             }
 
+            block.AddInstruction(funcInst, decl.Location.Start.Line);
+
             var funcBody = decl.Body;
             if (funcBody is BlockStatement blockStatement)
             {
-                AdhocInstructionBlock functionBlock = new AdhocInstructionBlock();
-                funcInst.Instructions = functionBlock.Instructions;
-                CompileStatements(functionBlock, blockStatement);
+                CompileStatements(funcInst.FunctionBlock, blockStatement);
             }
             else
                 ThrowCompilationError(funcBody, "Expected function body to be block statement.");
@@ -141,10 +154,11 @@ namespace GTAdhocCompiler
 
             if (id is Identifier idIdentifier)
             {
-                AdhocSymbol varSymb = RegisterSymbol(idIdentifier.Name);
+                AdhocSymbol varSymb = SymbolMap.RegisterSymbol(idIdentifier.Name);
 
                 var varPush = new InsVariablePush();
-                varPush.VariableSymbol = varSymb;
+                varPush.VariableSymbols.Add(varSymb);
+
                 // varPush.StackIndex = 
 
                 block.AddInstruction(varPush, idIdentifier.Location.Start.Line);
@@ -165,8 +179,11 @@ namespace GTAdhocCompiler
                 ThrowCompilationError(import, "Import declaration is empty.");
             }
 
-            string importNamespace = "";
+            string fullImportNamespace = "";
             string target = "";
+
+            InsImport importIns = new InsImport();
+
             for (int i = 0; i < import.Specifiers.Count; i++)
             {
                 ImportDeclarationSpecifier specifier = import.Specifiers[i];
@@ -176,16 +193,21 @@ namespace GTAdhocCompiler
                     break;
                 }
 
-                importNamespace += specifier.Local.Name;
+                AdhocSymbol part = SymbolMap.RegisterSymbol(specifier.Local.Name);
+                importIns.ImportNamespaceParts.Add(part);
+                fullImportNamespace += specifier.Local.Name;
+
                 if (i < import.Specifiers.Count - 1 && import.Specifiers[i + 1].Local.Name != "*")
-                    importNamespace += "::";
+                    fullImportNamespace += "::";
             }
 
-            AdhocSymbol namespaceSymbol = RegisterSymbol(importNamespace);
-            AdhocSymbol targetNamespace = RegisterSymbol(target);
-            AdhocSymbol nilSymbol = RegisterSymbol("nil");
+            AdhocSymbol namespaceSymbol = SymbolMap.RegisterSymbol(fullImportNamespace);
+            AdhocSymbol targetNamespace = SymbolMap.RegisterSymbol(target);
+            AdhocSymbol nilSymbol = SymbolMap.RegisterSymbol("nil");
 
-            var importIns = new InsImport(namespaceSymbol, targetNamespace);
+            importIns.ImportNamespaceParts.Add(namespaceSymbol);
+            importIns.Target = targetNamespace;
+
             block.AddInstruction(importIns, import.Location.Start.Line);
         }
 
@@ -238,6 +260,16 @@ namespace GTAdhocCompiler
         private void CompileAssignmentExpression(AdhocInstructionBlock block, AssignmentExpression assignExpression)
         {
             CompileExpression(block, assignExpression.Right);
+            CompileExpression(block, assignExpression.Left);
+
+            if (assignExpression.Operator == AssignmentOperator.Assign)
+            {
+                block.AddInstruction(InsAssignPop.Default, 0);
+            }
+            else
+            {
+                ThrowCompilationError(assignExpression, "Unimplemented operator assignment");
+            }
         }
 
         /// <summary>
@@ -257,8 +289,7 @@ namespace GTAdhocCompiler
             // This jump will skip the alternate statement if the consequent path is taken
             InsJump altSkipJump = new InsJump();
             block.AddInstruction(altSkipJump, 0);
-            InsAssignPop pop = new InsAssignPop(); // Also needed
-            block.AddInstruction(pop, 0);
+            block.AddInstruction(InsPop.Default, 0);
 
             // Update alternate jump index now that we've compiled the consequent
             alternateJump.JumpIndex = block.GetLastInstructionIndex();
@@ -267,7 +298,7 @@ namespace GTAdhocCompiler
             CompileExpression(block, condExpression.Alternate);
 
             // Done completely, update alt skip jump to end of condition instruction block
-            altSkipJump.InstructionIndex = block.GetLastInstructionIndex();
+            altSkipJump.JumpInstructionIndex = block.GetLastInstructionIndex();
         }
 
         /// <summary>
@@ -281,7 +312,7 @@ namespace GTAdhocCompiler
 
             }
 
-            AdhocSymbol symb = RegisterSymbol(identifier.Name);
+            AdhocSymbol symb = SymbolMap.RegisterSymbol(identifier.Name);
 
             var varEval = new InsVariableEvaluation();
             varEval.VariableSymbols.Add(symb); // Only one
@@ -318,9 +349,11 @@ namespace GTAdhocCompiler
             InsVariableEvaluation eval = new InsVariableEvaluation();
             foreach (string part in pathParts)
             {
-                AdhocSymbol symb = RegisterSymbol(part);
+                AdhocSymbol symb = SymbolMap.RegisterSymbol(part);
                 eval.VariableSymbols.Add(symb);
             }
+
+            SymbolMap.RegisterSymbol(string.Join("::", pathParts));
 
             block.AddInstruction(eval, staticExp.Location.Start.Line);
             void BuildStaticPath(StaticMemberExpression exp, ref List<string> pathParts)
@@ -393,10 +426,10 @@ namespace GTAdhocCompiler
                 switch (binExp.Operator)
                 {
                     case BinaryOperator.Equal:
-                        opSymbol = RegisterSymbol("==");
+                        opSymbol = SymbolMap.RegisterSymbol("==");
                         break;
                     case BinaryOperator.NotEqual:
-                        opSymbol = RegisterSymbol("!=");
+                        opSymbol = SymbolMap.RegisterSymbol("!=");
                         break;
                     default:
                         ThrowCompilationError(binExp, "Binary operator not implemented");
@@ -418,7 +451,7 @@ namespace GTAdhocCompiler
                 _ => throw new NotImplementedException("TODO"),
             };
 
-            AdhocSymbol symb = RegisterSymbol(op);
+            AdhocSymbol symb = SymbolMap.RegisterSymbol(op);
             InsUnaryOperator unaryIns = new InsUnaryOperator(symb);
             block.AddInstruction(unaryIns, unaryExp.Location.Start.Line);
         }
@@ -428,7 +461,7 @@ namespace GTAdhocCompiler
             switch (literal.TokenType)
             {
                 case TokenType.StringLiteral:
-                    AdhocSymbol str = RegisterSymbol(literal.StringValue);
+                    AdhocSymbol str = SymbolMap.RegisterSymbol(literal.StringValue);
                     InsStringConst strIns = new InsStringConst(str);
                     block.AddInstruction(strIns, literal.Location.Start.Line);
                     break;
@@ -436,59 +469,28 @@ namespace GTAdhocCompiler
                     InsNilConst nil = new InsNilConst();
                     block.AddInstruction(nil, literal.Location.Start.Line);
                     break;
+                case TokenType.NumericLiteral:
+                    InstructionBase ins = literal.NumericTokenType switch
+                    {
+                        NumericTokenType.Integer => new InsIntConst((int)literal.NumericValue),
+                        _ => throw GetCompilationError(literal, "Unknown numeric literal type"),
+                    };
+                    block.AddInstruction(ins, literal.Location.Start.Line);
+                    break;
                 default:
                     throw new NotImplementedException("Not implemented literal");
             }
         }
 
-        private AdhocSymbol RegisterSymbol(string symbolName)
-        {
-            string identifier = symbolName switch
-            {
-                "==" => "__eq__", // Equals
-                "!=" => "__ne__", // Not Equal
-                ">=" => "__ge__", // Greater Equal
-                ">" => "__gt__", // Greater Than
-                "<=" => "__le__", // Lesser Equal
-                "<" => "__lt__", // Lesser Than
-                "!" => "__not__", // Logical Not
-
-                // __minus__
-                "+" => "__add__", // Add,
-                "-" => "__min__", // Minus,
-                "*" => "__mul__", // Multiply or Import Wildcard
-                "/" => "__div__", // Division
-                "^" => "__xor__", // Xor,
-                "%" => "__mod__", // Modulo
-                "**" => "__pow__", // Pow
-                "<<" => "__lshift__", // Left Shift
-                ">>" => "__rshift__", // Right Shift
-                "~" => "__invert__", // Invert
-                "|" => "__or__", // Or
-
-                "-@" => "__uminus__", // Unary Minus
-                "+@" => "__uplus__", // Unary Plus
-                "--@" => "__pre_decr__", // Pre Decrementation,
-                "++@" => "__pre_incr__", // Pre Incrementation
-                "@--" => "__post_decr__", // Post Decrementation,
-                "@++" => "__post_incr__", // Post Incrementation
-
-                _ => symbolName,
-            };
-
-
-            if (!Symbols.TryGetValue(identifier, out var symbol))
-            {
-                symbol = new AdhocSymbol(Symbols.Count, identifier);
-                Symbols.Add(identifier, symbol);
-            }
-
-            return symbol;
-        }
 
         private void ThrowCompilationError(Node node, string message)
         {
-            throw new AdhocCompilationException($"{message}. Line {node.Location.Start.Line}:{node.Location.Start.Column}");
+            throw GetCompilationError(node, message);
+        }
+
+        private AdhocCompilationException GetCompilationError(Node node, string message)
+        {
+            return new AdhocCompilationException($"{message}. Line {node.Location.Start.Line}:{node.Location.Start.Column}");
         }
     }
 }

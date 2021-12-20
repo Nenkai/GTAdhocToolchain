@@ -11,6 +11,10 @@ namespace GTAdhocCompiler.Instructions
     /// </summary>
     public class InsPop : InstructionBase
     {
+        public readonly static InsPop Default = new();
+
+        public override AdhocInstructionType InstructionType => AdhocInstructionType.POP;
+
         public override string InstructionName => "POP";
     }
 }

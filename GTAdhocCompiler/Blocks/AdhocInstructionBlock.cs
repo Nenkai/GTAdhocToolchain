@@ -14,6 +14,15 @@ namespace GTAdhocCompiler
     public class AdhocInstructionBlock
     {
         public List<InstructionBase> Instructions { get; set; } = new();
+        public AdhocSymbol SourceFilePath { get; private set; }
+
+        public List<AdhocSymbol> Parameters { get; set; } = new List<AdhocSymbol>();
+        public List<AdhocSymbol> CallbackParameters { get; set; } = new List<AdhocSymbol>();
+
+        public void SetSourcePath(AdhocSymbolMap symbolMap, string path)
+        {
+            SourceFilePath = symbolMap.RegisterSymbol(path);
+        }
 
         public void AddInstruction(InstructionBase ins, int lineNumber)
         {

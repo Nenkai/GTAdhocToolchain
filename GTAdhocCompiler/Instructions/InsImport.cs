@@ -8,15 +8,16 @@ namespace GTAdhocCompiler.Instructions
 {
     public class InsImport : InstructionBase
     {
+        public override AdhocInstructionType InstructionType => AdhocInstructionType.IMPORT;
+
         public override string InstructionName => "IMPORT";
 
-        public AdhocSymbol ImportNamespace { get; set; }
+        public List<AdhocSymbol> ImportNamespaceParts { get; set; } = new();
         public AdhocSymbol Target { get; set; }
 
-        public InsImport(AdhocSymbol importNamespace, AdhocSymbol target)
+        public InsImport()
         {
-            ImportNamespace = importNamespace;
-            Target = target;
+            
         }
     }
 }

@@ -11,6 +11,8 @@ namespace GTAdhocCompiler.Instructions
     /// </summary>
     public class InsStringConst : InstructionBase
     {
+        public override AdhocInstructionType InstructionType => AdhocInstructionType.STRING_CONST;
+
         public override string InstructionName => "STRING_CONST";
 
         public AdhocSymbol String { get; set; }

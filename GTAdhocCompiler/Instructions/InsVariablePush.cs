@@ -11,9 +11,11 @@ namespace GTAdhocCompiler.Instructions
     /// </summary>
     public class InsVariablePush : InstructionBase
     {
+        public override AdhocInstructionType InstructionType => AdhocInstructionType.VARIABLE_PUSH;
+
         public override string InstructionName => "VARIABLE_PUSH";
 
-        public AdhocSymbol VariableSymbol { get; set; }
+        public List<AdhocSymbol> VariableSymbols { get; set; } = new();
 
         public int StackIndex { get; set; }
     }
