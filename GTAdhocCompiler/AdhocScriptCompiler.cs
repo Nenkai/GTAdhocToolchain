@@ -245,8 +245,14 @@ namespace GTAdhocCompiler
                 case ConditionalExpression condExp:
                     CompileConditionalExpression(block, condExp);
                     break;
+                case TemplateLiteral templateLiteral:
+                    CompileTemplateLiteral(block, templateLiteral);
+                    break;
+                case TaggedTemplateExpression taggedTemplateExpression:
+                    CompileTaggedTemplateExpression(block, taggedTemplateExpression);
+                    break;
                 default:
-                    ThrowCompilationError(exp, "Expression not supported");
+                    ThrowCompilationError(exp, $"Expression {exp.Type} not supported");
                     break;
             }
         }
@@ -256,7 +262,85 @@ namespace GTAdhocCompiler
             CompileExpression(block, expStatement.Expression);
         }
 
-       
+        // Combination of string literals/templates
+        private void CompileTaggedTemplateExpression(AdhocInstructionBlock block, TaggedTemplateExpression taggedTemplate)
+        {
+            int elemCount = 0;
+            BuildStringRecurse(taggedTemplate);
+            void BuildStringRecurse(TaggedTemplateExpression taggedTemplateExpression)
+            {
+                foreach (var node in taggedTemplateExpression.ChildNodes)
+                {
+                    if (node is TaggedTemplateExpression childExp)
+                        BuildStringRecurse(childExp);
+                    else if (node is TemplateLiteral literal)
+                    {
+                        TemplateElement element = literal.Quasis[0];
+                        AdhocSymbol strSymb = SymbolMap.RegisterSymbol(element.Value.Cooked);
+                        InsStringConst strConst = new InsStringConst(strSymb);
+                        block.Instructions.Add(strConst);
+
+                        elemCount++;
+                    }
+                }
+            }
+
+            InsStringPush strPush = new InsStringPush(elemCount);
+            block.Instructions.Add(strPush);
+        }
+
+
+        private void CompileTemplateLiteral(AdhocInstructionBlock block, TemplateLiteral templateLiteral)
+        {
+            if (templateLiteral.Quasis.Count == 1 && templateLiteral.Expressions.Count == 0)
+            {
+                // Regular string const
+                TemplateElement strElement = templateLiteral.Quasis[0];
+                if (string.IsNullOrEmpty(strElement.Value.Cooked))
+                {
+                    // Empty strings are always a string push with 0 args (aka nil)
+                    InsStringPush strPush = new InsStringPush(0);
+                    block.Instructions.Add(strPush);
+                }
+                else 
+                {
+                    AdhocSymbol strSymb = SymbolMap.RegisterSymbol(strElement.Value.Cooked);
+                    InsStringConst strConst = new InsStringConst(strSymb);
+                    block.Instructions.Add(strConst);
+                }
+            }
+            else
+            {
+                /* Adhoc expects all literals and interpolated values to be all in a row, one per string push */
+                List<Node> literalNodes = new List<Node>();
+                literalNodes.AddRange(templateLiteral.Quasis);
+                literalNodes.AddRange(templateLiteral.Expressions);
+
+                // A bit hacky 
+                literalNodes = literalNodes.OrderBy(e => e.Location.Start.Column).ThenBy(e => e.Location.Start.Line).ToList();
+
+                foreach (Node node in literalNodes)
+                {
+                    if (node is TemplateElement tElem)
+                    {
+                        AdhocSymbol valSymb = SymbolMap.RegisterSymbol(tElem.Value.Cooked);
+                        InsStringConst strConst = new InsStringConst(valSymb);
+                        block.Instructions.Add(strConst);
+                    }
+                    else if (node is Expression exp)
+                    {
+                        CompileExpression(block, exp);
+                    }
+                    else
+                        ThrowCompilationError(node, "Unexpected template element type");
+                }
+
+                // Link strings together
+                InsStringPush strPush = new InsStringPush(literalNodes.Count);
+                block.Instructions.Add(strPush);
+            }
+        }
+
         private void CompileAssignmentExpression(AdhocInstructionBlock block, AssignmentExpression assignExpression)
         {
             CompileExpression(block, assignExpression.Right);
@@ -268,7 +352,7 @@ namespace GTAdhocCompiler
             }
             else
             {
-                ThrowCompilationError(assignExpression, "Unimplemented operator assignment");
+                ThrowCompilationError(assignExpression, $"Unimplemented operator assignment {assignExpression.Operator}");
             }
         }
 
@@ -432,7 +516,7 @@ namespace GTAdhocCompiler
                         opSymbol = SymbolMap.RegisterSymbol("!=");
                         break;
                     default:
-                        ThrowCompilationError(binExp, "Binary operator not implemented");
+                        ThrowCompilationError(binExp, $"Binary operator {binExp.Operator} not implemented");
                         break;
                 }
 
@@ -460,11 +544,6 @@ namespace GTAdhocCompiler
         {
             switch (literal.TokenType)
             {
-                case TokenType.StringLiteral:
-                    AdhocSymbol str = SymbolMap.RegisterSymbol(literal.StringValue);
-                    InsStringConst strIns = new InsStringConst(str);
-                    block.AddInstruction(strIns, literal.Location.Start.Line);
-                    break;
                 case TokenType.NilLiteral:
                     InsNilConst nil = new InsNilConst();
                     block.AddInstruction(nil, literal.Location.Start.Line);
@@ -478,7 +557,7 @@ namespace GTAdhocCompiler
                     block.AddInstruction(ins, literal.Location.Start.Line);
                     break;
                 default:
-                    throw new NotImplementedException("Not implemented literal");
+                    throw new NotImplementedException($"Not implemented literal {literal.TokenType}");
             }
         }
 
