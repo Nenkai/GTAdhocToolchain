@@ -37,7 +37,7 @@ namespace GTAdhocCompiler
 
         public void WriteVarString(string str)
         {
-            WriteVarInt(str.Length);
+            WriteVarInt(Encoding.UTF8.GetByteCount(str));
             StreamExtensions.WriteString(this, str, StringCoding.Raw);
         }
 

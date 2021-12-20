@@ -120,6 +120,10 @@ namespace GTAdhocCompiler
                     WriteUnaryOperator(instruction as InsUnaryOperator); break;
                 case AdhocInstructionType.BINARY_OPERATOR:
                     WriteBinaryOperator(instruction as InsBinaryOperator); break;
+                case AdhocInstructionType.BINARY_ASSIGN_OPERATOR:
+                    WriteBinaryOperator(instruction as InsBinaryAssignOperator); break;
+                case AdhocInstructionType.UNARY_ASSIGN_OPERATOR:
+                    WriteBinaryOperator(instruction as InsUnaryAssignOperator); break;
                 case AdhocInstructionType.LOGICAL_AND:
                     WriteLogicalAnd(instruction as InsLogicalAnd); break;
                 case AdhocInstructionType.LOGICAL_OR:
@@ -130,6 +134,8 @@ namespace GTAdhocCompiler
                     WriteJump(instruction as InsJump); break;
                 case AdhocInstructionType.STRING_CONST:
                     WriteStringConst(instruction as InsStringConst); break;
+                case AdhocInstructionType.STRING_PUSH:
+                    WriteStringPush(instruction as InsStringPush); break;
                 case AdhocInstructionType.INT_CONST:
                     WriteIntConst(instruction as InsIntConst); break;
                 case AdhocInstructionType.SET_STATE:
@@ -167,6 +173,11 @@ namespace GTAdhocCompiler
             stream.WriteSymbol(stringConst.String);
         }
 
+        private void WriteStringPush(InsStringPush strPush)
+        {
+            stream.WriteInt32(strPush.StringCount);
+        }
+
         private void WriteJumpIfFalse(InsJumpIfFalse jif) // unrelated but gif is pronounced like the name of this parameter (:
         {
             stream.WriteInt32(jif.JumpIndex);
@@ -180,6 +191,16 @@ namespace GTAdhocCompiler
         private void WriteBinaryOperator(InsBinaryOperator binaryOperator)
         {
             stream.WriteSymbol(binaryOperator.Operator);
+        }
+
+        private void WriteBinaryOperator(InsBinaryAssignOperator binaryAssignOperator)
+        {
+            stream.WriteSymbol(binaryAssignOperator.Operator);
+        }
+
+        private void WriteBinaryOperator(InsUnaryAssignOperator unaryAssignOperator)
+        {
+            stream.WriteSymbol(unaryAssignOperator.Operator);
         }
 
         private void WriteUnaryOperator(InsUnaryOperator unaryOperator)

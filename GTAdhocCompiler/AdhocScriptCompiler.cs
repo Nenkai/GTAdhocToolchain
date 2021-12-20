@@ -44,6 +44,9 @@ namespace GTAdhocCompiler
                 case FunctionDeclaration funcDecl:
                     CompileFunction(block, funcDecl);
                     break;
+                case ForStatement forStatement:
+                    CompileFor(block, forStatement);
+                    break;
                 case VariableDeclaration variableDecl:
                     CompileVariableDeclaration(block, variableDecl);
                     break;
@@ -84,6 +87,55 @@ namespace GTAdhocCompiler
             CompileStatement(block, result);
 
             jmp.JumpIndex = block.GetLastInstructionIndex();
+        }
+
+        public void CompileFor(AdhocInstructionBlock block, ForStatement forStatement)
+        {
+            // Initialization
+            if (forStatement.Init is VariableDeclaration varDecl)
+            {
+                CompileVariableDeclaration(block, varDecl);
+            }
+            else if (forStatement.Init is Identifier ident)
+            {
+                
+            }
+            else
+            {
+
+            }
+
+            int startIndex = block.GetLastInstructionIndex();
+
+            // Condition
+            InsJumpIfFalse jumpIfFalse = null; // will only be inserted if the condition exists, else its essentially a while true loop
+            if (forStatement.Test != null)
+            {
+                CompileExpression(block, forStatement.Test);
+
+                // Insert jump to the end of loop block
+                jumpIfFalse = new InsJumpIfFalse();
+                block.AddInstruction(jumpIfFalse, 0);
+            }
+
+            CompileStatement(block, forStatement.Body);
+
+            // Update Counter
+            if (forStatement.Update != null)
+                CompileExpression(block, forStatement.Update);
+
+            // Insert jump to go back to the beginning of the loop
+            InsJump startJump = new InsJump();
+            startJump.JumpInstructionIndex = startIndex;
+            block.AddInstruction(startJump, 0);
+
+            // Update jump that exits the loop if it exists
+            if (jumpIfFalse != null)
+                jumpIfFalse.JumpIndex = block.GetLastInstructionIndex();
+
+            // Insert final leave
+            InsLeaveScope leave = new InsLeaveScope();
+            block.AddInstruction(leave, 0);
         }
 
         public void CompileFunction(AdhocInstructionBlock block, FunctionDeclaration decl)
@@ -169,7 +221,7 @@ namespace GTAdhocCompiler
             }
 
             // Perform assignment
-            block.AddInstruction(new InsAssignPop(), 0);
+            block.AddInstruction(InsAssignPop.Default, 0);
         }
 
         public void CompileImport(AdhocInstructionBlock block, ImportDeclaration import)
@@ -260,6 +312,8 @@ namespace GTAdhocCompiler
         private void CompileExpressionStatement(AdhocInstructionBlock block, ExpressionStatement expStatement)
         {
             CompileExpression(block, expStatement.Expression);
+
+
         }
 
         // Combination of string literals/templates
@@ -267,6 +321,7 @@ namespace GTAdhocCompiler
         {
             int elemCount = 0;
             BuildStringRecurse(taggedTemplate);
+
             void BuildStringRecurse(TaggedTemplateExpression taggedTemplateExpression)
             {
                 foreach (var node in taggedTemplateExpression.ChildNodes)
@@ -275,13 +330,46 @@ namespace GTAdhocCompiler
                         BuildStringRecurse(childExp);
                     else if (node is TemplateLiteral literal)
                     {
-                        TemplateElement element = literal.Quasis[0];
-                        AdhocSymbol strSymb = SymbolMap.RegisterSymbol(element.Value.Cooked);
-                        InsStringConst strConst = new InsStringConst(strSymb);
-                        block.Instructions.Add(strConst);
+                        if (literal.Expressions.Count == 0)
+                        {
+                            TemplateElement element = literal.Quasis[0];
+                            AdhocSymbol strSymb = SymbolMap.RegisterSymbol(element.Value.Cooked);
+                            InsStringConst strConst = new InsStringConst(strSymb);
+                            block.AddInstruction(strConst, element.Location.Start.Line);
 
-                        elemCount++;
+                            elemCount++;
+                        }
+                        else
+                        {
+                            // Interpolated
+                            List<Node> literalNodes = new List<Node>();
+                            literalNodes.AddRange(literal.Quasis);
+                            literalNodes.AddRange(literal.Expressions);
+
+                            // A bit hacky 
+                            literalNodes = literalNodes.OrderBy(e => e.Location.Start.Column).ThenBy(e => e.Location.Start.Line).ToList();
+
+                            foreach (Node n in literalNodes)
+                            {
+                                if (n is TemplateElement tElem)
+                                {
+                                    AdhocSymbol valSymb = SymbolMap.RegisterSymbol(tElem.Value.Cooked);
+                                    InsStringConst strConst = new InsStringConst(valSymb);
+                                    block.AddInstruction(strConst, n.Location.Start.Line);
+                                }
+                                else if (n is Expression exp)
+                                {
+                                    CompileExpression(block, exp);
+                                }
+                                else
+                                    ThrowCompilationError(node, "Unexpected template element type");
+
+                                elemCount++;
+                            }
+                        }
                     }
+                    else
+                        throw new Exception("aa");
                 }
             }
 
@@ -343,12 +431,22 @@ namespace GTAdhocCompiler
 
         private void CompileAssignmentExpression(AdhocInstructionBlock block, AssignmentExpression assignExpression)
         {
-            CompileExpression(block, assignExpression.Right);
-            CompileExpression(block, assignExpression.Left);
-
             if (assignExpression.Operator == AssignmentOperator.Assign)
             {
+                // Assigning to something new
+                CompileExpression(block, assignExpression.Right);
+                CompileExpression(block, assignExpression.Left);
                 block.AddInstruction(InsAssignPop.Default, 0);
+            }
+            else if (assignExpression.Operator == AssignmentOperator.PlusAssign)
+            {
+                // Assigning to self (+=)
+                CompileExpression(block, assignExpression.Left); // Push current value first
+                CompileExpression(block, assignExpression.Right);
+
+                var symb = SymbolMap.RegisterSymbol("+");
+                block.AddInstruction(new InsBinaryAssignOperator(symb), assignExpression.Location.Start.Line);
+                block.AddInstruction(InsPop.Default, 0);
             }
             else
             {
@@ -515,6 +613,18 @@ namespace GTAdhocCompiler
                     case BinaryOperator.NotEqual:
                         opSymbol = SymbolMap.RegisterSymbol("!=");
                         break;
+                    case BinaryOperator.Less:
+                        opSymbol = SymbolMap.RegisterSymbol("<");
+                        break;
+                    case BinaryOperator.Greater:
+                        opSymbol = SymbolMap.RegisterSymbol(">");
+                        break;
+                    case BinaryOperator.LessOrEqual:
+                        opSymbol = SymbolMap.RegisterSymbol("<=");
+                        break;
+                    case BinaryOperator.GreaterOrEqual:
+                        opSymbol = SymbolMap.RegisterSymbol(">=");
+                        break;
                     default:
                         ThrowCompilationError(binExp, $"Binary operator {binExp.Operator} not implemented");
                         break;
@@ -529,15 +639,38 @@ namespace GTAdhocCompiler
         {
             CompileExpression(block, unaryExp.Argument);
 
-            string op = unaryExp.Operator switch
+            if (unaryExp is UpdateExpression upd)
             {
-                UnaryOperator.LogicalNot => "!",
-                _ => throw new NotImplementedException("TODO"),
-            };
+                bool postIncrement = unaryExp.Prefix;
 
-            AdhocSymbol symb = SymbolMap.RegisterSymbol(op);
-            InsUnaryOperator unaryIns = new InsUnaryOperator(symb);
-            block.AddInstruction(unaryIns, unaryExp.Location.Start.Line);
+                string op = unaryExp.Operator switch
+                {
+                    UnaryOperator.Increment when postIncrement => "@++",
+                    UnaryOperator.Increment when !postIncrement => "++@",
+                    UnaryOperator.Decrement when postIncrement => "@--",
+                    UnaryOperator.Decrement when !postIncrement => "--@",
+                    _ => throw new NotImplementedException("TODO"),
+                };
+
+                AdhocSymbol symb = SymbolMap.RegisterSymbol(op);
+                InsUnaryAssignOperator unaryIns = new InsUnaryAssignOperator(symb);
+                block.AddInstruction(unaryIns, unaryExp.Location.Start.Line);
+                block.AddInstruction(InsPop.Default, 0);
+
+            }
+            else
+            {
+                string op = unaryExp.Operator switch
+                {
+                    UnaryOperator.LogicalNot => "!",
+                    _ => throw new NotImplementedException("TODO"),
+                };
+
+                AdhocSymbol symb = SymbolMap.RegisterSymbol(op);
+                InsUnaryAssignOperator unaryIns = new InsUnaryAssignOperator(symb);
+                block.AddInstruction(unaryIns, unaryExp.Location.Start.Line);
+                block.AddInstruction(InsPop.Default, 0);
+            }
         }
 
         private void CompileLiteral(AdhocInstructionBlock block, Literal literal)
