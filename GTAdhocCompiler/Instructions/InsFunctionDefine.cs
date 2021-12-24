@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 
 namespace GTAdhocCompiler.Instructions
 {
+    /// <summary>
+    /// Defines a new function within the scope. Pops all the arguments before the definition.
+    /// </summary>
     public class InsFunctionDefine : InstructionBase
     {
         public override AdhocInstructionType InstructionType => AdhocInstructionType.FUNCTION_DEFINE;

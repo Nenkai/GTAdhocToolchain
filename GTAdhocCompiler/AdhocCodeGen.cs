@@ -41,10 +41,12 @@ namespace GTAdhocCompiler
                 SerializeSymbolTable();
 
             WriteCodeBlock(MainBlock);
-
-            File.WriteAllBytes("test.adc", (stream.BaseStream as MemoryStream).ToArray());
         }
 
+        public void SaveTo(string path)
+        {
+            File.WriteAllBytes(path, (stream.BaseStream as MemoryStream).ToArray());
+        }
         private void WriteCodeBlock(AdhocInstructionBlock block)
         {
             if (Version >= 8)
@@ -77,7 +79,7 @@ namespace GTAdhocCompiler
                     stream.WriteInt32(1 + i); // TODO: Proper Index?
                 }
 
-                stream.WriteInt32(0); // Unk
+                stream.WriteInt32(0); // Some stack variable index
             }
 
             if (Version <= 10)
@@ -87,8 +89,8 @@ namespace GTAdhocCompiler
             }
             else
             {
-                stream.WriteInt32(0);
-                stream.WriteInt32(0);
+                stream.WriteInt32(block.Stack.StackStorageSize);
+                stream.WriteInt32(block.VariableHeap.Count);
                 stream.WriteInt32(0);
             }
 
@@ -112,6 +114,8 @@ namespace GTAdhocCompiler
                     WriteFunction(instruction as InsFunctionDefine); break;
                 case AdhocInstructionType.VARIABLE_EVAL:
                     WriteVariableEval(instruction as InsVariableEvaluation); break;
+                case AdhocInstructionType.ATTRIBUTE_EVAL:
+                    WriteAttributeEval(instruction as InsAttributeEvaluation); break;
                 case AdhocInstructionType.VARIABLE_PUSH:
                     WriteVariablePush(instruction as InsVariablePush); break;
                 case AdhocInstructionType.CALL:
@@ -185,7 +189,7 @@ namespace GTAdhocCompiler
             stream.WriteInt32(jif.JumpIndex);
         }
 
-        private void WriteJumpIfTrue(InsJumpIfTrue jit) // unrelated but gif is pronounced like the name of this parameter (:
+        private void WriteJumpIfTrue(InsJumpIfTrue jit)
         {
             stream.WriteInt32(jit.JumpIndex);
         }
@@ -233,19 +237,24 @@ namespace GTAdhocCompiler
         private void WriteLeave(InsLeaveScope leave)
         {
             stream.WriteInt32(0); // Unused
-            stream.WriteInt32(leave.StackRewindIndex);
+            stream.WriteInt32(leave.TempStackRewindIndex);
         }
 
         private void WriteVariableEval(InsVariableEvaluation variableEval)
         {
             stream.WriteSymbols(variableEval.VariableSymbols);
-            stream.WriteInt32(variableEval.StackIndex);
+            stream.WriteInt32(variableEval.VariableHeapIndex);
+        }
+
+        private void WriteAttributeEval(InsAttributeEvaluation attributeEval)
+        {
+            stream.WriteSymbols(attributeEval.AttributeSymbols);
         }
 
         private void WriteVariablePush(InsVariablePush variablePush)
         {
             stream.WriteSymbols(variablePush.VariableSymbols);
-            stream.WriteInt32(variablePush.StackIndex);
+            stream.WriteInt32(variablePush.VariableStorageIndex);
         }
 
         private void WriteImport(InsImport import)

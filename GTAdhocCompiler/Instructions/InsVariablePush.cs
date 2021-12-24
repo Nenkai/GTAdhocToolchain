@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace GTAdhocCompiler.Instructions
 {
     /// <summary>
-    /// Pushes a new variable onto the stack.
+    /// Pushes a new variable into the variable storage. Value will be pushed on the stack.
     /// </summary>
     public class InsVariablePush : InstructionBase
     {
@@ -17,6 +17,6 @@ namespace GTAdhocCompiler.Instructions
 
         public List<AdhocSymbol> VariableSymbols { get; set; } = new();
 
-        public int StackIndex { get; set; }
+        public int VariableStorageIndex { get; set; }
     }
 }

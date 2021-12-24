@@ -15,6 +15,6 @@ namespace GTAdhocCompiler.Instructions
 
         public override string InstructionName => "LEAVE";
 
-        public int StackRewindIndex { get; set; }
+        public int TempStackRewindIndex { get; set; }
     }
 }

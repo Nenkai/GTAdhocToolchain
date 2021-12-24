@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace GTAdhocCompiler.Instructions
 {
     /// <summary>
-    /// Represents a binary operator instruction.
+    /// Represents a binary operator instruction. Pops two values from the stack, pushes the result into the stack.
     /// </summary>
     public class InsBinaryOperator : InstructionBase
     {

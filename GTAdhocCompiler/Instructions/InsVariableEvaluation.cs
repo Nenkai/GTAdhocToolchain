@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 
 namespace GTAdhocCompiler.Instructions
 {
+    /// <summary>
+    /// Evaluates a symbol, puts or gets it into the specified variable storage index. Will push the value onto the stack.
+    /// </summary>
     public class InsVariableEvaluation : InstructionBase
     {
         public override AdhocInstructionType InstructionType => AdhocInstructionType.VARIABLE_EVAL;
@@ -14,6 +17,16 @@ namespace GTAdhocCompiler.Instructions
 
         public List<AdhocSymbol> VariableSymbols { get; set; } = new();
 
-        public int StackIndex { get; set; }
+        public int VariableHeapIndex { get; set; }
+
+        public InsVariableEvaluation(int index)
+        {
+            VariableHeapIndex = index;
+        }
+
+        public InsVariableEvaluation()
+        {
+
+        }
     }
 }

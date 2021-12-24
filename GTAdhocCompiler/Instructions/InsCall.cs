@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace GTAdhocCompiler.Instructions
 {
     /// <summary>
-    /// Represents a function or method call.
+    /// Represents a function or method call. Will pop the amount of provided arguments from the stack, plus the function object itself. (Arg Count + 1).
     /// </summary>
     public class InsCall : InstructionBase
     {

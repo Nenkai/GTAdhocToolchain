@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace GTAdhocCompiler.Instructions
 {
     /// <summary>
-    /// Represents a jump to instruction if false instruction.
+    /// Represents a jump to instruction if false instruction. Pops the bool from the stack.
     /// </summary>
     public class InsJumpIfFalse : InstructionBase
     {

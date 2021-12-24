@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace GTAdhocCompiler.Instructions
 {
     /// <summary>
-    /// Represents a unary operator instruction.
+    /// Represents a unary operator instruction. Pops the last value into the stack, applies the operand and pushes back into the stack.
     /// </summary>
     public class InsUnaryOperator : InstructionBase
     {

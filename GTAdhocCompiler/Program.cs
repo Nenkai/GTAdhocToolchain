@@ -15,7 +15,7 @@ namespace GTAdhocCompiler
     {
         public static void Main(string[] args)
         {
-            if (args.Length != 1)
+            if (args.Length < 2)
                 return;
 
             var source = File.ReadAllText(args[0]);
@@ -29,6 +29,7 @@ namespace GTAdhocCompiler
 
             AdhocCodeGen codeGen = new AdhocCodeGen(compiler, compiler.SymbolMap);
             codeGen.Generate();
+            codeGen.SaveTo(args[1]);
         }
     }
 }
