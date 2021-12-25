@@ -42,39 +42,42 @@ namespace GTAdhocCompiler
 
         public void CompileStatement(AdhocInstructionBlock block, Node node)
         {
-            switch (node)
+            switch (node.Type)
             {
-                case FunctionDeclaration funcDecl:
-                    CompileFunction(block, funcDecl);
+                case Nodes.FunctionDeclaration:
+                    CompileFunction(block, node as FunctionDeclaration);
                     break;
-                case ForStatement forStatement:
-                    CompileFor(block, forStatement);
+                case Nodes.ForStatement:
+                    CompileFor(block, node as ForStatement);
                     break;
-                case WhileStatement whileStatement:
-                    CompileWhile(block, whileStatement);
+                case Nodes.WhileStatement:
+                    CompileWhile(block, node as WhileStatement);
                     break;
-                case VariableDeclaration variableDecl:
-                    CompileVariableDeclaration(block, variableDecl);
+                case Nodes.DoWhileStatement:
+                    CompileDoWhile(block, node as DoWhileStatement);
                     break;
-                case ReturnStatement retStatement:
-                    CompileReturnStatement(block, retStatement);
+                case Nodes.VariableDeclaration:
+                    CompileVariableDeclaration(block, node as VariableDeclaration);
                     break;
-                case ImportDeclaration importDecl:
-                    CompileImport(block, importDecl);
+                case Nodes.ReturnStatement:
+                    CompileReturnStatement(block, node as ReturnStatement);
                     break;
-                case IfStatement ifStatement:
-                    CompileIfStatement(block, ifStatement);
+                case Nodes.ImportDeclaration:
+                    CompileImport(block, node as ImportDeclaration);
                     break;
-                case BlockStatement blockStatement:
-                    CompileStatements(block, blockStatement.Body);
+                case Nodes.IfStatement:
+                    CompileIfStatement(block, node as IfStatement);
                     break;
-                case ExpressionStatement expStatement:
-                    CompileExpressionStatement(block, expStatement);
+                case Nodes.BlockStatement:
+                    CompileStatements(block, node as BlockStatement);
                     break;
-                case SwitchStatement switchStatement:
-                    CompileSwitch(block, switchStatement);
+                case Nodes.ExpressionStatement:
+                    CompileExpressionStatement(block, node as ExpressionStatement);
                     break;
-                case BreakStatement breakStatement:
+                case Nodes.SwitchStatement:
+                    CompileSwitch(block, node as SwitchStatement);
+                    break;
+                case Nodes.BreakStatement:
                     break;
                 default:
                     ThrowCompilationError(node, "Statement not supported");
@@ -171,6 +174,24 @@ namespace GTAdhocCompiler
 
             // Update jump that exits the loop
             jumpIfFalse.JumpIndex = block.GetLastInstructionIndex();
+
+            // Insert final leave
+            InsLeaveScope leave = new InsLeaveScope();
+            leave.TempStackRewindIndex = block.DeclaredVariables.Count + 1;
+            block.AddInstruction(leave, 0);
+        }
+
+        public void CompileDoWhile(AdhocInstructionBlock block, DoWhileStatement doWhileStatement)
+        {
+            int loopStartInsIndex = block.GetLastInstructionIndex();
+            CompileStatement(block, doWhileStatement.Body);
+
+            if (doWhileStatement.Test is not null)
+                CompileExpression(block, doWhileStatement.Test);
+
+            InsJumpIfTrue jumpIfTrue = new InsJumpIfTrue(); // Start loop jumper
+            jumpIfTrue.JumpIndex = loopStartInsIndex;
+            block.AddInstruction(jumpIfTrue, 0);
 
             // Insert final leave
             InsLeaveScope leave = new InsLeaveScope();
