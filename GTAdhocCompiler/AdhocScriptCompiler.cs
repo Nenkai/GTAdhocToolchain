@@ -186,8 +186,7 @@ namespace GTAdhocCompiler
             int loopStartInsIndex = block.GetLastInstructionIndex();
             CompileStatement(block, doWhileStatement.Body);
 
-            if (doWhileStatement.Test is not null)
-                CompileExpression(block, doWhileStatement.Test);
+            CompileExpression(block, doWhileStatement.Test);
 
             InsJumpIfTrue jumpIfTrue = new InsJumpIfTrue(); // Start loop jumper
             jumpIfTrue.JumpIndex = loopStartInsIndex;
