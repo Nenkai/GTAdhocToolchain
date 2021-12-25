@@ -4,9 +4,11 @@ using Esprima.Ast;
 
 using GTAdhocCompiler.Instructions;
 
-
 namespace GTAdhocCompiler
 {
+    /// <summary>
+    /// Adhoc script compiler.
+    /// </summary>
     public class AdhocScriptCompiler : AdhocInstructionBlock
     {
         public AdhocSymbolMap SymbolMap { get; set; } = new();
@@ -35,7 +37,7 @@ namespace GTAdhocCompiler
 
             // Exiting scope
             InsLeaveScope leaveIns = new InsLeaveScope();
-            leaveIns.TempStackRewindIndex = block.DeclaredVariables.Count + 1;
+            leaveIns.TempStackRewindIndex = block.VariableHeap.Count;
             block.AddInstruction(leaveIns, 0);
             block.Stack.StackStorageCounter = stackStartIndex;
         }
@@ -152,7 +154,7 @@ namespace GTAdhocCompiler
 
             // Insert final leave
             InsLeaveScope leave = new InsLeaveScope();
-            leave.TempStackRewindIndex = block.DeclaredVariables.Count + 1;
+            leave.TempStackRewindIndex = block.VariableHeap.Count;
             block.AddInstruction(leave, 0);
         }
 
@@ -177,7 +179,7 @@ namespace GTAdhocCompiler
 
             // Insert final leave
             InsLeaveScope leave = new InsLeaveScope();
-            leave.TempStackRewindIndex = block.DeclaredVariables.Count + 1;
+            leave.TempStackRewindIndex = block.VariableHeap.Count;
             block.AddInstruction(leave, 0);
         }
 
@@ -194,7 +196,7 @@ namespace GTAdhocCompiler
 
             // Insert final leave
             InsLeaveScope leave = new InsLeaveScope();
-            leave.TempStackRewindIndex = block.DeclaredVariables.Count + 1;
+            leave.TempStackRewindIndex = block.VariableHeap.Count;
             block.AddInstruction(leave, 0);
         }
 
@@ -219,6 +221,7 @@ namespace GTAdhocCompiler
                     // Get temp variable
                     InsVariableEvaluation tempVar = new InsVariableEvaluation();
                     tempVar.VariableSymbols.Add(labelSymb);
+                    tempVar.VariableHeapIndex = block.VariableHeap.IndexOf("case#0");
                     block.AddInstruction(tempVar, swCase.Location.Start.Line);
 
                     // Write what we are comparing to 
@@ -718,11 +721,6 @@ namespace GTAdhocCompiler
             block.AddInstruction(callIns, call.Location.Start.Line);
         }
 
-        private void CompileCallCallee(AdhocInstructionBlock block, Expression callee)
-        {
-
-        }
-
         private void CompileBinaryExpression(AdhocInstructionBlock block, BinaryExpression binExp)
         {
             CompileExpression(block, binExp.Left);
@@ -751,6 +749,17 @@ namespace GTAdhocCompiler
                     throw new InvalidOperationException();
                 }
                 
+            }
+            else if (binExp.Operator == BinaryOperator.InstanceOf)
+            {
+                // Object.isInstanceOf - No idea if adhoc supports it, but eh, why not
+                InsertAttributeEval(block, new Identifier("isInstanceOf"));
+
+                // Eval right identifier (if its one)
+                CompileExpression(block, binExp.Right);
+
+                // Call.
+                block.AddInstruction(new InsCall(argumentCount: 1), binExp.Location.Start.Line);
             }
             else
             {
