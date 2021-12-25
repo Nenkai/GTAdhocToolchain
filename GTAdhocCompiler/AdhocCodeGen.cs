@@ -89,9 +89,12 @@ namespace GTAdhocCompiler
             }
             else
             {
+                // Actual stack size
                 stream.WriteInt32(block.Stack.StackStorageSize);
+
+                /* These two are combined to make the size of the heap for variables */
                 stream.WriteInt32(block.VariableHeap.Count);
-                stream.WriteInt32(0);
+                stream.WriteInt32(0); // Space for variables that have their symbols written twice
             }
 
             stream.WriteInt32(block.Instructions.Count);
@@ -148,6 +151,8 @@ namespace GTAdhocCompiler
                     WriteSetState(instruction as InsSetState); break;
                 case AdhocInstructionType.LEAVE:
                     WriteLeave(instruction as InsLeaveScope); break;
+                case AdhocInstructionType.BOOL_CONST:
+                    WriteBoolConst(instruction as InsBoolConst); break;
                 case AdhocInstructionType.NIL_CONST:
                 case AdhocInstructionType.ASSIGN_POP:
                 case AdhocInstructionType.POP:
@@ -162,6 +167,11 @@ namespace GTAdhocCompiler
         {
             stream.WriteSymbol(function.Name);
             WriteCodeBlock(function.FunctionBlock);
+        }
+
+        private void WriteBoolConst(InsBoolConst boolConst)
+        {
+            stream.WriteBoolean(boolConst.Value, BooleanCoding.Byte);
         }
 
         private void WriteSetState(InsSetState setState)

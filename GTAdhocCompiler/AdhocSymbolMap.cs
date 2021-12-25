@@ -48,7 +48,7 @@ namespace GTAdhocCompiler
 
                 // __minus__
                 "+" => "__add__", // Add,
-                "-" => "__min__", // Minus,
+                "-" => "__sub__", // Subtract,
                 "*" => "__mul__", // Multiply or Import Wildcard
                 "/" => "__div__", // Division
                 "^" => "__xor__", // Xor,
