@@ -49,6 +49,9 @@ namespace GTAdhocCompiler
                 case Nodes.ForStatement:
                     CompileFor(block, node as ForStatement);
                     break;
+                case Nodes.ForeachStatement:
+                    throw new NotImplementedException("Unimplemented foreach");
+                    break;
                 case Nodes.WhileStatement:
                     CompileWhile(block, node as WhileStatement);
                     break;
@@ -1051,14 +1054,14 @@ namespace GTAdhocCompiler
 
             if (unaryExp is UpdateExpression upd)
             {
-                bool postIncrement = unaryExp.Prefix;
+                bool preIncrement = unaryExp.Prefix;
 
                 string op = unaryExp.Operator switch
                 {
-                    UnaryOperator.Increment when postIncrement => "@++",
-                    UnaryOperator.Increment when !postIncrement => "++@",
-                    UnaryOperator.Decrement when postIncrement => "@--",
-                    UnaryOperator.Decrement when !postIncrement => "--@",
+                    UnaryOperator.Increment when !preIncrement => "@++",
+                    UnaryOperator.Increment when preIncrement => "++@",
+                    UnaryOperator.Decrement when !preIncrement => "@--",
+                    UnaryOperator.Decrement when preIncrement => "--@",
                     _ => throw new NotImplementedException("TODO"),
                 };
 
