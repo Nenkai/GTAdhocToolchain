@@ -50,7 +50,7 @@ namespace GTAdhocCompiler
                     CompileFor(block, node as ForStatement);
                     break;
                 case Nodes.ForeachStatement:
-                    throw new NotImplementedException("Unimplemented foreach");
+                    CompileForeach(block, node as ForeachStatement);
                     break;
                 case Nodes.WhileStatement:
                     CompileWhile(block, node as WhileStatement);
@@ -335,12 +335,73 @@ namespace GTAdhocCompiler
             block.CurrentLoops.Pop();
         }
 
+        public void CompileForeach(AdhocInstructionBlock block, ForeachStatement foreachStatement)
+        {
+            LoopContext loopCtx = new LoopContext(foreachStatement);
+            block.CurrentLoops.Push(loopCtx);
+
+            CompileExpression(block, foreachStatement.Right);
+
+            // Access object iterator
+            InsAttributeEvaluation attrIns = new InsAttributeEvaluation();
+            attrIns.AttributeSymbols.Add(SymbolMap.RegisterSymbol("iterator"));
+            block.AddInstruction(attrIns, foreachStatement.Right.Location.Start.Line);
+
+            // Assign it to a temporary value for the iteration
+            string itorVariable = $"in#{SymbolMap.SwitchCaseTempValues++}";
+            InsertVariablePush(block, new Identifier(itorVariable));
+            block.AddInstruction(InsAssignPop.Default, 0);
+
+            // Test - fetch_next returns whether the iterator is done or not
+            int testInsIndex = block.GetLastInstructionIndex();
+            InsertVariableEval(block, new Identifier(itorVariable));
+            InsAttributeEvaluation fetchNextIns = new InsAttributeEvaluation();
+            fetchNextIns.AttributeSymbols.Add(SymbolMap.RegisterSymbol("fetch_next"));
+            block.AddInstruction(fetchNextIns, foreachStatement.Right.Location.Start.Line);
+
+            InsJumpIfFalse exitJump = new InsJumpIfFalse(); // End loop jumper
+            block.AddInstruction(exitJump, 0);
+
+            // Entering body, but we need to unbox the iterator's value into our declared variable
+            InsertVariableEval(block, new Identifier(itorVariable));
+            block.AddInstruction(InsEval.Default, 0);
+            CompileStatement(block, foreachStatement.Left);
+
+            // Compile body.
+            CompileStatement(block, foreachStatement.Body);
+            if (foreachStatement.Body is not BlockStatement) // One liner
+                InsertLeaveScopeInstruction(block);
+
+            // Add the jump back to the test
+            InsJump beginJump = new InsJump();
+            beginJump.JumpInstructionIndex = testInsIndex;
+            block.AddInstruction(beginJump, 0);
+
+            // continue's...
+            foreach (var continueJmp in loopCtx.ContinueJumps)
+                continueJmp.JumpInstructionIndex = testInsIndex;
+
+            // Main exit...
+            int loopExitIndex = block.GetLastInstructionIndex();
+            exitJump.JumpIndex = loopExitIndex;
+
+            // break's...
+            foreach (var breakJmp in loopCtx.BreakJumps)
+                breakJmp.JumpInstructionIndex = loopExitIndex;
+
+            // Insert final leave
+            InsertLeaveScopeInstruction(block);
+
+            block.CurrentLoops.Pop();
+        }
+
         public void CompileSwitch(AdhocInstructionBlock block, SwitchStatement switchStatement)
         {
             CompileExpression(block, switchStatement.Discriminant); // switch (type)
 
             // Create a label for the temporary switch variable
-            AdhocSymbol labelSymb = InsertVariablePush(block, new Identifier("case#0"));
+            string tmpCaseVariable = $"case#{SymbolMap.SwitchCaseTempValues++}";
+            AdhocSymbol labelSymb = InsertVariablePush(block, new Identifier(tmpCaseVariable));
             block.AddInstruction(InsAssignPop.Default, 0);
 
             Dictionary<SwitchCase, InsJumpIfTrue> caseBodyJumps = new();
@@ -356,7 +417,7 @@ namespace GTAdhocCompiler
                     // Get temp variable
                     InsVariableEvaluation tempVar = new InsVariableEvaluation();
                     tempVar.VariableSymbols.Add(labelSymb);
-                    tempVar.VariableHeapIndex = block.VariableHeap.IndexOf("case#0");
+                    tempVar.VariableHeapIndex = block.VariableHeap.IndexOf(tmpCaseVariable);
                     block.AddInstruction(tempVar, swCase.Location.Start.Line);
 
                     // Write what we are comparing to 
@@ -490,7 +551,8 @@ namespace GTAdhocCompiler
             Expression? initValue = declarator.Init;
             Expression? id = declarator.Id;
 
-            CompileExpression(block, initValue);
+            if (initValue != null)
+                CompileExpression(block, initValue);
 
             // Now write the id
             if (id is null)

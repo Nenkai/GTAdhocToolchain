@@ -165,6 +165,7 @@ namespace GTAdhocCompiler
                 case AdhocInstructionType.ARRAY_PUSH:
                 case AdhocInstructionType.POP:
                 case AdhocInstructionType.ELEMENT_EVAL:
+                case AdhocInstructionType.EVAL:
                     break;
                 default:
                     throw new NotImplementedException();

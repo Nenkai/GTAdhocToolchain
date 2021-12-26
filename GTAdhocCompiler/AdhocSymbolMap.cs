@@ -10,6 +10,9 @@ namespace GTAdhocCompiler
     {
         public Dictionary<string, AdhocSymbol> Symbols { get; set; } = new();
 
+        public int SwitchCaseTempValues { get; set; } = 0;
+        public int InTempValues { get; set; } = 0;
+
         /// <summary>
         /// Adds a new symbol to the map if it doesn't already exists.
         /// </summary>
