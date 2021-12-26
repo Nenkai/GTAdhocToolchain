@@ -76,6 +76,9 @@ namespace GTAdhocCompiler
                 case Nodes.SwitchStatement:
                     CompileSwitch(block, node as SwitchStatement);
                     break;
+                case Nodes.ContinueStatement:
+                    CompileContinue(block, node as ContinueStatement);
+                    break;
                 case Nodes.BreakStatement:
                     break;
                 default:
@@ -124,6 +127,18 @@ namespace GTAdhocCompiler
             }
         }
 
+        public void CompileContinue(AdhocInstructionBlock block, ContinueStatement continueStatement)
+        {
+            LoopContext loop = block.GetLastLoop();
+            if (loop is null)
+                ThrowCompilationError(continueStatement, "Got continue keyword without loop.");
+
+            InsJump continueJmp = new InsJump();
+            block.AddInstruction(continueJmp, continueStatement.Location.Start.Line);
+
+            loop.ContinueJumps.Add(continueJmp);
+        }
+
         public void CompileClassProperty(AdhocInstructionBlock block, ClassProperty classProp)
         {
             // For some reason the underlaying function expression has its id null when in a class
@@ -139,7 +154,6 @@ namespace GTAdhocCompiler
         {
             Expression condition = ifStatement.Test;
             Statement result = ifStatement.Consequent;
-            Statement alt = ifStatement.Alternate;
 
             CompileExpression(block, condition);
 
@@ -177,6 +191,9 @@ namespace GTAdhocCompiler
 
         public void CompileFor(AdhocInstructionBlock block, ForStatement forStatement)
         {
+            LoopContext loopCtx = new LoopContext(forStatement);
+            block.CurrentLoops.Push(loopCtx);
+
             // Initialization
             if (forStatement.Init is not null)
             {
@@ -211,6 +228,12 @@ namespace GTAdhocCompiler
             if (forStatement.Body is not BlockStatement) // One liner
                 InsertLeaveScopeInstruction(block);
 
+            // Reached bottom, proceed to do update
+            // But first, process continue if any
+            int loopUpdInsIndex = block.GetLastInstructionIndex();
+            foreach (var continueJmp in loopCtx.ContinueJumps)
+                continueJmp.JumpInstructionIndex = loopUpdInsIndex;
+
             // Update Counter
             if (forStatement.Update != null)
                 CompileExpression(block, forStatement.Update);
@@ -221,15 +244,25 @@ namespace GTAdhocCompiler
             block.AddInstruction(startJump, 0);
 
             // Update jump that exits the loop if it exists
+            int loopExitInsIndex = block.GetLastInstructionIndex();
             if (jumpIfFalse != null)
-                jumpIfFalse.JumpIndex = block.GetLastInstructionIndex();
+                jumpIfFalse.JumpIndex = loopExitInsIndex;
+
+            // Process break jumps before doing the final exit
+            foreach (var breakJmp in loopCtx.BreakJumps)
+                breakJmp.JumpInstructionIndex = loopExitInsIndex;
 
             // Insert final leave
             InsertLeaveScopeInstruction(block);
+
+            block.CurrentLoops.Pop();
         }
 
         public void CompileWhile(AdhocInstructionBlock block, WhileStatement whileStatement)
         {
+            LoopContext loopCtx = new LoopContext(whileStatement);
+            block.CurrentLoops.Push(loopCtx);
+
             int loopStartInsIndex = block.GetLastInstructionIndex();
             if (whileStatement.Test is not null)
                 CompileExpression(block, whileStatement.Test);
@@ -246,28 +279,56 @@ namespace GTAdhocCompiler
             startJump.JumpInstructionIndex = loopStartInsIndex;
             block.AddInstruction(startJump, 0);
 
+            // Reached bottom, proceed to do update
+            // But first, process continue if any
+            foreach (var continueJmp in loopCtx.ContinueJumps)
+                continueJmp.JumpInstructionIndex = loopStartInsIndex;
+
             // Update jump that exits the loop
-            jumpIfFalse.JumpIndex = block.GetLastInstructionIndex();
+            int loopExitInsIndex = block.GetLastInstructionIndex();
+            jumpIfFalse.JumpIndex = loopExitInsIndex;
+
+            // Process break jumps before doing the final exit
+            foreach (var breakJmp in loopCtx.BreakJumps)
+                breakJmp.JumpInstructionIndex = loopExitInsIndex;
 
             // Insert final leave
             InsertLeaveScopeInstruction(block);
+
+            block.CurrentLoops.Pop();
         }
 
         public void CompileDoWhile(AdhocInstructionBlock block, DoWhileStatement doWhileStatement)
         {
+            LoopContext loopCtx = new LoopContext(doWhileStatement);
+            block.CurrentLoops.Push(loopCtx);
+
             int loopStartInsIndex = block.GetLastInstructionIndex();
             CompileStatement(block, doWhileStatement.Body);
             if (doWhileStatement.Body is not BlockStatement) // One liner
                 InsertLeaveScopeInstruction(block);
 
+            int testInsIndex = block.GetLastInstructionIndex();
             CompileExpression(block, doWhileStatement.Test);
+
+            // Reached bottom, proceed to do update
+            // But first, process continue if any
+            foreach (var continueJmp in loopCtx.ContinueJumps)
+                continueJmp.JumpInstructionIndex = testInsIndex;
 
             InsJumpIfTrue jumpIfTrue = new InsJumpIfTrue(); // Start loop jumper
             jumpIfTrue.JumpIndex = loopStartInsIndex;
             block.AddInstruction(jumpIfTrue, 0);
 
+            // Process break jumps before doing the final exit
+            int loopEndIndex = block.GetLastInstructionIndex();
+            foreach (var breakJmp in loopCtx.BreakJumps)
+                breakJmp.JumpInstructionIndex = loopEndIndex;
+
             // Insert final leave
             InsertLeaveScopeInstruction(block);
+
+            block.CurrentLoops.Pop();
         }
 
         public void CompileSwitch(AdhocInstructionBlock block, SwitchStatement switchStatement)

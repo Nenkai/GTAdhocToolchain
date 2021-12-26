@@ -30,7 +30,9 @@ namespace GTAdhocCompiler
         /// Current stack for the block.
         /// </summary>
         public AdhocStack Stack { get; set; } = new();
-        
+
+        public Stack<LoopContext> CurrentLoops { get; set; } = new();
+
         /// <summary>
         /// Variable Heap for the current block.
         /// </summary>
@@ -48,6 +50,8 @@ namespace GTAdhocCompiler
         /// Whether the current block has a return statement, to manually add the return instructions if false.
         /// </summary>
         public bool HasReturn { get; set; }
+
+        public LoopContext GetLastLoop() => CurrentLoops.Peek();
 
         public int AddSymbolToHeap(string variableName)
         {
