@@ -9,18 +9,31 @@ using GTAdhocCompiler.Instructions;
 namespace GTAdhocCompiler
 {
     /// <summary>
-    /// Represents a block of instructions.
+    /// Represents a block of instructions. May be a function, method, or main.
     /// </summary>
     public class AdhocInstructionBlock
     {
+        /// <summary>
+        /// Current instructions for this block.
+        /// </summary>
         public List<InstructionBase> Instructions { get; set; } = new();
+
+        /// <summary>
+        /// Source file for this block.
+        /// </summary>
         public AdhocSymbol SourceFilePath { get; private set; }
 
         public List<AdhocSymbol> Parameters { get; set; } = new List<AdhocSymbol>();
         public List<AdhocSymbol> CallbackParameters { get; set; } = new List<AdhocSymbol>();
 
+        /// <summary>
+        /// Current stack for the block.
+        /// </summary>
         public AdhocStack Stack { get; set; } = new();
-
+        
+        /// <summary>
+        /// Variable Heap for the current block.
+        /// </summary>
         public List<string> VariableHeap { get; set; } = new()
         {
             null, // Always an empty one
@@ -30,6 +43,11 @@ namespace GTAdhocCompiler
         /// Used to keep track of static and non static members, as static members have two symbols in their variable push/eval
         /// </summary>
         public List<string> DeclaredVariables { get; set; } = new();
+
+        /// <summary>
+        /// Whether the current block has a return statement, to manually add the return instructions if false.
+        /// </summary>
+        public bool HasReturn { get; set; }
 
         public int AddSymbolToHeap(string variableName)
         {
@@ -45,6 +63,12 @@ namespace GTAdhocCompiler
             SourceFilePath = symbolMap.RegisterSymbol(path);
         }
 
+        /// <summary>
+        /// Adds a new instruction and updates the stack counter.
+        /// </summary>
+        /// <param name="ins"></param>
+        /// <param name="lineNumber"></param>
+        /// <exception cref="Exception"></exception>
         public void AddInstruction(InstructionBase ins, int lineNumber)
         {
             ins.LineNumber = lineNumber;

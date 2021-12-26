@@ -34,20 +34,17 @@ namespace GTAdhocCompiler
             int stackStartIndex = block.Stack.StackStorageCounter;
             foreach (var n in nodes)
                 CompileStatement(block, n);
-
-            // Exiting scope
-            InsLeaveScope leaveIns = new InsLeaveScope();
-            leaveIns.TempStackRewindIndex = block.VariableHeap.Count;
-            block.AddInstruction(leaveIns, 0);
-            block.Stack.StackStorageCounter = stackStartIndex;
         }
 
         public void CompileStatement(AdhocInstructionBlock block, Node node)
         {
             switch (node.Type)
             {
+                case Nodes.ClassDeclaration:
+                    CompileClassDeclaration(block, node as ClassDeclaration);
+                    break;
                 case Nodes.FunctionDeclaration:
-                    CompileFunction(block, node as FunctionDeclaration);
+                    CompileFunctionDeclaration(block, node as FunctionDeclaration);
                     break;
                 case Nodes.ForStatement:
                     CompileFor(block, node as ForStatement);
@@ -71,7 +68,7 @@ namespace GTAdhocCompiler
                     CompileIfStatement(block, node as IfStatement);
                     break;
                 case Nodes.BlockStatement:
-                    CompileStatements(block, node as BlockStatement);
+                    CompileBlockStatement(block, node as BlockStatement);
                     break;
                 case Nodes.ExpressionStatement:
                     CompileExpressionStatement(block, node as ExpressionStatement);
@@ -87,6 +84,57 @@ namespace GTAdhocCompiler
             }
         }
 
+        public void CompileBlockStatement(AdhocInstructionBlock block, BlockStatement blockStatement)
+        {
+            CompileStatements(block, blockStatement.Body);
+
+            // Insert block leave - rewind variable heap
+            InsertLeaveScopeInstruction(block);
+        }
+
+        public void CompileClassDeclaration(AdhocInstructionBlock block, ClassDeclaration classDecl)
+        {
+            if (classDecl.Id is null || classDecl.Id is not Identifier)
+            {
+                ThrowCompilationError(classDecl, "Class or module name must have a valid identifier.");
+                return;
+            }
+
+            if (classDecl.IsModule)
+            {
+                InsModuleDefine mod = new InsModuleDefine();
+                mod.Names.Add(SymbolMap.RegisterSymbol(classDecl.Id.Name));
+                block.AddInstruction(mod, classDecl.Location.Start.Line);
+            }
+            else
+            {
+                InsClassDefine @class = new InsClassDefine();
+                @class.Name = SymbolMap.RegisterSymbol(classDecl.Id.Name);
+                block.AddInstruction(@class, classDecl.Location.Start.Line);
+            }
+
+            CompileClassBody(block, classDecl.Body);
+        }
+
+        public void CompileClassBody(AdhocInstructionBlock block, ClassBody classBody)
+        {
+            foreach (var prop in classBody.Body)
+            {
+                CompileClassProperty(block, prop);
+            }
+        }
+
+        public void CompileClassProperty(AdhocInstructionBlock block, ClassProperty classProp)
+        {
+            // For some reason the underlaying function expression has its id null when in a class
+            if (classProp is MethodDefinition methodDef)
+            {
+                (classProp.Value as FunctionExpression).Id = classProp.Key as Identifier;
+            }
+
+            CompileExpression(block, classProp.Value);
+        }
+
         public void CompileIfStatement(AdhocInstructionBlock block, IfStatement ifStatement)
         {
             Expression condition = ifStatement.Test;
@@ -96,13 +144,35 @@ namespace GTAdhocCompiler
             CompileExpression(block, condition);
 
             // Create jump
-            InsJumpIfFalse jmp = new InsJumpIfFalse();
-            block.AddInstruction(jmp, 0);
+            InsJumpIfFalse endOrNextIfJump = new InsJumpIfFalse();
+            block.AddInstruction(endOrNextIfJump, 0);
 
             // Apply block
             CompileStatement(block, result);
+            if (result is not BlockStatement) // One liner
+                InsertLeaveScopeInstruction(block);
 
-            jmp.JumpIndex = block.GetLastInstructionIndex();
+            endOrNextIfJump.JumpIndex = block.GetLastInstructionIndex();
+
+            // else if's..
+            if (ifStatement.Alternate is not null)
+            {
+                // Jump to skip the else if block if the if was already taken
+                InsJump skipAlternateJmp = new InsJump();
+                block.AddInstruction(skipAlternateJmp, 0);
+
+                endOrNextIfJump.JumpIndex = block.GetLastInstructionIndex();
+
+                CompileStatement(block, ifStatement.Alternate);
+                if (ifStatement.Alternate is not BlockStatement) // One liner
+                    InsertLeaveScopeInstruction(block);
+
+                skipAlternateJmp.JumpInstructionIndex = block.GetLastInstructionIndex();
+            }
+            else
+            {
+                endOrNextIfJump.JumpIndex = block.GetLastInstructionIndex();
+            }
         }
 
         public void CompileFor(AdhocInstructionBlock block, ForStatement forStatement)
@@ -138,6 +208,8 @@ namespace GTAdhocCompiler
             }
 
             CompileStatement(block, forStatement.Body);
+            if (forStatement.Body is not BlockStatement) // One liner
+                InsertLeaveScopeInstruction(block);
 
             // Update Counter
             if (forStatement.Update != null)
@@ -153,9 +225,7 @@ namespace GTAdhocCompiler
                 jumpIfFalse.JumpIndex = block.GetLastInstructionIndex();
 
             // Insert final leave
-            InsLeaveScope leave = new InsLeaveScope();
-            leave.TempStackRewindIndex = block.VariableHeap.Count;
-            block.AddInstruction(leave, 0);
+            InsertLeaveScopeInstruction(block);
         }
 
         public void CompileWhile(AdhocInstructionBlock block, WhileStatement whileStatement)
@@ -168,6 +238,8 @@ namespace GTAdhocCompiler
             block.AddInstruction(jumpIfFalse, 0);
 
             CompileStatement(block, whileStatement.Body);
+            if (whileStatement.Body is not BlockStatement) // One liner
+                InsertLeaveScopeInstruction(block);
 
             // Insert jump to go back to the beginning of the loop
             InsJump startJump = new InsJump();
@@ -178,15 +250,15 @@ namespace GTAdhocCompiler
             jumpIfFalse.JumpIndex = block.GetLastInstructionIndex();
 
             // Insert final leave
-            InsLeaveScope leave = new InsLeaveScope();
-            leave.TempStackRewindIndex = block.VariableHeap.Count;
-            block.AddInstruction(leave, 0);
+            InsertLeaveScopeInstruction(block);
         }
 
         public void CompileDoWhile(AdhocInstructionBlock block, DoWhileStatement doWhileStatement)
         {
             int loopStartInsIndex = block.GetLastInstructionIndex();
             CompileStatement(block, doWhileStatement.Body);
+            if (doWhileStatement.Body is not BlockStatement) // One liner
+                InsertLeaveScopeInstruction(block);
 
             CompileExpression(block, doWhileStatement.Test);
 
@@ -195,9 +267,7 @@ namespace GTAdhocCompiler
             block.AddInstruction(jumpIfTrue, 0);
 
             // Insert final leave
-            InsLeaveScope leave = new InsLeaveScope();
-            leave.TempStackRewindIndex = block.VariableHeap.Count;
-            block.AddInstruction(leave, 0);
+            InsertLeaveScopeInstruction(block);
         }
 
         public void CompileSwitch(AdhocInstructionBlock block, SwitchStatement switchStatement)
@@ -274,17 +344,21 @@ namespace GTAdhocCompiler
             }
 
             // Leave switch block.
-            InsLeaveScope leave = new InsLeaveScope();
-            block.AddInstruction(leave, 0);
+            InsertLeaveScopeInstruction(block);
         }
 
-        public void CompileFunction(AdhocInstructionBlock block, FunctionDeclaration decl)
+        public void CompileFunctionDeclaration(AdhocInstructionBlock block, FunctionDeclaration funcDecl)
+        {
+            CompileFunction(block, funcDecl, funcDecl.Body, funcDecl.Id, funcDecl.Params);
+        }
+
+        public void CompileFunction(AdhocInstructionBlock block, Node parentNode, Node body, Identifier id, NodeList<Expression> funcParams)
         {
             var funcInst = new InsFunctionDefine();
-            if (decl.Id is not null)
-                funcInst.Name = SymbolMap.RegisterSymbol(decl.Id.Name);
+            if (id is not null)
+                funcInst.Name = SymbolMap.RegisterSymbol(id.Name);
 
-            foreach (Expression param in decl.Params)
+            foreach (Expression param in funcParams)
             {
                 if (param is Identifier paramIdent)
                 {
@@ -294,13 +368,13 @@ namespace GTAdhocCompiler
                     funcInst.FunctionBlock.DeclaredVariables.Add(paramSymb.Name);
 
                     // Function param is uninitialized, push nil
-                    block.AddInstruction(InsNilConst.Empty, decl.Location.Start.Line);
+                    block.AddInstruction(InsNilConst.Empty, parentNode.Location.Start.Line);
                     
                 }
                 else if (param is AssignmentExpression assignmentExpression)
                 {
                     if (assignmentExpression.Left is not Identifier || assignmentExpression.Right is not Literal)
-                        ThrowCompilationError(decl, "Function parameter assignment must be an identifier to a literal. (value = 0)");
+                        ThrowCompilationError(parentNode, "Function parameter assignment must be an identifier to a literal. (value = 0)");
 
                     AdhocSymbol paramSymb = SymbolMap.RegisterSymbol((assignmentExpression.Left as Identifier).Name);
                     funcInst.FunctionBlock.Parameters.Add(paramSymb);
@@ -311,16 +385,16 @@ namespace GTAdhocCompiler
                     CompileLiteral(block, assignmentExpression.Right as Literal);
                 }
                 else
-                    ThrowCompilationError(decl, "Function definition parameters must all be identifiers.");
+                    ThrowCompilationError(parentNode, "Function definition parameters must all be identifiers.");
             }
 
-            block.AddSymbolToHeap(decl.Id.Name);
-            block.AddInstruction(funcInst, decl.Location.Start.Line);
+            block.AddSymbolToHeap(id.Name);
+            block.AddInstruction(funcInst, parentNode.Location.Start.Line);
 
-            var funcBody = decl.Body;
+            var funcBody = body;
             if (funcBody is BlockStatement blockStatement)
             {
-                CompileStatements(funcInst.FunctionBlock, blockStatement);
+                CompileBlockStatement(funcInst.FunctionBlock, blockStatement);
             }
             else
                 ThrowCompilationError(funcBody, "Expected function body to be block statement.");
@@ -329,7 +403,16 @@ namespace GTAdhocCompiler
         public void CompileReturnStatement(AdhocInstructionBlock block, ReturnStatement retStatement)
         {
             if (retStatement.Argument is not null) // Return has argument?
+            {
                 CompileExpression(block, retStatement.Argument);
+            }
+            else
+            {
+                // Void const is returned
+                block.AddInstruction(InsVoidConst.Empty, retStatement.Location.Start.Line);
+
+                // TODO: Check when not explicity returning a value to return a void const
+            }
 
             block.AddInstruction(new InsSetState(1), 0);
         }
@@ -409,6 +492,9 @@ namespace GTAdhocCompiler
                 case Identifier initIdentifier:
                     CompileIdentifier(block, initIdentifier);
                     break;
+                case FunctionExpression funcExpression:
+                    CompileFunctionExpression(block, funcExpression);
+                    break;
                 case CallExpression callExp:
                     CompileCall(block, callExp);
                     break;
@@ -426,6 +512,9 @@ namespace GTAdhocCompiler
                     break;
                 case Literal literal:
                     CompileLiteral(block, literal);
+                    break;
+                case ArrayExpression arr:
+                    CompileArrayExpression(block, arr);
                     break;
                 case ComputedMemberExpression comp:
                     CompileComputedMemberExpression(block, comp);
@@ -448,9 +537,29 @@ namespace GTAdhocCompiler
             }
         }
 
+        private void CompileArrayExpression(AdhocInstructionBlock block, ArrayExpression arrayExpression)
+        {
+            block.AddInstruction(new InsArrayConst((uint)arrayExpression.Elements.Count), arrayExpression.Location.Start.Line);
+
+            foreach (var elem in arrayExpression.Elements)
+            {
+                if (elem is null)
+                    ThrowCompilationError(arrayExpression, "Unsupported empty element in array declaration.");
+
+                CompileExpression(block, elem);
+
+                block.AddInstruction(InsArrayPush.Default, arrayExpression.Location.Start.Line);
+            }
+        }
+
         private void CompileExpressionStatement(AdhocInstructionBlock block, ExpressionStatement expStatement)
         {
             CompileExpression(block, expStatement.Expression);
+        }
+
+        private void CompileFunctionExpression(AdhocInstructionBlock block, FunctionExpression funcExp)
+        {
+            CompileFunction(block, funcExp, funcExp.Body, funcExp.Id, funcExp.Params);
         }
 
         // Combination of string literals/templates
@@ -514,7 +623,11 @@ namespace GTAdhocCompiler
             block.AddInstruction(strPush, taggedTemplate.Location.Start.Line);
         }
 
-
+        /// <summary>
+        /// Compiles a string format literal. i.e "hello %{name}!"
+        /// </summary>
+        /// <param name="block"></param>
+        /// <param name="templateLiteral"></param>
         private void CompileTemplateLiteral(AdhocInstructionBlock block, TemplateLiteral templateLiteral)
         {
             if (templateLiteral.Quasis.Count == 1 && templateLiteral.Expressions.Count == 0)
@@ -589,11 +702,24 @@ namespace GTAdhocCompiler
             }
         }
 
+        /// <summary>
+        /// Compiles an assignment to a variable.
+        /// </summary>
+        /// <param name="block"></param>
+        /// <param name="expression"></param>
         public void CompileVariableAssignment(AdhocInstructionBlock block, Expression expression)
         {
             if (expression is Identifier ident)
             {
                 InsertVariablePush(block, ident);
+            }
+            else if (expression is AttributeMemberExpression attrMember)
+            {
+                CompileExpression(block, attrMember.Object);
+                if (attrMember.Property is not Identifier)
+                    ThrowCompilationError(attrMember.Property, "Expected attribute member property identifier");
+
+                InsertVariablePush(block, attrMember.Property as Identifier);
             }
             else
                 ThrowCompilationError(expression, "Implement this");
@@ -655,7 +781,11 @@ namespace GTAdhocCompiler
             block.AddInstruction(eval, 0);
         }
 
-        // ORG.inSession();
+        /// <summary>
+        /// Compiles an attribute member path.
+        /// </summary>
+        /// <param name="block"></param>
+        /// <param name="staticExp"></param>
         private void CompileAttributeMemberExpression(AdhocInstructionBlock block, AttributeMemberExpression staticExp)
         {
             CompileExpression(block, staticExp.Object); // ORG
@@ -666,7 +796,11 @@ namespace GTAdhocCompiler
             CompileIdentifier(block, staticExp.Property as Identifier, attribute: true); // inSession
         }
 
-        // pdistd::MPjson::Encode
+        /// <summary>
+        /// Compiles a static member path.
+        /// </summary>
+        /// <param name="block"></param>
+        /// <param name="staticExp"></param>
         private void CompileStaticMemberExpression(AdhocInstructionBlock block, StaticMemberExpression staticExp)
         {
             // Recursively build the namespace path
@@ -707,6 +841,11 @@ namespace GTAdhocCompiler
             }
         }
 
+        /// <summary>
+        /// Compiles a function or method call.
+        /// </summary>
+        /// <param name="block"></param>
+        /// <param name="call"></param>
         private void CompileCall(AdhocInstructionBlock block, CallExpression call)
         {
             // Get the function variable
@@ -721,6 +860,12 @@ namespace GTAdhocCompiler
             block.AddInstruction(callIns, call.Location.Start.Line);
         }
 
+        /// <summary>
+        /// Compiles a binary expression.
+        /// </summary>
+        /// <param name="block"></param>
+        /// <param name="binExp"></param>
+        /// <exception cref="InvalidOperationException"></exception>
         private void CompileBinaryExpression(AdhocInstructionBlock block, BinaryExpression binExp)
         {
             CompileExpression(block, binExp.Left);
@@ -811,6 +956,12 @@ namespace GTAdhocCompiler
             }
         }
 
+        /// <summary>
+        /// Compiles an unary expression.
+        /// </summary>
+        /// <param name="block"></param>
+        /// <param name="unaryExp"></param>
+        /// <exception cref="NotImplementedException"></exception>
         private void CompileUnaryExpression(AdhocInstructionBlock block, UnaryExpression unaryExp)
         {
             // We need to push instead
@@ -855,6 +1006,12 @@ namespace GTAdhocCompiler
             }
         }
 
+        /// <summary>
+        /// Compile a literal into a proper constant instruction.
+        /// </summary>
+        /// <param name="block"></param>
+        /// <param name="literal"></param>
+        /// <exception cref="NotImplementedException"></exception>
         private void CompileLiteral(AdhocInstructionBlock block, Literal literal)
         {
             switch (literal.TokenType)
@@ -880,6 +1037,12 @@ namespace GTAdhocCompiler
             }
         }
 
+        /// <summary>
+        /// Inserts an attribute eval instruction to access an attribute of a certain object.
+        /// </summary>
+        /// <param name="block"></param>
+        /// <param name="identifier"></param>
+        /// <returns></returns>
         private AdhocSymbol InsertAttributeEval(AdhocInstructionBlock block, Identifier identifier)
         {
             AdhocSymbol symb = SymbolMap.RegisterSymbol(identifier.Name);
@@ -890,6 +1053,12 @@ namespace GTAdhocCompiler
             return symb;
         }
 
+        /// <summary>
+        /// Inserts a variable evaluation instruction.
+        /// </summary>
+        /// <param name="block"></param>
+        /// <param name="identifier"></param>
+        /// <returns></returns>
         private AdhocSymbol InsertVariableEval(AdhocInstructionBlock block, Identifier identifier)
         {
             AdhocSymbol symb = SymbolMap.RegisterSymbol(identifier.Name);
@@ -904,6 +1073,12 @@ namespace GTAdhocCompiler
             return symb;
         }
 
+        /// <summary>
+        /// Inserts a variable push instruction to push a variable into the heap.
+        /// </summary>
+        /// <param name="block"></param>
+        /// <param name="identifier"></param>
+        /// <returns></returns>
         private AdhocSymbol InsertVariablePush(AdhocInstructionBlock block, Identifier identifier)
         {
             AdhocSymbol varSymb = SymbolMap.RegisterSymbol(identifier.Name);
@@ -920,6 +1095,14 @@ namespace GTAdhocCompiler
             return varSymb;
         }
 
+        /// <summary>
+        /// Inserts a binary assign operator.
+        /// </summary>
+        /// <param name="block"></param>
+        /// <param name="parentNode"></param>
+        /// <param name="assignOperator"></param>
+        /// <param name="lineNumber"></param>
+        /// <returns></returns>
         private AdhocSymbol InsertBinaryAssignOperator(AdhocInstructionBlock block, Node parentNode, AssignmentOperator assignOperator, int lineNumber)
         {
             string opStr = AssignOperatorToString(assignOperator);
@@ -932,6 +1115,14 @@ namespace GTAdhocCompiler
             return symb;
         }
 
+        /// <summary>
+        /// Inserts an unary assign operator.
+        /// </summary>
+        /// <param name="block"></param>
+        /// <param name="parentNode"></param>
+        /// <param name="unaryOperator"></param>
+        /// <param name="lineNumber"></param>
+        /// <returns></returns>
         private AdhocSymbol InsertUnaryAssignOperator(AdhocInstructionBlock block, UnaryExpression parentNode, UnaryOperator unaryOperator, int lineNumber)
         {
             bool postIncrement = parentNode.Prefix;
@@ -942,6 +1133,17 @@ namespace GTAdhocCompiler
             block.AddInstruction(unaryIns, parentNode.Location.Start.Line);
 
             return symb;
+        }
+
+        /// <summary>
+        /// Inserts a leave scope instruction, which rewinds the variable heap to a certain point.
+        /// </summary>
+        /// <param name="block"></param>
+        private void InsertLeaveScopeInstruction(AdhocInstructionBlock block)
+        {
+            InsLeaveScope leave = new InsLeaveScope();
+            leave.VariableHeapRewindIndex = block.VariableHeap.Count;
+            block.AddInstruction(leave, 0);
         }
 
         private static string AssignOperatorToString(AssignmentOperator op)

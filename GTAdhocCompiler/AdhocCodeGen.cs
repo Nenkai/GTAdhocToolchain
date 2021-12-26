@@ -111,6 +111,10 @@ namespace GTAdhocCompiler
 
             switch (instruction.InstructionType)
             {
+                case AdhocInstructionType.CLASS_DEFINE:
+                    WriteClassDefine(instruction as InsClassDefine); break;
+                case AdhocInstructionType.MODULE_DEFINE:
+                    WriteModuleDefine(instruction as InsModuleDefine); break;
                 case AdhocInstructionType.IMPORT:
                     WriteImport(instruction as InsImport); break;
                 case AdhocInstructionType.FUNCTION_DEFINE:
@@ -153,8 +157,12 @@ namespace GTAdhocCompiler
                     WriteLeave(instruction as InsLeaveScope); break;
                 case AdhocInstructionType.BOOL_CONST:
                     WriteBoolConst(instruction as InsBoolConst); break;
+                case AdhocInstructionType.ARRAY_CONST:
+                    WriteArrayConst(instruction as InsArrayConst); break;
                 case AdhocInstructionType.NIL_CONST:
+                case AdhocInstructionType.VOID_CONST:
                 case AdhocInstructionType.ASSIGN_POP:
+                case AdhocInstructionType.ARRAY_PUSH:
                 case AdhocInstructionType.POP:
                 case AdhocInstructionType.ELEMENT_EVAL:
                     break;
@@ -163,10 +171,26 @@ namespace GTAdhocCompiler
             }
         }
 
+        private void WriteArrayConst(InsArrayConst arrayConst)
+        {
+            stream.WriteUInt32(arrayConst.ArraySize);
+        }
+
         private void WriteFunction(InsFunctionDefine function)
         {
             stream.WriteSymbol(function.Name);
             WriteCodeBlock(function.FunctionBlock);
+        }
+
+        private void WriteClassDefine(InsClassDefine classDefine)
+        {
+            stream.WriteSymbol(classDefine.Name);
+            stream.WriteSymbols(classDefine.ExtendsFrom);
+        }
+
+        private void WriteModuleDefine(InsModuleDefine module)
+        {
+            stream.WriteSymbols(module.Names);
         }
 
         private void WriteBoolConst(InsBoolConst boolConst)
@@ -247,7 +271,7 @@ namespace GTAdhocCompiler
         private void WriteLeave(InsLeaveScope leave)
         {
             stream.WriteInt32(0); // Unused
-            stream.WriteInt32(leave.TempStackRewindIndex);
+            stream.WriteInt32(leave.VariableHeapRewindIndex);
         }
 
         private void WriteVariableEval(InsVariableEvaluation variableEval)
