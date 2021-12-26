@@ -201,7 +201,7 @@ namespace GTAdhocCompiler
 
         private void WriteSetState(InsSetState setState)
         {
-            stream.WriteByte(setState.State);
+            stream.WriteByte((byte)setState.State);
         }
 
         private void WriteIntConst(InsIntConst intConst)

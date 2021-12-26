@@ -12,9 +12,9 @@ namespace GTAdhocCompiler.Instructions
 
         public override string InstructionName => "SET_STATE";
 
-        public byte State { get; set; }
+        public AdhocRunState State { get; set; }
 
-        public InsSetState(byte state)
+        public InsSetState(AdhocRunState state)
         {
             State = state;
         }

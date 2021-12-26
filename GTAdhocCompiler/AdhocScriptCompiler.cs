@@ -20,7 +20,7 @@ namespace GTAdhocCompiler
 
 
             // Script done.
-            this.AddInstruction(new InsSetState(0), 0);
+            this.AddInstruction(new InsSetState(AdhocRunState.EXIT), 0);
         }
 
         public void CompileStatements(AdhocInstructionBlock block, Node node)
@@ -540,7 +540,7 @@ namespace GTAdhocCompiler
                 // TODO: Check when not explicity returning a value to return a void const
             }
 
-            block.AddInstruction(new InsSetState(1), 0);
+            block.AddInstruction(new InsSetState(AdhocRunState.RETURN), 0);
         }
 
         public void CompileVariableDeclaration(AdhocInstructionBlock block, VariableDeclaration varDeclaration)
