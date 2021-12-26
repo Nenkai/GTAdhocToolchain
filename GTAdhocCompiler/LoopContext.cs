@@ -26,7 +26,7 @@ namespace GTAdhocCompiler
 
         public LoopContext(Statement loopNode)
         {
-            SourceLoopNode = loopNode;
+            SourceLoopStatement = loopNode;
         }
     }
 }

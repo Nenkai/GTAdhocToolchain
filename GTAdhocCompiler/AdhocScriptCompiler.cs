@@ -129,9 +129,10 @@ namespace GTAdhocCompiler
 
         public void CompileContinue(AdhocInstructionBlock block, ContinueStatement continueStatement)
         {
-            LoopContext loop = block.GetLastLoop();
-            if (loop is null)
+            if (block.CurrentLoops.Count == 0)
                 ThrowCompilationError(continueStatement, "Got continue keyword without loop.");
+
+            LoopContext loop = block.GetLastLoop();
 
             InsJump continueJmp = new InsJump();
             block.AddInstruction(continueJmp, continueStatement.Location.Start.Line);
