@@ -554,7 +554,16 @@ namespace GTAdhocCompiler
 
         private void CompileExpressionStatement(AdhocInstructionBlock block, ExpressionStatement expStatement)
         {
-            CompileExpression(block, expStatement.Expression);
+            if (expStatement.Expression is CallExpression call)
+            {
+                // Call expressions need to be directly popped within an expression statement -> 'getThing()' instead of 'var thing = getThing()'.
+                // Their return values aren't used.
+                CompileCall(block, call, popReturnValue: true);
+            }
+            else
+            {
+                CompileExpression(block, expStatement.Expression);
+            }
         }
 
         private void CompileFunctionExpression(AdhocInstructionBlock block, FunctionExpression funcExp)
@@ -846,7 +855,7 @@ namespace GTAdhocCompiler
         /// </summary>
         /// <param name="block"></param>
         /// <param name="call"></param>
-        private void CompileCall(AdhocInstructionBlock block, CallExpression call)
+        private void CompileCall(AdhocInstructionBlock block, CallExpression call, bool popReturnValue = false)
         {
             // Get the function variable
             CompileExpression(block, call.Callee);
@@ -858,6 +867,10 @@ namespace GTAdhocCompiler
             
             var callIns = new InsCall(call.Arguments.Count);
             block.AddInstruction(callIns, call.Location.Start.Line);
+
+            // When calling and not caring about returns
+            if (popReturnValue)
+                block.AddInstruction(InsPop.Default, 0);
         }
 
         /// <summary>
