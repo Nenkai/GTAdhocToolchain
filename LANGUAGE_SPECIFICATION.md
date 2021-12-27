@@ -34,9 +34,9 @@ Example: `pdistd::MPjson::Encode(...)`.
 ### Strings & Interpolation
 There is only one type of string declaration, quotes.
 ```js
-var str = "Hello world!"
+var str = "Hello world!";
 var multiLineString = "hello"
-                      "world!"
+                      "world!";
 
 var interpolated = "hello, %{name}!"; // Notice %, instead of $ in javascript.
 ```
@@ -60,8 +60,8 @@ Maps are Key/Value collections, similar to javascript's map or C#'s dictionaries
 var myMap = Map();
 var myMap2 = [:]; // Shortcut to creation
 
-myMap["hello"] = "world!"
-myMap.getMapCount() // 1
+myMap["hello"] = "world!";
+myMap.getMapCount(); // 1
 ```
 
 ### Enums
