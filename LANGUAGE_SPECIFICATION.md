@@ -69,6 +69,7 @@ Adhoc supports enums by default.
 ```csharp
 enum MyEnum
 {
+    zero,
     one,
     two,
     three = 3,
