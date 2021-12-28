@@ -734,10 +734,26 @@ namespace GTAdhocCompiler
                 case TaggedTemplateExpression taggedTemplateExpression:
                     CompileTaggedTemplateExpression(block, taggedTemplateExpression);
                     break;
+                case PropertyDefinition propDefinition:
+                    CompilePropertyDefinition(block, propDefinition);
+                    break;
                 default:
                     ThrowCompilationError(exp, $"Expression {exp.Type} not supported");
                     break;
             }
+        }
+
+        private void CompilePropertyDefinition(AdhocInstructionBlock block, PropertyDefinition propDefinition)
+        {
+            if (propDefinition.Static)
+                ThrowCompilationError(propDefinition, "Implement this");
+
+            CompileExpression(block, propDefinition.Value);
+
+            if (propDefinition.Key is not Identifier)
+                ThrowCompilationError(propDefinition, "Expected property key to be an identifier.");
+
+            InsertVariablePush(block, propDefinition.Key as Identifier);
         }
 
         private void CompileArrayExpression(AdhocInstructionBlock block, ArrayExpression arrayExpression)
@@ -951,8 +967,11 @@ namespace GTAdhocCompiler
                 attrPush.AttributeSymbols.Add(attrSymbol);
                 block.AddInstruction(attrPush, propIdent.Location.Start.Line);
             }
-            else
-                ThrowCompilationError(expression, "Implement this");
+            else if (expression is ComputedMemberExpression compExpression)
+            {
+                CompileComputedMemberExpression(block, compExpression);
+
+            }
 
             block.AddInstruction(InsAssignPop.Default, 0);
         }
