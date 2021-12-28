@@ -116,6 +116,28 @@ namespace GTAdhocCompiler
             {
                 InsClassDefine @class = new InsClassDefine();
                 @class.Name = SymbolMap.RegisterSymbol(classDecl.Id.Name);
+                var superClassIdent = classDecl.SuperClass as Identifier;
+                if (superClassIdent != null)
+                {
+                    @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol(superClassIdent.Name));
+                }
+                else if (classDecl.SuperClass != null)
+                {
+                    string fullSuperClassName = "";
+                    foreach (var node in classDecl.SuperClass.ChildNodes)
+                    {
+                        var nodeIdent = node as Identifier;
+                        if (nodeIdent == null)
+                        {
+                            ThrowCompilationError(classDecl, "Superclasses must be identifiers or module::identifiers.");
+                            return;
+                        }
+                        @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol(nodeIdent.Name));
+                        fullSuperClassName += $"{nodeIdent.Name}::";
+                    }
+                    fullSuperClassName = fullSuperClassName.Remove(fullSuperClassName.Length - 2);
+                    @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol(fullSuperClassName));
+                }
                 block.AddInstruction(@class, classDecl.Location.Start.Line);
             }
 
