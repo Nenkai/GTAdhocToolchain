@@ -20,6 +20,7 @@ namespace GTAdhocCompiler
 
 
             // Script done.
+            this.AddInstruction(new InsLeaveScope() {  VariableHeapRewindIndex = 1 }, 0);
             this.AddInstruction(new InsSetState(AdhocRunState.EXIT), 0);
         }
 
@@ -31,7 +32,6 @@ namespace GTAdhocCompiler
 
         public void CompileStatements(AdhocInstructionBlock block, NodeList<Statement> nodes)
         {
-            int stackStartIndex = block.Stack.StackStorageCounter;
             foreach (var n in nodes)
                 CompileStatement(block, n);
         }
@@ -90,12 +90,21 @@ namespace GTAdhocCompiler
             }
         }
 
-        public void CompileBlockStatement(AdhocInstructionBlock block, BlockStatement blockStatement)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="block"></param>
+        /// <param name="blockStatement"></param>
+        /// <param name="doLeave">Whether to compile a leave scope, which isnt needed for function returns.</param>
+        public void CompileBlockStatement(AdhocInstructionBlock block, BlockStatement blockStatement, bool doLeave = true)
         {
             CompileStatements(block, blockStatement.Body);
 
-            // Insert block leave - rewind variable heap
-            InsertLeaveScopeInstruction(block);
+            if (doLeave && blockStatement.Body.Count > 0)
+            {
+                // Insert block leave - rewind variable heap
+                InsertLeaveScopeInstruction(block);
+            }
         }
 
         public void CompileClassDeclaration(AdhocInstructionBlock block, ClassDeclaration classDecl)
@@ -120,6 +129,10 @@ namespace GTAdhocCompiler
             }
 
             CompileClassBody(block, classDecl.Body);
+
+            // Exit class or module scope. Important.
+            InsSetState state = new InsSetState(AdhocRunState.EXIT);
+            block.AddInstruction(state, 0);
         }
 
         public void CompileClassBody(AdhocInstructionBlock block, ClassBody classBody)
@@ -156,6 +169,8 @@ namespace GTAdhocCompiler
 
         public void CompileIfStatement(AdhocInstructionBlock block, IfStatement ifStatement)
         {
+            block.CurrentScopes.Push(ifStatement);
+
             Expression condition = ifStatement.Test;
             Statement result = ifStatement.Consequent;
 
@@ -191,12 +206,15 @@ namespace GTAdhocCompiler
             {
                 endOrNextIfJump.JumpIndex = block.GetLastInstructionIndex();
             }
+
+            block.CurrentScopes.Pop();
         }
 
         public void CompileFor(AdhocInstructionBlock block, ForStatement forStatement)
         {
             LoopContext loopCtx = new LoopContext(forStatement);
             block.CurrentLoops.Push(loopCtx);
+            block.CurrentScopes.Push(forStatement);
 
             // Initialization
             if (forStatement.Init is not null)
@@ -260,10 +278,13 @@ namespace GTAdhocCompiler
             InsertLeaveScopeInstruction(block);
 
             block.CurrentLoops.Pop();
+            block.CurrentScopes.Pop();
         }
 
         public void CompileWhile(AdhocInstructionBlock block, WhileStatement whileStatement)
         {
+            block.CurrentScopes.Push(whileStatement);
+
             LoopContext loopCtx = new LoopContext(whileStatement);
             block.CurrentLoops.Push(loopCtx);
 
@@ -300,12 +321,14 @@ namespace GTAdhocCompiler
             InsertLeaveScopeInstruction(block);
 
             block.CurrentLoops.Pop();
+            block.CurrentScopes.Pop();
         }
 
         public void CompileDoWhile(AdhocInstructionBlock block, DoWhileStatement doWhileStatement)
         {
             LoopContext loopCtx = new LoopContext(doWhileStatement);
             block.CurrentLoops.Push(loopCtx);
+            block.CurrentScopes.Push(doWhileStatement);
 
             int loopStartInsIndex = block.GetLastInstructionIndex();
             CompileStatement(block, doWhileStatement.Body);
@@ -333,12 +356,14 @@ namespace GTAdhocCompiler
             InsertLeaveScopeInstruction(block);
 
             block.CurrentLoops.Pop();
+            block.CurrentScopes.Pop();
         }
 
         public void CompileForeach(AdhocInstructionBlock block, ForeachStatement foreachStatement)
         {
             LoopContext loopCtx = new LoopContext(foreachStatement);
             block.CurrentLoops.Push(loopCtx);
+            block.CurrentScopes.Push(foreachStatement);
 
             CompileExpression(block, foreachStatement.Right);
 
@@ -349,12 +374,17 @@ namespace GTAdhocCompiler
 
             // Assign it to a temporary value for the iteration
             string itorVariable = $"in#{SymbolMap.SwitchCaseTempValues++}";
-            InsertVariablePush(block, new Identifier(itorVariable));
+            Identifier itorIdentifier = new Identifier(itorVariable)
+            {
+                Location = foreachStatement.Right.Location,
+            };
+
+            InsertVariablePush(block, itorIdentifier);
             block.AddInstruction(InsAssignPop.Default, 0);
 
             // Test - fetch_next returns whether the iterator is done or not
             int testInsIndex = block.GetLastInstructionIndex();
-            InsertVariableEval(block, new Identifier(itorVariable));
+            InsertVariableEval(block, itorIdentifier);
             InsAttributeEvaluation fetchNextIns = new InsAttributeEvaluation();
             fetchNextIns.AttributeSymbols.Add(SymbolMap.RegisterSymbol("fetch_next"));
             block.AddInstruction(fetchNextIns, foreachStatement.Right.Location.Start.Line);
@@ -363,7 +393,7 @@ namespace GTAdhocCompiler
             block.AddInstruction(exitJump, 0);
 
             // Entering body, but we need to unbox the iterator's value into our declared variable
-            InsertVariableEval(block, new Identifier(itorVariable));
+            InsertVariableEval(block, itorIdentifier);
             block.AddInstruction(InsEval.Default, 0);
             CompileStatement(block, foreachStatement.Left);
 
@@ -393,11 +423,13 @@ namespace GTAdhocCompiler
             InsertLeaveScopeInstruction(block);
 
             block.CurrentLoops.Pop();
+            block.CurrentScopes.Pop();
         }
 
         public void CompileSwitch(AdhocInstructionBlock block, SwitchStatement switchStatement)
         {
             CompileExpression(block, switchStatement.Discriminant); // switch (type)
+            block.CurrentScopes.Push(switchStatement);
 
             // Create a label for the temporary switch variable
             string tmpCaseVariable = $"case#{SymbolMap.SwitchCaseTempValues++}";
@@ -471,6 +503,8 @@ namespace GTAdhocCompiler
 
             // Leave switch block.
             InsertLeaveScopeInstruction(block);
+
+            block.CurrentScopes.Pop();
         }
 
         public void CompileFunctionDeclaration(AdhocInstructionBlock block, FunctionDeclaration funcDecl)
@@ -483,6 +517,8 @@ namespace GTAdhocCompiler
             var funcInst = new InsFunctionDefine();
             if (id is not null)
                 funcInst.Name = SymbolMap.RegisterSymbol(id.Name);
+
+            block.CurrentScopes.Push(parentNode);
 
             foreach (Expression param in funcParams)
             {
@@ -520,10 +556,23 @@ namespace GTAdhocCompiler
             var funcBody = body;
             if (funcBody is BlockStatement blockStatement)
             {
-                CompileBlockStatement(funcInst.FunctionBlock, blockStatement);
+                CompileBlockStatement(funcInst.FunctionBlock, blockStatement, doLeave: false);
             }
             else
                 ThrowCompilationError(funcBody, "Expected function body to be block statement.");
+
+            if (!funcInst.FunctionBlock.HasTopLevelReturnValue)
+            {
+                /* HACK: Return wasn't explicitly set in the script.
+                 * Add a nil return - this isn't how adhoc does it but it works for now.
+                 * Presumably how adhoc does it is use a LEAVE in a non explicit return in a function body
+                 * Which is somehow handled using the nil value at the very start of the variable heap.  */
+                /* NOTE: Some (non-function body return) returns also use void for some reason too. Adds to the confusion. */
+                funcInst.FunctionBlock.AddInstruction(InsNilConst.Empty, 0);
+                funcInst.FunctionBlock.AddInstruction(new InsSetState(AdhocRunState.RETURN), parentNode.Location.End.Line);
+            }
+
+            block.CurrentScopes.Pop();
         }
 
         public void CompileReturnStatement(AdhocInstructionBlock block, ReturnStatement retStatement)
@@ -536,11 +585,13 @@ namespace GTAdhocCompiler
             {
                 // Void const is returned
                 block.AddInstruction(InsVoidConst.Empty, retStatement.Location.Start.Line);
-
-                // TODO: Check when not explicity returning a value to return a void const
             }
 
             block.AddInstruction(new InsSetState(AdhocRunState.RETURN), 0);
+
+            // Top level of block?
+            if (block.IsTopLevel)
+                block.HasTopLevelReturnValue = true;
         }
 
         public void CompileVariableDeclaration(AdhocInstructionBlock block, VariableDeclaration varDeclaration)
@@ -774,11 +825,11 @@ namespace GTAdhocCompiler
                 {
                     // Empty strings are always a string push with 0 args (aka nil)
                     InsStringPush strPush = new InsStringPush(0);
-                    block.AddInstruction(strPush, 0);
+                    block.AddInstruction(strPush, strElement.Location.Start.Line);
                 }
                 else 
                 {
-                    AdhocSymbol strSymb = SymbolMap.RegisterSymbol(strElement.Value.Cooked);
+                    AdhocSymbol strSymb = SymbolMap.RegisterSymbol(strElement.Value.Cooked, convertToOperand: false);
                     InsStringConst strConst = new InsStringConst(strSymb);
                     block.AddInstruction(strConst, strElement.Location.Start.Line);
                 }
@@ -797,7 +848,7 @@ namespace GTAdhocCompiler
                 {
                     if (node is TemplateElement tElem)
                     {
-                        AdhocSymbol valSymb = SymbolMap.RegisterSymbol(tElem.Value.Cooked);
+                        AdhocSymbol valSymb = SymbolMap.RegisterSymbol(tElem.Value.Cooked, convertToOperand: false);
                         InsStringConst strConst = new InsStringConst(valSymb);
                         block.AddInstruction(strConst, tElem.Location.Start.Line);
                     }
@@ -845,17 +896,22 @@ namespace GTAdhocCompiler
         /// <param name="expression"></param>
         public void CompileVariableAssignment(AdhocInstructionBlock block, Expression expression)
         {
-            if (expression is Identifier ident)
+            if (expression is Identifier ident) // hello = world
             {
                 InsertVariablePush(block, ident);
             }
-            else if (expression is AttributeMemberExpression attrMember)
+            else if (expression is AttributeMemberExpression attrMember) // Pushing into an object i.e hello.world = "!"
             {
                 CompileExpression(block, attrMember.Object);
                 if (attrMember.Property is not Identifier)
                     ThrowCompilationError(attrMember.Property, "Expected attribute member property identifier");
 
-                InsertVariablePush(block, attrMember.Property as Identifier);
+                var propIdent = attrMember.Property as Identifier;
+
+                InsAttributePush attrPush = new InsAttributePush();
+                AdhocSymbol attrSymbol = SymbolMap.RegisterSymbol(propIdent.Name);
+                attrPush.AttributeSymbols.Add(attrSymbol);
+                block.AddInstruction(attrPush, propIdent.Location.Start.Line);
             }
             else
                 ThrowCompilationError(expression, "Implement this");

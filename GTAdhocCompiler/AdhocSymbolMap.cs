@@ -18,9 +18,9 @@ namespace GTAdhocCompiler
         /// </summary>
         /// <param name="symbolName"></param>
         /// <returns>Symbol entity.</returns>
-        public AdhocSymbol RegisterSymbol(string symbolName)
+        public AdhocSymbol RegisterSymbol(string symbolName, bool convertToOperand = true)
         {
-            string identifier = ConvertSymbol(symbolName);
+            string identifier = convertToOperand ? ConvertSymbol(symbolName) : symbolName;
 
             if (!Symbols.TryGetValue(identifier, out var symbol))
             {

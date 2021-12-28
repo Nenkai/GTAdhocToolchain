@@ -125,6 +125,8 @@ namespace GTAdhocCompiler
                     WriteAttributeEval(instruction as InsAttributeEvaluation); break;
                 case AdhocInstructionType.VARIABLE_PUSH:
                     WriteVariablePush(instruction as InsVariablePush); break;
+                case AdhocInstructionType.ATTRIBUTE_PUSH:
+                    WriteAttributePush(instruction as InsAttributePush); break;
                 case AdhocInstructionType.CALL:
                     WriteCall(instruction as InsCall); break;
                 case AdhocInstructionType.UNARY_OPERATOR:
@@ -290,6 +292,11 @@ namespace GTAdhocCompiler
         {
             stream.WriteSymbols(variablePush.VariableSymbols);
             stream.WriteInt32(variablePush.VariableStorageIndex);
+        }
+
+        private void WriteAttributePush(InsAttributePush attributePush)
+        {
+            stream.WriteSymbols(attributePush.AttributeSymbols);
         }
 
         private void WriteImport(InsImport import)

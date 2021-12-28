@@ -31,7 +31,17 @@ namespace GTAdhocCompiler
         /// </summary>
         public AdhocStack Stack { get; set; } = new();
 
+        /// <summary>
+        /// To keep track of the current loops, to compile continue and break statements at the end of one.
+        /// </summary>
         public Stack<LoopContext> CurrentLoops { get; set; } = new();
+
+        /// <summary>
+        /// To keep track of the current scope depth within the block. Used to whether a return or not has been writen to insert one later for instance.
+        /// </summary>
+        public Stack<object> CurrentScopes { get; set; } = new();
+
+        public bool IsTopLevel => CurrentScopes.Count == 0;
 
         /// <summary>
         /// Variable Heap for the current block.
@@ -49,7 +59,7 @@ namespace GTAdhocCompiler
         /// <summary>
         /// Whether the current block has a return statement, to manually add the return instructions if false.
         /// </summary>
-        public bool HasReturn { get; set; }
+        public bool HasTopLevelReturnValue { get; set; }
 
         public LoopContext GetLastLoop() => CurrentLoops.Peek();
 
@@ -75,6 +85,9 @@ namespace GTAdhocCompiler
         /// <exception cref="Exception"></exception>
         public void AddInstruction(InstructionBase ins, int lineNumber)
         {
+            if (lineNumber == 262)
+                ;
+
             ins.LineNumber = lineNumber;
             Instructions.Add(ins);
 
