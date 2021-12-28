@@ -597,6 +597,69 @@ namespace GTAdhocCompiler
             block.CurrentScopes.Pop();
         }
 
+        public void CompileMethod(AdhocInstructionBlock block, Node parentNode, Node body, Identifier id, NodeList<Expression> funcParams)
+        {
+            var methodInst = new InsMethodDefine();
+            if (id is not null)
+                methodInst.Name = SymbolMap.RegisterSymbol(id.Name);
+
+            block.CurrentScopes.Push(parentNode);
+
+            foreach (Expression param in funcParams)
+            {
+                if (param is Identifier paramIdent)
+                {
+                    AdhocSymbol paramSymb = SymbolMap.RegisterSymbol(paramIdent.Name);
+                    methodInst.MethodBlock.Parameters.Add(paramSymb);
+                    methodInst.MethodBlock.AddSymbolToHeap(paramSymb.Name);
+                    methodInst.MethodBlock.DeclaredVariables.Add(paramSymb.Name);
+
+                    // Function param is uninitialized, push nil
+                    block.AddInstruction(InsNilConst.Empty, parentNode.Location.Start.Line);
+
+                }
+                else if (param is AssignmentExpression assignmentExpression)
+                {
+                    if (assignmentExpression.Left is not Identifier || assignmentExpression.Right is not Literal)
+                        ThrowCompilationError(parentNode, "Method parameter assignment must be an identifier to a literal. (value = 0)");
+
+                    AdhocSymbol paramSymb = SymbolMap.RegisterSymbol((assignmentExpression.Left as Identifier).Name);
+                    methodInst.MethodBlock.Parameters.Add(paramSymb);
+                    methodInst.MethodBlock.AddSymbolToHeap(paramSymb.Name);
+                    methodInst.MethodBlock.DeclaredVariables.Add(paramSymb.Name);
+
+                    // Push default value
+                    CompileLiteral(block, assignmentExpression.Right as Literal);
+                }
+                else
+                    ThrowCompilationError(parentNode, "Method definition parameters must all be identifiers.");
+            }
+
+            block.AddSymbolToHeap(id.Name);
+            block.AddInstruction(methodInst, parentNode.Location.Start.Line);
+
+            var methBody = body;
+            if (methBody is BlockStatement blockStatement)
+            {
+                CompileBlockStatement(methodInst.MethodBlock, blockStatement, doLeave: false);
+            }
+            else
+                ThrowCompilationError(methBody, "Expected function body to be block statement.");
+
+            if (!methodInst.MethodBlock.HasTopLevelReturnValue)
+            {
+                /* HACK: Return wasn't explicitly set in the script.
+                 * Add a nil return - this isn't how adhoc does it but it works for now.
+                 * Presumably how adhoc does it is use a LEAVE in a non explicit return in a function body
+                 * Which is somehow handled using the nil value at the very start of the variable heap.  */
+                /* NOTE: Some (non-function body return) returns also use void for some reason too. Adds to the confusion. */
+                methodInst.MethodBlock.AddInstruction(InsNilConst.Empty, 0);
+                methodInst.MethodBlock.AddInstruction(new InsSetState(AdhocRunState.RETURN), parentNode.Location.End.Line);
+            }
+
+            block.CurrentScopes.Pop();
+        }
+
         public void CompileReturnStatement(AdhocInstructionBlock block, ReturnStatement retStatement)
         {
             if (retStatement.Argument is not null) // Return has argument?
@@ -737,9 +800,48 @@ namespace GTAdhocCompiler
                 case PropertyDefinition propDefinition:
                     CompilePropertyDefinition(block, propDefinition);
                     break;
+                case StaticExpression staticExpr:
+                    CompileStaticExpression(block, staticExpr);
+                    break;
                 default:
                     ThrowCompilationError(exp, $"Expression {exp.Type} not supported");
                     break;
+            }
+        }
+
+        private void CompileStaticExpression(AdhocInstructionBlock block, StaticExpression staticExpression)
+        {
+            if (staticExpression.VarExpression is not AssignmentExpression staticAssignment)
+                ThrowCompilationError(staticExpression, "Expected static keyword to be a variable assignment.");
+
+            AssignmentExpression assignmentExpression = staticExpression.VarExpression as AssignmentExpression;
+            if (assignmentExpression.Left is not Identifier)
+                ThrowCompilationError(assignmentExpression, "Expected static declaration to be an identifier.");
+
+            Identifier identifier = assignmentExpression.Left as Identifier;
+            var idSymb = SymbolMap.RegisterSymbol(identifier.Name);
+
+            InsStaticDefine staticDefine = new InsStaticDefine(idSymb);
+            block.AddInstruction(staticDefine, staticExpression.Location.End.Line);
+
+            if (assignmentExpression.Operator == AssignmentOperator.Assign)
+            {
+                // Assigning to something new
+                CompileExpression(block, assignmentExpression.Right);
+                CompileVariableAssignment(block, assignmentExpression.Left, staticVariableDoubleSymbol: true);
+            }
+            else if (IsAdhocAssignWithOperandOperator(assignmentExpression.Operator))
+            {
+                // Assigning to self (+=)
+                InsertVariablePush(block, assignmentExpression.Left as Identifier, staticVariableDoubleSymbol: true); // Push current value first
+                CompileExpression(block, assignmentExpression.Right);
+
+                InsertBinaryAssignOperator(block, assignmentExpression, assignmentExpression.Operator, assignmentExpression.Location.Start.Line);
+                block.AddInstruction(InsPop.Default, 0);
+            }
+            else
+            {
+                ThrowCompilationError(assignmentExpression, $"Unimplemented operator assignment {assignmentExpression.Operator}");
             }
         }
 
@@ -753,7 +855,11 @@ namespace GTAdhocCompiler
             if (propDefinition.Key is not Identifier)
                 ThrowCompilationError(propDefinition, "Expected property key to be an identifier.");
 
-            InsertVariablePush(block, propDefinition.Key as Identifier);
+            // Declaring a class attribute, so we don't push anything
+            var ident = propDefinition.Key as Identifier;
+            InsAttributeDefine attrDefine = new InsAttributeDefine();
+            attrDefine.AttributeName = SymbolMap.RegisterSymbol(ident.Name);
+            block.AddInstruction(attrDefine, ident.Location.Start.Line);
         }
 
         private void CompileArrayExpression(AdhocInstructionBlock block, ArrayExpression arrayExpression)
@@ -792,9 +898,16 @@ namespace GTAdhocCompiler
                 var funcExp = methodDefinition.Value as FunctionExpression;
                 CompileFunction(block, funcExp, funcExp.Body, methodDefinition.Key as Identifier, funcExp.Params);
             }
-            else
+            else if (methodDefinition.Kind == PropertyKind.Method)
             {
-                ThrowCompilationError(methodDefinition, "Method compilation not yet implemented");
+                if (methodDefinition.Value is not FunctionExpression methodFunc)
+                    ThrowCompilationError(methodDefinition, "Unexpected non-function expression value for method");
+
+                if (methodDefinition.Key is not Identifier)
+                    ThrowCompilationError(methodDefinition, "Unexpected non-function identifier key for method");
+
+                methodFunc = methodDefinition.Value as FunctionExpression;
+                CompileMethod(block, methodDefinition, methodFunc.Body, methodDefinition.Key as Identifier, methodFunc.Params);
             }
         }
 
@@ -948,11 +1061,11 @@ namespace GTAdhocCompiler
         /// </summary>
         /// <param name="block"></param>
         /// <param name="expression"></param>
-        public void CompileVariableAssignment(AdhocInstructionBlock block, Expression expression)
+        public void CompileVariableAssignment(AdhocInstructionBlock block, Expression expression, bool staticVariableDoubleSymbol = false)
         {
             if (expression is Identifier ident) // hello = world
             {
-                InsertVariablePush(block, ident);
+                InsertVariablePush(block, ident, staticVariableDoubleSymbol);
             }
             else if (expression is AttributeMemberExpression attrMember) // Pushing into an object i.e hello.world = "!"
             {
@@ -965,12 +1078,13 @@ namespace GTAdhocCompiler
                 InsAttributePush attrPush = new InsAttributePush();
                 AdhocSymbol attrSymbol = SymbolMap.RegisterSymbol(propIdent.Name);
                 attrPush.AttributeSymbols.Add(attrSymbol);
+                if (staticVariableDoubleSymbol)
+                    attrPush.AttributeSymbols.Add(attrSymbol);
                 block.AddInstruction(attrPush, propIdent.Location.Start.Line);
             }
             else if (expression is ComputedMemberExpression compExpression)
             {
-                CompileComputedMemberExpression(block, compExpression);
-
+                CompileComputedMemberExpressionAssignment(block, compExpression);
             }
 
             block.AddInstruction(InsAssignPop.Default, 0);
@@ -1028,6 +1142,18 @@ namespace GTAdhocCompiler
 
             InsElementEval eval = new InsElementEval();
             block.AddInstruction(eval, 0);
+        }
+
+        /// <summary>
+        /// Compiles array or map element assignment
+        /// </summary>
+        private void CompileComputedMemberExpressionAssignment(AdhocInstructionBlock block, ComputedMemberExpression computedMember)
+        {
+            CompileExpression(block, computedMember.Object);
+            CompileExpression(block, computedMember.Property);
+
+            InsElementPush push = new InsElementPush();
+            block.AddInstruction(push, 0);
         }
 
         /// <summary>
@@ -1324,7 +1450,7 @@ namespace GTAdhocCompiler
             varEval.VariableSymbols.Add(symb); // Only one
             block.AddInstruction(varEval, identifier.Location.Start.Line);
 
-            if (!block.DeclaredVariables.Contains(symb.Name))
+            if (!block.DeclaredVariables.Contains(symb.Name) && identifier.Name != "self") // Ignore self keyword
                 varEval.VariableSymbols.Add(symb); // Static, two symbols
 
             return symb;
@@ -1336,13 +1462,16 @@ namespace GTAdhocCompiler
         /// <param name="block"></param>
         /// <param name="identifier"></param>
         /// <returns></returns>
-        private AdhocSymbol InsertVariablePush(AdhocInstructionBlock block, Identifier identifier)
+        private AdhocSymbol InsertVariablePush(AdhocInstructionBlock block, Identifier identifier, bool staticVariableDoubleSymbol = false)
         {
             AdhocSymbol varSymb = SymbolMap.RegisterSymbol(identifier.Name);
             int idx = block.AddSymbolToHeap(varSymb.Name);
 
             var varPush = new InsVariablePush();
             varPush.VariableSymbols.Add(varSymb);
+            if (staticVariableDoubleSymbol)
+                varPush.VariableSymbols.Add(varSymb);
+
             varPush.VariableStorageIndex = idx;
             block.AddInstruction(varPush, identifier.Location.Start.Line);
 

@@ -119,6 +119,8 @@ namespace GTAdhocCompiler
                     WriteImport(instruction as InsImport); break;
                 case AdhocInstructionType.FUNCTION_DEFINE:
                     WriteFunction(instruction as InsFunctionDefine); break;
+                case AdhocInstructionType.METHOD_DEFINE:
+                    WriteMethod(instruction as InsMethodDefine); break;
                 case AdhocInstructionType.VARIABLE_EVAL:
                     WriteVariableEval(instruction as InsVariableEvaluation); break;
                 case AdhocInstructionType.ATTRIBUTE_EVAL:
@@ -127,6 +129,8 @@ namespace GTAdhocCompiler
                     WriteVariablePush(instruction as InsVariablePush); break;
                 case AdhocInstructionType.ATTRIBUTE_PUSH:
                     WriteAttributePush(instruction as InsAttributePush); break;
+                case AdhocInstructionType.ATTRIBUTE_DEFINE:
+                    WriteAttributeDefine(instruction as InsAttributeDefine); break;
                 case AdhocInstructionType.CALL:
                     WriteCall(instruction as InsCall); break;
                 case AdhocInstructionType.UNARY_OPERATOR:
@@ -161,12 +165,15 @@ namespace GTAdhocCompiler
                     WriteBoolConst(instruction as InsBoolConst); break;
                 case AdhocInstructionType.ARRAY_CONST:
                     WriteArrayConst(instruction as InsArrayConst); break;
+                case AdhocInstructionType.STATIC_DEFINE:
+                    WriteStaticDefine(instruction as InsStaticDefine); break;
                 case AdhocInstructionType.NIL_CONST:
                 case AdhocInstructionType.VOID_CONST:
                 case AdhocInstructionType.ASSIGN_POP:
                 case AdhocInstructionType.ARRAY_PUSH:
                 case AdhocInstructionType.POP:
                 case AdhocInstructionType.ELEMENT_EVAL:
+                case AdhocInstructionType.ELEMENT_PUSH:
                 case AdhocInstructionType.EVAL:
                     break;
                 default:
@@ -174,15 +181,32 @@ namespace GTAdhocCompiler
             }
         }
 
+
+        private void WriteAttributeDefine(InsAttributeDefine attrDefine)
+        {
+            stream.WriteSymbol(attrDefine.AttributeName);
+        }
+
         private void WriteArrayConst(InsArrayConst arrayConst)
         {
             stream.WriteUInt32(arrayConst.ArraySize);
+        }
+
+        private void WriteStaticDefine(InsStaticDefine staticDefine)
+        {
+            stream.WriteSymbol(staticDefine.Name);
         }
 
         private void WriteFunction(InsFunctionDefine function)
         {
             stream.WriteSymbol(function.Name);
             WriteCodeBlock(function.FunctionBlock);
+        }
+
+        private void WriteMethod(InsMethodDefine method)
+        {
+            stream.WriteSymbol(method.Name);
+            WriteCodeBlock(method.MethodBlock);
         }
 
         private void WriteClassDefine(InsClassDefine classDefine)

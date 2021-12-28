@@ -116,6 +116,11 @@ namespace GTAdhocCompiler
                     Stack.StackStorageCounter -= func.FunctionBlock.Parameters.Count; // Ver > 8
                     Stack.StackStorageCounter -= func.FunctionBlock.CallbackParameters.Count; // Ver > 7
                     break;
+                case AdhocInstructionType.METHOD_DEFINE:
+                    InsMethodDefine method = ins as InsMethodDefine;
+                    Stack.StackStorageCounter -= method.MethodBlock.Parameters.Count; // Ver > 8
+                    Stack.StackStorageCounter -= method.MethodBlock.CallbackParameters.Count; // Ver > 7
+                    break;
                 case AdhocInstructionType.POP:
                 case AdhocInstructionType.POP_OLD:
                 case AdhocInstructionType.ASSIGN:
@@ -197,15 +202,12 @@ namespace GTAdhocCompiler
                     throw new Exception("Not implemented");
             }
 
-            // METHOD_DEFINE
             // FUNCTION_CONST
             // METHOD_CONST
             // LIST_ASSIGN
             // CALL_OLD
             // LEAVE
             // SET_STATE
-            // LOGICAL_AND
-            // LOGICAL_OR
             // VA_CALL
         }
 
