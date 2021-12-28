@@ -161,7 +161,7 @@ namespace GTAdhocCompiler
         {
             foreach (var prop in classBody.Body)
             {
-                CompileClassProperty(block, prop);
+                CompileExpression(block, prop);
             }
         }
 
@@ -695,6 +695,9 @@ namespace GTAdhocCompiler
                 case FunctionExpression funcExpression:
                     CompileFunctionExpression(block, funcExpression);
                     break;
+                case MethodDefinition methodDefinition: // May also be a function!
+                    CompileMethodDefinition(block, methodDefinition);
+                    break;
                 case CallExpression callExp:
                     CompileCall(block, callExp);
                     break;
@@ -763,6 +766,19 @@ namespace GTAdhocCompiler
             else
             {
                 CompileExpression(block, expStatement.Expression);
+            }
+        }
+
+        private void CompileMethodDefinition(AdhocInstructionBlock block, MethodDefinition methodDefinition)
+        {
+            if (methodDefinition.Kind == PropertyKind.Function)
+            {
+                var funcExp = methodDefinition.Value as FunctionExpression;
+                CompileFunction(block, funcExp, funcExp.Body, methodDefinition.Key as Identifier, funcExp.Params);
+            }
+            else
+            {
+                ThrowCompilationError(methodDefinition, "Method compilation not yet implemented");
             }
         }
 
@@ -1189,6 +1205,8 @@ namespace GTAdhocCompiler
                 InsertVariablePush(block, attr.Property as Identifier);
             else if (unaryExp.Argument is ComputedMemberExpression comp)
                 CompileComputedMemberExpression(block, comp);
+            else if (unaryExp.Argument is Literal literal) // -1 -> int const + unary op
+                CompileLiteral(block, literal);
             else
                 ThrowCompilationError(unaryExp.Argument, "Unsupported");
 
@@ -1215,6 +1233,8 @@ namespace GTAdhocCompiler
                 string op = unaryExp.Operator switch
                 {
                     UnaryOperator.LogicalNot => "!",
+                    UnaryOperator.Minus => "-@",
+                    UnaryOperator.Plus => "+@",
                     _ => throw new NotImplementedException("TODO"),
                 };
 
