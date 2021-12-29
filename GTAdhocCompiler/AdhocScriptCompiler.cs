@@ -1325,6 +1325,15 @@ namespace GTAdhocCompiler
                     case BinaryOperator.Modulo:
                         opSymbol = SymbolMap.RegisterSymbol("%");
                         break;
+                    case BinaryOperator.BitwiseOr:
+                        opSymbol = SymbolMap.RegisterSymbol("|");
+                        break;
+                    case BinaryOperator.BitwiseXOr:
+                        opSymbol = SymbolMap.RegisterSymbol("^");
+                        break;
+                    case BinaryOperator.BitwiseAnd:
+                        opSymbol = SymbolMap.RegisterSymbol("&");
+                        break;
                     default:
                         ThrowCompilationError(binExp, $"Binary operator {binExp.Operator} not implemented");
                         break;
