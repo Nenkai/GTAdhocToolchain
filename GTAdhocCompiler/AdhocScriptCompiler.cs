@@ -873,7 +873,7 @@ namespace GTAdhocCompiler
 
                 CompileExpression(block, elem);
 
-                block.AddInstruction(InsArrayPush.Default, arrayExpression.Location.Start.Line);
+                block.AddInstruction(InsArrayPush.Default, elem.Location.Start.Line);
             }
         }
 
