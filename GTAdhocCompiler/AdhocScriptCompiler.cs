@@ -586,7 +586,7 @@ namespace GTAdhocCompiler
                     ThrowCompilationError(parentNode, "Subroutine definition parameters must all be identifiers.");
             }
 
-            block.AddScopeVariable(subroutine.Name);
+            block.AddScopeVariable(subroutine.Name, isVariableDeclaration: false);
             block.AddInstruction(subroutine, parentNode.Location.Start.Line);
 
             var funcBody = body;
@@ -614,6 +614,8 @@ namespace GTAdhocCompiler
             if (retStatement.Argument is not null) // Return has argument?
             {
                 CompileExpression(block, retStatement.Argument);
+                if (retStatement.Argument is AssignmentExpression assignmentExpr)
+                    CompileExpression(block, assignmentExpr.Left); // If we are returning an assignment i.e return <variable or path> += "hi", we need to eval str again
             }
             else
             {
