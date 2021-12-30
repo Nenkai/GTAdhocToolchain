@@ -10,10 +10,8 @@ using Esprima.Ast;
 
 namespace GTAdhocCompiler
 {
-    public class LoopContext
+    public class LoopContext : ScopeContext
     {
-        public Statement SourceLoopStatement { get; set; }
-
         /// <summary>
         /// Direct jumps for continues
         /// </summary>
@@ -24,9 +22,10 @@ namespace GTAdhocCompiler
         /// </summary>
         public List<InsJump> BreakJumps { get; set; } = new();
 
-        public LoopContext(Statement loopNode)
+        public LoopContext(Node srcNode)
+            : base(srcNode)
         {
-            SourceLoopStatement = loopNode;
+            
         }
     }
 }

@@ -9,34 +9,42 @@ namespace GTAdhocCompiler
     /// <summary>
     /// Adhoc script compiler.
     /// </summary>
-    public class AdhocScriptCompiler : AdhocInstructionBlock
+    public class AdhocScriptCompiler : AdhocCodeFrame
     {
         public AdhocSymbolMap SymbolMap { get; set; } = new();
 
+        public string ProjectDirectory { get; set; }
+        public void SetProjectDirectory(string dir)
+        {
+            ProjectDirectory = dir;
+        }
+
         public void Compile(Script script)
         {
+            EnterScope(this, script);
+
             // "this" is main + declarations
             CompileStatements(this, script.Body);
 
+            LeaveScope(this);
 
             // Script done.
-            this.AddInstruction(new InsLeaveScope() {  VariableHeapRewindIndex = 1 }, 0);
             this.AddInstruction(new InsSetState(AdhocRunState.EXIT), 0);
         }
 
-        public void CompileStatements(AdhocInstructionBlock block, Node node)
+        public void CompileStatements(AdhocCodeFrame block, Node node)
         {
             foreach (var n in node.ChildNodes)
                 CompileStatement(block, n);
         }
 
-        public void CompileStatements(AdhocInstructionBlock block, NodeList<Statement> nodes)
+        public void CompileStatements(AdhocCodeFrame block, NodeList<Statement> nodes)
         {
             foreach (var n in nodes)
                 CompileStatement(block, n);
         }
 
-        public void CompileStatement(AdhocInstructionBlock block, Node node)
+        public void CompileStatement(AdhocCodeFrame block, Node node)
         {
             switch (node.Type)
             {
@@ -83,6 +91,10 @@ namespace GTAdhocCompiler
                     CompileContinue(block, node as ContinueStatement);
                     break;
                 case Nodes.BreakStatement:
+                    // TODO
+                    break;
+                case Nodes.IncludeStatement:
+                    CompileIncludeStatement(block, node as IncludeStatement);
                     break;
                 default:
                     ThrowCompilationError(node, "Statement not supported");
@@ -91,23 +103,43 @@ namespace GTAdhocCompiler
         }
 
         /// <summary>
-        /// 
+        /// Compiles a new block/scope containing statements.
         /// </summary>
         /// <param name="block"></param>
         /// <param name="blockStatement"></param>
-        /// <param name="doLeave">Whether to compile a leave scope, which isnt needed for function returns.</param>
-        public void CompileBlockStatement(AdhocInstructionBlock block, BlockStatement blockStatement, bool doLeave = true)
+        /// <param name="insertLeaveInstruction">Whether to compile a leave scope, which isnt needed for function returns.</param>
+        public void CompileBlockStatement(AdhocCodeFrame block, BlockStatement blockStatement, bool openScope = true, bool insertLeaveInstruction = true)
         {
+            if (openScope)
+                EnterScope(block, blockStatement);
+
             CompileStatements(block, blockStatement.Body);
 
-            if (doLeave && blockStatement.Body.Count > 0)
-            {
-                // Insert block leave - rewind variable heap
-                InsertLeaveScopeInstruction(block);
-            }
+            LeaveScope(block, insertLeaveInstruction && blockStatement.Body.Count > 0);
         }
 
-        public void CompileClassDeclaration(AdhocInstructionBlock block, ClassDeclaration classDecl)
+        public void CompileIncludeStatement(AdhocCodeFrame block, IncludeStatement include)
+        {
+            string pathToIncludeFile = Path.Combine(ProjectDirectory, include.Path);
+            if (!File.Exists(pathToIncludeFile))
+                ThrowCompilationError(include, $"Include file does not exist: {pathToIncludeFile}.");
+
+            string file = File.ReadAllText(pathToIncludeFile);
+
+            var parser = new AdhocAbstractSyntaxTree(file);
+            Script includeScript = parser.ParseScript();
+
+            InsSourceFile srcFileIns = new InsSourceFile(SymbolMap.RegisterSymbol(include.Path, false));
+            block.AddInstruction(srcFileIns, include.Location.Start.Line);
+
+            Compile(includeScript);
+
+            // Resume
+            InsSourceFile ogSrcFileIns = new InsSourceFile(block.SourceFilePath);
+            block.AddInstruction(ogSrcFileIns, include.Location.Start.Line);
+        }
+
+        public void CompileClassDeclaration(AdhocCodeFrame block, ClassDeclaration classDecl)
         {
             if (classDecl.Id is null || classDecl.Id is not Identifier)
             {
@@ -157,15 +189,24 @@ namespace GTAdhocCompiler
             block.AddInstruction(state, 0);
         }
 
-        public void CompileClassBody(AdhocInstructionBlock block, ClassBody classBody)
+        public void CompileClassBody(AdhocCodeFrame block, ClassBody classBody)
         {
             foreach (var prop in classBody.Body)
             {
-                CompileExpression(block, prop);
+                if (prop is Expression exp)
+                    CompileExpression(block, exp);
+                else if (prop is IncludeStatement includeStatement)
+                {
+                    CompileIncludeStatement(block, includeStatement);
+                }
+                else
+                {
+                    ThrowCompilationError(prop, "Unsupported class body element");
+                }
             }
         }
 
-        public void CompileContinue(AdhocInstructionBlock block, ContinueStatement continueStatement)
+        public void CompileContinue(AdhocCodeFrame block, ContinueStatement continueStatement)
         {
             if (block.CurrentLoops.Count == 0)
                 ThrowCompilationError(continueStatement, "Got continue keyword without loop.");
@@ -178,7 +219,7 @@ namespace GTAdhocCompiler
             loop.ContinueJumps.Add(continueJmp);
         }
 
-        public void CompileClassProperty(AdhocInstructionBlock block, ClassProperty classProp)
+        public void CompileClassProperty(AdhocCodeFrame block, ClassProperty classProp)
         {
             // For some reason the underlaying function expression has its id null when in a class
             if (classProp is MethodDefinition methodDef)
@@ -189,23 +230,18 @@ namespace GTAdhocCompiler
             CompileExpression(block, classProp.Value);
         }
 
-        public void CompileIfStatement(AdhocInstructionBlock block, IfStatement ifStatement)
+        public void CompileIfStatement(AdhocCodeFrame block, IfStatement ifStatement)
         {
-            block.CurrentScopes.Push(ifStatement);
+            EnterScope(block, ifStatement);
 
-            Expression condition = ifStatement.Test;
-            Statement result = ifStatement.Consequent;
-
-            CompileExpression(block, condition);
+            CompileExpression(block, ifStatement.Test); // if (<test>)
 
             // Create jump
             InsJumpIfFalse endOrNextIfJump = new InsJumpIfFalse();
             block.AddInstruction(endOrNextIfJump, 0);
 
             // Apply block
-            CompileStatement(block, result);
-            if (result is not BlockStatement) // One liner
-                InsertLeaveScopeInstruction(block);
+            CompileStatementWithScope(block, ifStatement.Consequent); // if body
 
             endOrNextIfJump.JumpIndex = block.GetLastInstructionIndex();
 
@@ -219,8 +255,6 @@ namespace GTAdhocCompiler
                 endOrNextIfJump.JumpIndex = block.GetLastInstructionIndex();
 
                 CompileStatement(block, ifStatement.Alternate);
-                if (ifStatement.Alternate is not BlockStatement) // One liner
-                    InsertLeaveScopeInstruction(block);
 
                 skipAlternateJmp.JumpInstructionIndex = block.GetLastInstructionIndex();
             }
@@ -229,14 +263,12 @@ namespace GTAdhocCompiler
                 endOrNextIfJump.JumpIndex = block.GetLastInstructionIndex();
             }
 
-            block.CurrentScopes.Pop();
+            LeaveScope(block);
         }
 
-        public void CompileFor(AdhocInstructionBlock block, ForStatement forStatement)
+        public void CompileFor(AdhocCodeFrame block, ForStatement forStatement)
         {
-            LoopContext loopCtx = new LoopContext(forStatement);
-            block.CurrentLoops.Push(loopCtx);
-            block.CurrentScopes.Push(forStatement);
+            LoopContext loopCtx = EnterLoop(block, forStatement);
 
             // Initialization
             if (forStatement.Init is not null)
@@ -268,9 +300,7 @@ namespace GTAdhocCompiler
                 block.AddInstruction(jumpIfFalse, 0);
             }
 
-            CompileStatement(block, forStatement.Body);
-            if (forStatement.Body is not BlockStatement) // One liner
-                InsertLeaveScopeInstruction(block);
+            CompileStatementWithScope(block, forStatement.Body);
 
             // Reached bottom, proceed to do update
             // But first, process continue if any
@@ -297,18 +327,12 @@ namespace GTAdhocCompiler
                 breakJmp.JumpInstructionIndex = loopExitInsIndex;
 
             // Insert final leave
-            InsertLeaveScopeInstruction(block);
-
-            block.CurrentLoops.Pop();
-            block.CurrentScopes.Pop();
+            LeaveLoop(block);
         }
 
-        public void CompileWhile(AdhocInstructionBlock block, WhileStatement whileStatement)
+        public void CompileWhile(AdhocCodeFrame block, WhileStatement whileStatement)
         {
-            block.CurrentScopes.Push(whileStatement);
-
-            LoopContext loopCtx = new LoopContext(whileStatement);
-            block.CurrentLoops.Push(loopCtx);
+            LoopContext loopCtx = EnterLoop(block, whileStatement);
 
             int loopStartInsIndex = block.GetLastInstructionIndex();
             if (whileStatement.Test is not null)
@@ -317,9 +341,7 @@ namespace GTAdhocCompiler
             InsJumpIfFalse jumpIfFalse = new InsJumpIfFalse(); // End loop jumper
             block.AddInstruction(jumpIfFalse, 0);
 
-            CompileStatement(block, whileStatement.Body);
-            if (whileStatement.Body is not BlockStatement) // One liner
-                InsertLeaveScopeInstruction(block);
+            CompileStatementWithScope(block, whileStatement.Body);
 
             // Insert jump to go back to the beginning of the loop
             InsJump startJump = new InsJump();
@@ -339,23 +361,15 @@ namespace GTAdhocCompiler
             foreach (var breakJmp in loopCtx.BreakJumps)
                 breakJmp.JumpInstructionIndex = loopExitInsIndex;
 
-            // Insert final leave
-            InsertLeaveScopeInstruction(block);
-
-            block.CurrentLoops.Pop();
-            block.CurrentScopes.Pop();
+            LeaveLoop(block);
         }
 
-        public void CompileDoWhile(AdhocInstructionBlock block, DoWhileStatement doWhileStatement)
+        public void CompileDoWhile(AdhocCodeFrame block, DoWhileStatement doWhileStatement)
         {
-            LoopContext loopCtx = new LoopContext(doWhileStatement);
-            block.CurrentLoops.Push(loopCtx);
-            block.CurrentScopes.Push(doWhileStatement);
+            LoopContext loopCtx = EnterLoop(block, doWhileStatement);
 
             int loopStartInsIndex = block.GetLastInstructionIndex();
-            CompileStatement(block, doWhileStatement.Body);
-            if (doWhileStatement.Body is not BlockStatement) // One liner
-                InsertLeaveScopeInstruction(block);
+            CompileStatementWithScope(block, doWhileStatement.Body);
 
             int testInsIndex = block.GetLastInstructionIndex();
             CompileExpression(block, doWhileStatement.Test);
@@ -374,18 +388,12 @@ namespace GTAdhocCompiler
             foreach (var breakJmp in loopCtx.BreakJumps)
                 breakJmp.JumpInstructionIndex = loopEndIndex;
 
-            // Insert final leave
-            InsertLeaveScopeInstruction(block);
-
-            block.CurrentLoops.Pop();
-            block.CurrentScopes.Pop();
+            LeaveLoop(block);
         }
 
-        public void CompileForeach(AdhocInstructionBlock block, ForeachStatement foreachStatement)
+        public void CompileForeach(AdhocCodeFrame block, ForeachStatement foreachStatement)
         {
-            LoopContext loopCtx = new LoopContext(foreachStatement);
-            block.CurrentLoops.Push(loopCtx);
-            block.CurrentScopes.Push(foreachStatement);
+            LoopContext loopCtx = EnterLoop(block, foreachStatement);
 
             CompileExpression(block, foreachStatement.Right);
 
@@ -420,9 +428,7 @@ namespace GTAdhocCompiler
             CompileStatement(block, foreachStatement.Left);
 
             // Compile body.
-            CompileStatement(block, foreachStatement.Body);
-            if (foreachStatement.Body is not BlockStatement) // One liner
-                InsertLeaveScopeInstruction(block);
+            CompileStatementWithScope(block, foreachStatement.Body);
 
             // Add the jump back to the test
             InsJump beginJump = new InsJump();
@@ -441,17 +447,14 @@ namespace GTAdhocCompiler
             foreach (var breakJmp in loopCtx.BreakJumps)
                 breakJmp.JumpInstructionIndex = loopExitIndex;
 
-            // Insert final leave
-            InsertLeaveScopeInstruction(block);
-
-            block.CurrentLoops.Pop();
-            block.CurrentScopes.Pop();
+            LeaveLoop(block);
         }
 
-        public void CompileSwitch(AdhocInstructionBlock block, SwitchStatement switchStatement)
+        public void CompileSwitch(AdhocCodeFrame block, SwitchStatement switchStatement)
         {
             CompileExpression(block, switchStatement.Discriminant); // switch (type)
-            block.CurrentScopes.Push(switchStatement);
+            LoopContext loopCtx = new LoopContext(switchStatement);
+            block.CurrentScopes.Push(loopCtx);
 
             // Create a label for the temporary switch variable
             string tmpCaseVariable = $"case#{SymbolMap.SwitchCaseTempValues++}";
@@ -524,32 +527,28 @@ namespace GTAdhocCompiler
             }
 
             // Leave switch block.
-            InsertLeaveScopeInstruction(block);
-
-            block.CurrentScopes.Pop();
+            LeaveScope(block);
         }
 
-        public void CompileFunctionDeclaration(AdhocInstructionBlock block, FunctionDeclaration funcDecl)
+        public void CompileFunctionDeclaration(AdhocCodeFrame block, FunctionDeclaration funcDecl)
         {
-            CompileFunction(block, funcDecl, funcDecl.Body, funcDecl.Id, funcDecl.Params);
+            CompileSubroutine(block, funcDecl, funcDecl.Body, funcDecl.Id, funcDecl.Params, isMethod: false);
         }
 
-        public void CompileFunction(AdhocInstructionBlock block, Node parentNode, Node body, Identifier id, NodeList<Expression> funcParams)
+        public void CompileSubroutine(AdhocCodeFrame block, Node parentNode, Node body, Identifier id, NodeList<Expression> subParams, bool isMethod)
         {
-            var funcInst = new InsFunctionDefine();
+            SubroutineBase subroutine = isMethod ? new InsMethodDefine() : new InsFunctionDefine();
             if (id is not null)
-                funcInst.Name = SymbolMap.RegisterSymbol(id.Name);
+                subroutine.Name = SymbolMap.RegisterSymbol(id.Name);
+            subroutine.CodeFrame.SourceFilePath = block.SourceFilePath;
 
-            block.CurrentScopes.Push(parentNode);
-
-            foreach (Expression param in funcParams)
+            foreach (Expression param in subParams)
             {
                 if (param is Identifier paramIdent)
                 {
                     AdhocSymbol paramSymb = SymbolMap.RegisterSymbol(paramIdent.Name);
-                    funcInst.FunctionBlock.Parameters.Add(paramSymb);
-                    funcInst.FunctionBlock.AddSymbolToHeap(paramSymb.Name);
-                    funcInst.FunctionBlock.DeclaredVariables.Add(paramSymb.Name);
+                    subroutine.CodeFrame.FunctionParameters.Add(paramSymb);
+                    subroutine.CodeFrame.DeclaredVariables.Add(paramSymb.Name);
 
                     // Function param is uninitialized, push nil
                     block.AddInstruction(InsNilConst.Empty, parentNode.Location.Start.Line);
@@ -558,109 +557,43 @@ namespace GTAdhocCompiler
                 else if (param is AssignmentExpression assignmentExpression)
                 {
                     if (assignmentExpression.Left is not Identifier || assignmentExpression.Right is not Literal)
-                        ThrowCompilationError(parentNode, "Function parameter assignment must be an identifier to a literal. (value = 0)");
+                        ThrowCompilationError(parentNode, "Subroutine parameter assignment must be an identifier to a literal. (value = 0)");
 
                     AdhocSymbol paramSymb = SymbolMap.RegisterSymbol((assignmentExpression.Left as Identifier).Name);
-                    funcInst.FunctionBlock.Parameters.Add(paramSymb);
-                    funcInst.FunctionBlock.AddSymbolToHeap(paramSymb.Name);
-                    funcInst.FunctionBlock.DeclaredVariables.Add(paramSymb.Name);
+                    subroutine.CodeFrame.FunctionParameters.Add(paramSymb);
+                    subroutine.CodeFrame.DeclaredVariables.Add(paramSymb.Name);
 
                     // Push default value
                     CompileLiteral(block, assignmentExpression.Right as Literal);
                 }
                 else
-                    ThrowCompilationError(parentNode, "Function definition parameters must all be identifiers.");
+                    ThrowCompilationError(parentNode, "Subroutine definition parameters must all be identifiers.");
             }
 
-            block.AddSymbolToHeap(id.Name);
-            block.AddInstruction(funcInst, parentNode.Location.Start.Line);
+            block.AddScopeVariable(subroutine.Name);
+            block.AddInstruction(subroutine, parentNode.Location.Start.Line);
 
             var funcBody = body;
             if (funcBody is BlockStatement blockStatement)
             {
-                CompileBlockStatement(funcInst.FunctionBlock, blockStatement, doLeave: false);
+                EnterScope(subroutine.CodeFrame, parentNode);
+                foreach (var param in subroutine.CodeFrame.FunctionParameters)
+                    subroutine.CodeFrame.AddScopeVariable(param);
+                
+                CompileBlockStatement(subroutine.CodeFrame, blockStatement, openScope: false, insertLeaveInstruction: false);
             }
             else
-                ThrowCompilationError(funcBody, "Expected function body to be block statement.");
+                ThrowCompilationError(funcBody, "Expected subroutine body to be block statement.");
 
-            if (!funcInst.FunctionBlock.HasTopLevelReturnValue)
+            if (!subroutine.CodeFrame.HasTopLevelReturnValue)
             {
-                /* HACK: Return wasn't explicitly set in the script.
-                 * Add a nil return - this isn't how adhoc does it but it works for now.
-                 * Presumably how adhoc does it is use a LEAVE in a non explicit return in a function body
-                 * Which is somehow handled using the nil value at the very start of the variable heap.  */
-                /* NOTE: Some (non-function body return) returns also use void for some reason too. Adds to the confusion. */
-                funcInst.FunctionBlock.AddInstruction(InsNilConst.Empty, 0);
-                funcInst.FunctionBlock.AddInstruction(new InsSetState(AdhocRunState.RETURN), parentNode.Location.End.Line);
+                // All functions return a value internally, even if they don't in the code.
+                subroutine.CodeFrame.AddInstruction(InsVoidConst.Empty, 0);
+                subroutine.CodeFrame.AddInstruction(new InsSetState(AdhocRunState.RETURN), parentNode.Location.End.Line);
             }
-
-            block.CurrentScopes.Pop();
         }
 
-        public void CompileMethod(AdhocInstructionBlock block, Node parentNode, Node body, Identifier id, NodeList<Expression> funcParams)
-        {
-            var methodInst = new InsMethodDefine();
-            if (id is not null)
-                methodInst.Name = SymbolMap.RegisterSymbol(id.Name);
-
-            block.CurrentScopes.Push(parentNode);
-
-            foreach (Expression param in funcParams)
-            {
-                if (param is Identifier paramIdent)
-                {
-                    AdhocSymbol paramSymb = SymbolMap.RegisterSymbol(paramIdent.Name);
-                    methodInst.MethodBlock.Parameters.Add(paramSymb);
-                    methodInst.MethodBlock.AddSymbolToHeap(paramSymb.Name);
-                    methodInst.MethodBlock.DeclaredVariables.Add(paramSymb.Name);
-
-                    // Function param is uninitialized, push nil
-                    block.AddInstruction(InsNilConst.Empty, parentNode.Location.Start.Line);
-
-                }
-                else if (param is AssignmentExpression assignmentExpression)
-                {
-                    if (assignmentExpression.Left is not Identifier || assignmentExpression.Right is not Literal)
-                        ThrowCompilationError(parentNode, "Method parameter assignment must be an identifier to a literal. (value = 0)");
-
-                    AdhocSymbol paramSymb = SymbolMap.RegisterSymbol((assignmentExpression.Left as Identifier).Name);
-                    methodInst.MethodBlock.Parameters.Add(paramSymb);
-                    methodInst.MethodBlock.AddSymbolToHeap(paramSymb.Name);
-                    methodInst.MethodBlock.DeclaredVariables.Add(paramSymb.Name);
-
-                    // Push default value
-                    CompileLiteral(block, assignmentExpression.Right as Literal);
-                }
-                else
-                    ThrowCompilationError(parentNode, "Method definition parameters must all be identifiers.");
-            }
-
-            block.AddSymbolToHeap(id.Name);
-            block.AddInstruction(methodInst, parentNode.Location.Start.Line);
-
-            var methBody = body;
-            if (methBody is BlockStatement blockStatement)
-            {
-                CompileBlockStatement(methodInst.MethodBlock, blockStatement, doLeave: false);
-            }
-            else
-                ThrowCompilationError(methBody, "Expected function body to be block statement.");
-
-            if (!methodInst.MethodBlock.HasTopLevelReturnValue)
-            {
-                /* HACK: Return wasn't explicitly set in the script.
-                 * Add a nil return - this isn't how adhoc does it but it works for now.
-                 * Presumably how adhoc does it is use a LEAVE in a non explicit return in a function body
-                 * Which is somehow handled using the nil value at the very start of the variable heap.  */
-                /* NOTE: Some (non-function body return) returns also use void for some reason too. Adds to the confusion. */
-                methodInst.MethodBlock.AddInstruction(InsNilConst.Empty, 0);
-                methodInst.MethodBlock.AddInstruction(new InsSetState(AdhocRunState.RETURN), parentNode.Location.End.Line);
-            }
-
-            block.CurrentScopes.Pop();
-        }
-
-        public void CompileReturnStatement(AdhocInstructionBlock block, ReturnStatement retStatement)
+        public void CompileReturnStatement(AdhocCodeFrame block, ReturnStatement retStatement)
         {
             if (retStatement.Argument is not null) // Return has argument?
             {
@@ -679,7 +612,7 @@ namespace GTAdhocCompiler
                 block.HasTopLevelReturnValue = true;
         }
 
-        public void CompileVariableDeclaration(AdhocInstructionBlock block, VariableDeclaration varDeclaration)
+        public void CompileVariableDeclaration(AdhocCodeFrame block, VariableDeclaration varDeclaration)
         {
             NodeList<VariableDeclarator> declarators = varDeclaration.Declarations;
             VariableDeclarator declarator = declarators[0];
@@ -692,24 +625,50 @@ namespace GTAdhocCompiler
 
             // Now write the id
             if (id is null)
-            {
                 ThrowCompilationError(varDeclaration, "Variable declaration for id is null.");
-            }
 
-            if (id is Identifier idIdentifier)
+            if (id is Identifier idIdentifier) // var hello [= world];
             {
-                InsertVariablePush(block, idIdentifier);
+                if (initValue != null)
+                {
+                    // Variable is being defined with a value.
+                    InsertVariablePush(block, idIdentifier);
+
+                    // Perform assignment
+                    block.AddInstruction(InsAssignPop.Default, 0);
+                }
+                else
+                {
+                    // Variable is declared but not assigned to anything yet. Do not add any variable push.
+                    AdhocSymbol varSymb = SymbolMap.RegisterSymbol(idIdentifier.Name);
+                    block.AddScopeVariable(varSymb);
+                }
+            }
+            else if (id is ArrayPattern arrayPattern) // var [hello, world] = helloworld; - deconstruct array
+            {
+                if (arrayPattern.Elements.Count == 0)
+                    ThrowCompilationError(arrayPattern, "Array pattern has no elements.");
+
+                foreach (Expression exp in arrayPattern.Elements)
+                {
+                    if (exp is not Identifier)
+                        ThrowCompilationError(exp, "Expected array element to be identifier.");
+
+                    Identifier arrElemIdentifier = exp as Identifier;
+                    InsertVariablePush(block, arrElemIdentifier);
+                }
+
+                InsListAssign listAssign = new InsListAssign(arrayPattern.Elements.Count);
+                block.AddInstruction(listAssign, arrayPattern.Location.Start.Line);
+                block.AddInstruction(InsPop.Default, 0); // Pop array from stack 
             }
             else
             {
                 ThrowCompilationError(varDeclaration, "Variable declaration for id is not an identifier.");
             }
-
-            // Perform assignment
-            block.AddInstruction(InsAssignPop.Default, 0);
         }
 
-        public void CompileImport(AdhocInstructionBlock block, ImportDeclaration import)
+        public void CompileImport(AdhocCodeFrame block, ImportDeclaration import)
         {
             if (import.Specifiers.Count == 0)
             {
@@ -748,7 +707,7 @@ namespace GTAdhocCompiler
             block.AddInstruction(importIns, import.Location.Start.Line);
         }
 
-        private void CompileExpression(AdhocInstructionBlock block, Expression exp)
+        private void CompileExpression(AdhocCodeFrame block, Expression exp)
         {
             switch (exp)
             {
@@ -809,7 +768,7 @@ namespace GTAdhocCompiler
             }
         }
 
-        private void CompileStaticExpression(AdhocInstructionBlock block, StaticExpression staticExpression)
+        private void CompileStaticExpression(AdhocCodeFrame block, StaticExpression staticExpression)
         {
             if (staticExpression.VarExpression is not AssignmentExpression staticAssignment)
                 ThrowCompilationError(staticExpression, "Expected static keyword to be a variable assignment.");
@@ -845,7 +804,7 @@ namespace GTAdhocCompiler
             }
         }
 
-        private void CompilePropertyDefinition(AdhocInstructionBlock block, PropertyDefinition propDefinition)
+        private void CompilePropertyDefinition(AdhocCodeFrame block, PropertyDefinition propDefinition)
         {
             if (propDefinition.Static)
                 ThrowCompilationError(propDefinition, "Implement this");
@@ -862,7 +821,7 @@ namespace GTAdhocCompiler
             block.AddInstruction(attrDefine, ident.Location.Start.Line);
         }
 
-        private void CompileArrayExpression(AdhocInstructionBlock block, ArrayExpression arrayExpression)
+        private void CompileArrayExpression(AdhocCodeFrame block, ArrayExpression arrayExpression)
         {
             block.AddInstruction(new InsArrayConst((uint)arrayExpression.Elements.Count), arrayExpression.Location.Start.Line);
 
@@ -877,7 +836,7 @@ namespace GTAdhocCompiler
             }
         }
 
-        private void CompileExpressionStatement(AdhocInstructionBlock block, ExpressionStatement expStatement)
+        private void CompileExpressionStatement(AdhocCodeFrame block, ExpressionStatement expStatement)
         {
             if (expStatement.Expression is CallExpression call)
             {
@@ -891,12 +850,12 @@ namespace GTAdhocCompiler
             }
         }
 
-        private void CompileMethodDefinition(AdhocInstructionBlock block, MethodDefinition methodDefinition)
+        private void CompileMethodDefinition(AdhocCodeFrame block, MethodDefinition methodDefinition)
         {
             if (methodDefinition.Kind == PropertyKind.Function)
             {
                 var funcExp = methodDefinition.Value as FunctionExpression;
-                CompileFunction(block, funcExp, funcExp.Body, methodDefinition.Key as Identifier, funcExp.Params);
+                CompileSubroutine(block, funcExp, funcExp.Body, methodDefinition.Key as Identifier, funcExp.Params, isMethod: false);
             }
             else if (methodDefinition.Kind == PropertyKind.Method)
             {
@@ -907,17 +866,17 @@ namespace GTAdhocCompiler
                     ThrowCompilationError(methodDefinition, "Unexpected non-function identifier key for method");
 
                 methodFunc = methodDefinition.Value as FunctionExpression;
-                CompileMethod(block, methodDefinition, methodFunc.Body, methodDefinition.Key as Identifier, methodFunc.Params);
+                CompileSubroutine(block, methodDefinition, methodFunc.Body, methodDefinition.Key as Identifier, methodFunc.Params, isMethod: true);
             }
         }
 
-        private void CompileFunctionExpression(AdhocInstructionBlock block, FunctionExpression funcExp)
+        private void CompileFunctionExpression(AdhocCodeFrame block, FunctionExpression funcExp)
         {
-            CompileFunction(block, funcExp, funcExp.Body, funcExp.Id, funcExp.Params);
+            CompileSubroutine(block, funcExp, funcExp.Body, funcExp.Id, funcExp.Params, isMethod: false);
         }
 
         // Combination of string literals/templates
-        private void CompileTaggedTemplateExpression(AdhocInstructionBlock block, TaggedTemplateExpression taggedTemplate)
+        private void CompileTaggedTemplateExpression(AdhocCodeFrame block, TaggedTemplateExpression taggedTemplate)
         {
             int elemCount = 0;
             BuildStringRecurse(taggedTemplate);
@@ -982,7 +941,7 @@ namespace GTAdhocCompiler
         /// </summary>
         /// <param name="block"></param>
         /// <param name="templateLiteral"></param>
-        private void CompileTemplateLiteral(AdhocInstructionBlock block, TemplateLiteral templateLiteral)
+        private void CompileTemplateLiteral(AdhocCodeFrame block, TemplateLiteral templateLiteral)
         {
             if (templateLiteral.Quasis.Count == 1 && templateLiteral.Expressions.Count == 0)
             {
@@ -1033,7 +992,7 @@ namespace GTAdhocCompiler
             }
         }
 
-        private void CompileAssignmentExpression(AdhocInstructionBlock block, AssignmentExpression assignExpression)
+        private void CompileAssignmentExpression(AdhocCodeFrame block, AssignmentExpression assignExpression)
         {
             if (assignExpression.Operator == AssignmentOperator.Assign)
             {
@@ -1061,7 +1020,7 @@ namespace GTAdhocCompiler
         /// </summary>
         /// <param name="block"></param>
         /// <param name="expression"></param>
-        public void CompileVariableAssignment(AdhocInstructionBlock block, Expression expression, bool staticVariableDoubleSymbol = false)
+        public void CompileVariableAssignment(AdhocCodeFrame block, Expression expression, bool staticVariableDoubleSymbol = false)
         {
             if (expression is Identifier ident) // hello = world
             {
@@ -1094,7 +1053,7 @@ namespace GTAdhocCompiler
         /// test ? consequent : alternate;
         /// </summary>
         /// <param name="condExpression"></param>
-        private void CompileConditionalExpression(AdhocInstructionBlock block, ConditionalExpression condExpression)
+        private void CompileConditionalExpression(AdhocCodeFrame block, ConditionalExpression condExpression)
         {
             // Compile condition
             CompileExpression(block, condExpression.Test);
@@ -1123,7 +1082,7 @@ namespace GTAdhocCompiler
         /// Compiles an identifier. var test = otherVariable;
         /// </summary>
         /// <param name="identifier"></param>
-        private void CompileIdentifier(AdhocInstructionBlock block, Identifier identifier, bool attribute = false)
+        private void CompileIdentifier(AdhocCodeFrame block, Identifier identifier, bool attribute = false)
         {
             if (attribute)
                 InsertAttributeEval(block, identifier);
@@ -1135,7 +1094,7 @@ namespace GTAdhocCompiler
         /// <summary>
         /// Compiles array or map access or anything that can be indexed
         /// </summary>
-        private void CompileComputedMemberExpression(AdhocInstructionBlock block, ComputedMemberExpression computedMember)
+        private void CompileComputedMemberExpression(AdhocCodeFrame block, ComputedMemberExpression computedMember)
         {
             CompileExpression(block, computedMember.Object);
             CompileExpression(block, computedMember.Property);
@@ -1147,7 +1106,7 @@ namespace GTAdhocCompiler
         /// <summary>
         /// Compiles array or map element assignment
         /// </summary>
-        private void CompileComputedMemberExpressionAssignment(AdhocInstructionBlock block, ComputedMemberExpression computedMember)
+        private void CompileComputedMemberExpressionAssignment(AdhocCodeFrame block, ComputedMemberExpression computedMember)
         {
             CompileExpression(block, computedMember.Object);
             CompileExpression(block, computedMember.Property);
@@ -1161,14 +1120,16 @@ namespace GTAdhocCompiler
         /// </summary>
         /// <param name="block"></param>
         /// <param name="staticExp"></param>
-        private void CompileAttributeMemberExpression(AdhocInstructionBlock block, AttributeMemberExpression staticExp)
+        /// <param name="compileProperty">Whether to compile the property - used whenever we're compiling the eval call or not</param>
+        private void CompileAttributeMemberExpression(AdhocCodeFrame block, AttributeMemberExpression staticExp, bool compileProperty = true)
         {
             CompileExpression(block, staticExp.Object); // ORG
 
             if (staticExp.Property is not Identifier)
                 ThrowCompilationError(staticExp, "Expected attribute member to be identifier.");
 
-            CompileIdentifier(block, staticExp.Property as Identifier, attribute: true); // inSession
+            if (compileProperty)
+                CompileIdentifier(block, staticExp.Property as Identifier, attribute: true); // inSession
         }
 
         /// <summary>
@@ -1176,7 +1137,7 @@ namespace GTAdhocCompiler
         /// </summary>
         /// <param name="block"></param>
         /// <param name="staticExp"></param>
-        private void CompileStaticMemberExpression(AdhocInstructionBlock block, StaticMemberExpression staticExp)
+        private void CompileStaticMemberExpression(AdhocCodeFrame block, StaticMemberExpression staticExp)
         {
             // Recursively build the namespace path
             List<string> pathParts = new(4);
@@ -1193,7 +1154,7 @@ namespace GTAdhocCompiler
             AdhocSymbol fullPathSymb = SymbolMap.RegisterSymbol(fullPath);
             eval.VariableSymbols.Add(fullPathSymb);
 
-            int idx = block.AddSymbolToHeap(fullPathSymb.Name);
+            int idx = block.AddScopeVariable(fullPathSymb, isVariableDeclaration: false);
             eval.VariableHeapIndex = idx;
 
             block.AddInstruction(eval, staticExp.Location.Start.Line);
@@ -1221,9 +1182,20 @@ namespace GTAdhocCompiler
         /// </summary>
         /// <param name="block"></param>
         /// <param name="call"></param>
-        private void CompileCall(AdhocInstructionBlock block, CallExpression call, bool popReturnValue = false)
+        private void CompileCall(AdhocCodeFrame block, CallExpression call, bool popReturnValue = false)
         {
-            // Get the function variable
+            /* NOTE: So adhoc has this "EVAL" instruction which seems to be called as such: myArray[] 
+             * Obviously this is weird and Javascript doesnt support it normally
+             * So instead we're shortcuting calls to eval of an object property to the actual instruction
+             * It's a hack, but when you don't know the actual language syntax (and it may be a pain to implement anyway), this is the best compromise
+             * Just don't name your method "eval" i guess  */
+            if (call.Callee is AttributeMemberExpression exp && exp.Property is Identifier ident && ident.Name == "eval")
+            {
+                CompileAttributeMemberExpression(block, exp, compileProperty: false);
+                block.AddInstruction(InsEval.Default, 0);
+                return;
+            }
+
             CompileExpression(block, call.Callee);
 
             for (int i = 0; i < call.Arguments.Count; i++)
@@ -1245,7 +1217,7 @@ namespace GTAdhocCompiler
         /// <param name="block"></param>
         /// <param name="binExp"></param>
         /// <exception cref="InvalidOperationException"></exception>
-        private void CompileBinaryExpression(AdhocInstructionBlock block, BinaryExpression binExp)
+        private void CompileBinaryExpression(AdhocCodeFrame block, BinaryExpression binExp)
         {
             CompileExpression(block, binExp.Left);
 
@@ -1350,7 +1322,7 @@ namespace GTAdhocCompiler
         /// <param name="block"></param>
         /// <param name="unaryExp"></param>
         /// <exception cref="NotImplementedException"></exception>
-        private void CompileUnaryExpression(AdhocInstructionBlock block, UnaryExpression unaryExp)
+        private void CompileUnaryExpression(AdhocCodeFrame block, UnaryExpression unaryExp)
         {
             // We need to push instead
             if (unaryExp.Argument is Identifier leftIdent)
@@ -1404,7 +1376,7 @@ namespace GTAdhocCompiler
         /// <param name="block"></param>
         /// <param name="literal"></param>
         /// <exception cref="NotImplementedException"></exception>
-        private void CompileLiteral(AdhocInstructionBlock block, Literal literal)
+        private void CompileLiteral(AdhocCodeFrame block, Literal literal)
         {
             switch (literal.TokenType)
             {
@@ -1435,7 +1407,7 @@ namespace GTAdhocCompiler
         /// <param name="block"></param>
         /// <param name="identifier"></param>
         /// <returns></returns>
-        private AdhocSymbol InsertAttributeEval(AdhocInstructionBlock block, Identifier identifier)
+        private AdhocSymbol InsertAttributeEval(AdhocCodeFrame block, Identifier identifier)
         {
             AdhocSymbol symb = SymbolMap.RegisterSymbol(identifier.Name);
             var attrEval = new InsAttributeEvaluation();
@@ -1451,10 +1423,10 @@ namespace GTAdhocCompiler
         /// <param name="block"></param>
         /// <param name="identifier"></param>
         /// <returns></returns>
-        private AdhocSymbol InsertVariableEval(AdhocInstructionBlock block, Identifier identifier)
+        private AdhocSymbol InsertVariableEval(AdhocCodeFrame block, Identifier identifier)
         {
             AdhocSymbol symb = SymbolMap.RegisterSymbol(identifier.Name);
-            int idx = block.AddSymbolToHeap(symb.Name);
+            int idx = block.AddScopeVariable(symb, isVariableDeclaration: false);
             var varEval = new InsVariableEvaluation(idx);
             varEval.VariableSymbols.Add(symb); // Only one
             block.AddInstruction(varEval, identifier.Location.Start.Line);
@@ -1471,10 +1443,10 @@ namespace GTAdhocCompiler
         /// <param name="block"></param>
         /// <param name="identifier"></param>
         /// <returns></returns>
-        private AdhocSymbol InsertVariablePush(AdhocInstructionBlock block, Identifier identifier, bool staticVariableDoubleSymbol = false)
+        private AdhocSymbol InsertVariablePush(AdhocCodeFrame block, Identifier identifier, bool staticVariableDoubleSymbol = false)
         {
             AdhocSymbol varSymb = SymbolMap.RegisterSymbol(identifier.Name);
-            int idx = block.AddSymbolToHeap(varSymb.Name);
+            int idx = block.AddScopeVariable(varSymb);
 
             var varPush = new InsVariablePush();
             varPush.VariableSymbols.Add(varSymb);
@@ -1483,9 +1455,6 @@ namespace GTAdhocCompiler
 
             varPush.VariableStorageIndex = idx;
             block.AddInstruction(varPush, identifier.Location.Start.Line);
-
-            if (!block.DeclaredVariables.Contains(varSymb.Name))
-                block.DeclaredVariables.Add(varSymb.Name);
 
             return varSymb;
         }
@@ -1498,7 +1467,7 @@ namespace GTAdhocCompiler
         /// <param name="assignOperator"></param>
         /// <param name="lineNumber"></param>
         /// <returns></returns>
-        private AdhocSymbol InsertBinaryAssignOperator(AdhocInstructionBlock block, Node parentNode, AssignmentOperator assignOperator, int lineNumber)
+        private AdhocSymbol InsertBinaryAssignOperator(AdhocCodeFrame block, Node parentNode, AssignmentOperator assignOperator, int lineNumber)
         {
             string opStr = AssignOperatorToString(assignOperator);
             if (string.IsNullOrEmpty(opStr))
@@ -1518,7 +1487,7 @@ namespace GTAdhocCompiler
         /// <param name="unaryOperator"></param>
         /// <param name="lineNumber"></param>
         /// <returns></returns>
-        private AdhocSymbol InsertUnaryAssignOperator(AdhocInstructionBlock block, UnaryExpression parentNode, UnaryOperator unaryOperator, int lineNumber)
+        private AdhocSymbol InsertUnaryAssignOperator(AdhocCodeFrame block, UnaryExpression parentNode, UnaryOperator unaryOperator, int lineNumber)
         {
             bool postIncrement = parentNode.Prefix;
             string op = UnaryOperatorToString(parentNode.Operator, postIncrement);
@@ -1528,17 +1497,6 @@ namespace GTAdhocCompiler
             block.AddInstruction(unaryIns, parentNode.Location.Start.Line);
 
             return symb;
-        }
-
-        /// <summary>
-        /// Inserts a leave scope instruction, which rewinds the variable heap to a certain point.
-        /// </summary>
-        /// <param name="block"></param>
-        private void InsertLeaveScopeInstruction(AdhocInstructionBlock block)
-        {
-            InsLeaveScope leave = new InsLeaveScope();
-            leave.VariableHeapRewindIndex = block.VariableHeap.Count;
-            block.AddInstruction(leave, 0);
         }
 
         private static string AssignOperatorToString(AssignmentOperator op)
@@ -1601,6 +1559,57 @@ namespace GTAdhocCompiler
         private AdhocCompilationException GetCompilationError(Node node, string message)
         {
             return new AdhocCompilationException($"{message}. Line {node.Location.Start.Line}:{node.Location.Start.Column}");
+        }
+
+        private LoopContext EnterLoop(AdhocCodeFrame block, Statement loopStatement)
+        {
+            LoopContext loopCtx = new LoopContext(loopStatement);
+            block.CurrentLoops.Push(loopCtx);
+            block.CurrentScopes.Push(loopCtx);
+            return loopCtx;
+        }
+
+        private ScopeContext EnterScope(AdhocCodeFrame block, Node node)
+        {
+            var scope = new ScopeContext(node);
+            block.CurrentScopes.Push(scope);
+            return scope;
+        }
+
+        private void LeaveLoop(AdhocCodeFrame block)
+        {
+            block.CurrentLoops.Pop();
+            LeaveScope(block);
+        }
+
+        private void LeaveScope(AdhocCodeFrame block, bool insertLeaveInstruction = true)
+        {
+            var lastScope = block.CurrentScopes.Pop();
+            block.RewindVariableHeap(lastScope.ScopeVariables.Count);
+
+            foreach (var variable in lastScope.ScopeVariables)
+                block.DeclaredVariables.Remove(variable.Value.Name);
+
+            if (insertLeaveInstruction)
+            {
+                InsLeaveScope leave = new InsLeaveScope();
+                leave.VariableHeapRewindIndex = block.VariableHeap.Count;
+                block.AddInstruction(leave, 0);
+            }
+        }
+
+        private void CompileStatementWithScope(AdhocCodeFrame block, Statement statement)
+        {
+            if (statement is BlockStatement)
+            {
+                CompileStatement(block, statement);
+            }
+            else
+            {
+                EnterScope(block, statement);
+                CompileStatement(block, statement);
+                LeaveScope(block);
+            }
         }
     }
 }

@@ -15,13 +15,13 @@ namespace GTAdhocCompiler
     {
         public static void Main(string[] args)
         {
-            if (args.Length < 2)
+            if (args.Length < 3)
                 return;
 
-            DateTime t = new FileInfo(args[0]).LastWriteTime;
+            DateTime t = new FileInfo(args[1]).LastWriteTime;
             while (true)
             {
-                var current = new FileInfo(args[0]).LastWriteTime;
+                var current = new FileInfo(args[1]).LastWriteTime;
                 if (t >= current)
                 {
                     Thread.Sleep(2000);
@@ -30,17 +30,18 @@ namespace GTAdhocCompiler
 
                 t = current;
 
-                var source = File.ReadAllText(args[0]);
+                var source = File.ReadAllText(args[1]);
                 var parser = new AdhocAbstractSyntaxTree(source);
                 var program = parser.ParseScript();
 
                 var compiler = new AdhocScriptCompiler();
+                compiler.SetProjectDirectory(args[0]);
                 compiler.SetSourcePath(compiler.SymbolMap, "www/gt7sp/adhoc/get_car_parameter.ad");
                 compiler.Compile(program);
 
                 AdhocCodeGen codeGen = new AdhocCodeGen(compiler, compiler.SymbolMap);
                 codeGen.Generate();
-                codeGen.SaveTo(args[1]);
+                codeGen.SaveTo(args[2]);
 
                 Console.WriteLine($"Compiled {args[1]}");
             }

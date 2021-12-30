@@ -15,8 +15,8 @@ namespace GTAdhocCompiler
             get => _stackStorageCounter;
             set
             {
-                if (value > StackStorageSize)
-                    StackStorageSize = value;
+                if (value > MaxStackStorageSize)
+                    MaxStackStorageSize = value;
 
                 _stackStorageCounter = value;
             }
@@ -25,6 +25,6 @@ namespace GTAdhocCompiler
         /// <summary>
         /// Max stack space used for this block.
         /// </summary>
-        public int StackStorageSize { get; set; }
+        public int MaxStackStorageSize { get; set; }
     }
 }

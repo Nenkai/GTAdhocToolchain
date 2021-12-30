@@ -17,12 +17,12 @@ namespace GTAdhocCompiler
         public byte Version { get; set; } = 12;
         public bool WriteDebugInformation { get; set; } = true;
 
-        public AdhocInstructionBlock MainBlock { get; set; }
+        public AdhocCodeFrame MainBlock { get; set; }
         public AdhocSymbolMap SymbolMap { get; set; }
 
         private AdhocStream stream;
 
-        public AdhocCodeGen(AdhocInstructionBlock mainBlock, AdhocSymbolMap symbols)
+        public AdhocCodeGen(AdhocCodeFrame mainBlock, AdhocSymbolMap symbols)
         {
             MainBlock = mainBlock;
             SymbolMap = symbols;
@@ -47,7 +47,7 @@ namespace GTAdhocCompiler
         {
             File.WriteAllBytes(path, (stream.BaseStream as MemoryStream).ToArray());
         }
-        private void WriteCodeBlock(AdhocInstructionBlock block)
+        private void WriteCodeBlock(AdhocCodeFrame block)
         {
             if (Version >= 8)
             {
@@ -65,17 +65,17 @@ namespace GTAdhocCompiler
                 if (Version >= 12)
                     stream.WriteByte(0);
 
-                stream.WriteInt32(block.Parameters.Count);
-                for (int i = 0; i < block.Parameters.Count; i++)
+                stream.WriteInt32(block.FunctionParameters.Count);
+                for (int i = 0; i < block.FunctionParameters.Count; i++)
                 {
-                    stream.WriteSymbol(block.Parameters[i]);
+                    stream.WriteSymbol(block.FunctionParameters[i]);
                     stream.WriteInt32(1 + i); // TODO: Proper Index?
                 }
 
-                stream.WriteInt32(block.CallbackParameters.Count);
-                for (int i = 0; i < block.CallbackParameters.Count; i++)
+                stream.WriteInt32(block.CapturedCallbackVariables.Count);
+                for (int i = 0; i < block.CapturedCallbackVariables.Count; i++)
                 {
-                    stream.WriteSymbol(block.CallbackParameters[i]);
+                    stream.WriteSymbol(block.CapturedCallbackVariables[i]);
                     stream.WriteInt32(1 + i); // TODO: Proper Index?
                 }
 
@@ -84,17 +84,17 @@ namespace GTAdhocCompiler
 
             if (Version <= 10)
             {
-                stream.WriteInt32(0);
-                stream.WriteInt32(0);
+                stream.WriteInt32(block.Stack.MaxStackStorageSize);
+                stream.WriteInt32(block.MaxVariableHeapSize);
             }
             else
             {
                 // Actual stack size
-                stream.WriteInt32(block.Stack.StackStorageSize);
+                stream.WriteInt32(block.Stack.MaxStackStorageSize);
 
                 /* These two are combined to make the size of the heap for variables */
-                stream.WriteInt32(block.VariableHeap.Count);
-                stream.WriteInt32(0); // Space for variables that have their symbols written twice
+                stream.WriteInt32(block.MaxVariableHeapSize);
+                stream.WriteInt32(0); // Space for variables that have their symbols written twice - static
             }
 
             stream.WriteInt32(block.Instructions.Count);
@@ -167,6 +167,10 @@ namespace GTAdhocCompiler
                     WriteArrayConst(instruction as InsArrayConst); break;
                 case AdhocInstructionType.STATIC_DEFINE:
                     WriteStaticDefine(instruction as InsStaticDefine); break;
+                case AdhocInstructionType.SOURCE_FILE:
+                    WriteSourceFile(instruction as InsSourceFile); break;
+                case AdhocInstructionType.LIST_ASSIGN:
+                    WriteListAssign(instruction as InsListAssign); break;
                 case AdhocInstructionType.NIL_CONST:
                 case AdhocInstructionType.VOID_CONST:
                 case AdhocInstructionType.ASSIGN_POP:
@@ -181,6 +185,16 @@ namespace GTAdhocCompiler
             }
         }
 
+        private void WriteListAssign(InsListAssign listAssign)
+        {
+            stream.WriteInt32(listAssign.VariableCount);
+            stream.WriteBoolean(listAssign.Unk);
+        }
+
+        private void WriteSourceFile(InsSourceFile srcFile)
+        {
+            stream.WriteSymbol(srcFile.FileName);
+        }
 
         private void WriteAttributeDefine(InsAttributeDefine attrDefine)
         {
@@ -200,13 +214,13 @@ namespace GTAdhocCompiler
         private void WriteFunction(InsFunctionDefine function)
         {
             stream.WriteSymbol(function.Name);
-            WriteCodeBlock(function.FunctionBlock);
+            WriteCodeBlock(function.CodeFrame);
         }
 
         private void WriteMethod(InsMethodDefine method)
         {
             stream.WriteSymbol(method.Name);
-            WriteCodeBlock(method.MethodBlock);
+            WriteCodeBlock(method.CodeFrame);
         }
 
         private void WriteClassDefine(InsClassDefine classDefine)

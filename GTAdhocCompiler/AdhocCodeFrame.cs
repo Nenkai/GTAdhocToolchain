@@ -9,9 +9,9 @@ using GTAdhocCompiler.Instructions;
 namespace GTAdhocCompiler
 {
     /// <summary>
-    /// Represents a block of instructions. May be a function, method, or main.
+    /// Represents a frame of instructions. May be a function, method, or main.
     /// </summary>
-    public class AdhocInstructionBlock
+    public class AdhocCodeFrame
     {
         /// <summary>
         /// Current instructions for this block.
@@ -21,10 +21,17 @@ namespace GTAdhocCompiler
         /// <summary>
         /// Source file for this block.
         /// </summary>
-        public AdhocSymbol SourceFilePath { get; private set; }
+        public AdhocSymbol SourceFilePath { get; set; }
 
-        public List<AdhocSymbol> Parameters { get; set; } = new List<AdhocSymbol>();
-        public List<AdhocSymbol> CallbackParameters { get; set; } = new List<AdhocSymbol>();
+        /// <summary>
+        /// Function or method parameters
+        /// </summary>
+        public List<AdhocSymbol> FunctionParameters { get; set; } = new List<AdhocSymbol>();
+
+        /// <summary>
+        /// Captured variables for function consts
+        /// </summary>
+        public List<AdhocSymbol> CapturedCallbackVariables { get; set; } = new List<AdhocSymbol>();
 
         /// <summary>
         /// Current stack for the block.
@@ -39,12 +46,20 @@ namespace GTAdhocCompiler
         /// <summary>
         /// To keep track of the current scope depth within the block. Used to whether a return or not has been writen to insert one later for instance.
         /// </summary>
-        public Stack<object> CurrentScopes { get; set; } = new();
-
-        public bool IsTopLevel => CurrentScopes.Count == 0;
+        public Stack<ScopeContext> CurrentScopes { get; set; } = new();
 
         /// <summary>
-        /// Variable Heap for the current block.
+        /// Gets the current scope.
+        /// </summary>
+        public ScopeContext CurrentScope => CurrentScopes.Peek();
+
+        /// <summary>
+        /// Returns whether the current scope is the top block level.
+        /// </summary>
+        public bool IsTopLevel => CurrentScopes.Count == 1;
+
+        /// <summary>
+        /// Heap for all variables for the current block.
         /// </summary>
         public List<string> VariableHeap { get; set; } = new()
         {
@@ -52,7 +67,7 @@ namespace GTAdhocCompiler
         };
 
         /// <summary>
-        /// Used to keep track of static and non static members, as static members have two symbols in their variable push/eval
+        /// Used to keep track of all declared variables, mostly for telling whether a variable is static or not
         /// </summary>
         public List<string> DeclaredVariables { get; set; } = new();
 
@@ -61,16 +76,13 @@ namespace GTAdhocCompiler
         /// </summary>
         public bool HasTopLevelReturnValue { get; set; }
 
+        public int MaxVariableHeapSize { get; set; }
+
+        /// <summary>
+        /// Gets the current/last loop.
+        /// </summary>
+        /// <returns></returns>
         public LoopContext GetLastLoop() => CurrentLoops.Peek();
-
-        public int AddSymbolToHeap(string variableName)
-        {
-            if (VariableHeap.Contains(variableName))
-                return VariableHeap.IndexOf(variableName);
-
-            VariableHeap.Add(variableName);
-            return VariableHeap.Count - 1;
-        }
 
         public void SetSourcePath(AdhocSymbolMap symbolMap, string path)
         {
@@ -85,9 +97,6 @@ namespace GTAdhocCompiler
         /// <exception cref="Exception"></exception>
         public void AddInstruction(InstructionBase ins, int lineNumber)
         {
-            if (lineNumber == 262)
-                ;
-
             ins.LineNumber = lineNumber;
             Instructions.Add(ins);
 
@@ -113,13 +122,13 @@ namespace GTAdhocCompiler
                     Stack.StackStorageCounter++; break;
                 case AdhocInstructionType.FUNCTION_DEFINE:
                     InsFunctionDefine func = ins as InsFunctionDefine;
-                    Stack.StackStorageCounter -= func.FunctionBlock.Parameters.Count; // Ver > 8
-                    Stack.StackStorageCounter -= func.FunctionBlock.CallbackParameters.Count; // Ver > 7
+                    Stack.StackStorageCounter -= func.CodeFrame.FunctionParameters.Count; // Ver > 8
+                    Stack.StackStorageCounter -= func.CodeFrame.CapturedCallbackVariables.Count; // Ver > 7
                     break;
                 case AdhocInstructionType.METHOD_DEFINE:
                     InsMethodDefine method = ins as InsMethodDefine;
-                    Stack.StackStorageCounter -= method.MethodBlock.Parameters.Count; // Ver > 8
-                    Stack.StackStorageCounter -= method.MethodBlock.CallbackParameters.Count; // Ver > 7
+                    Stack.StackStorageCounter -= method.CodeFrame.FunctionParameters.Count; // Ver > 8
+                    Stack.StackStorageCounter -= method.CodeFrame.CapturedCallbackVariables.Count; // Ver > 7
                     break;
                 case AdhocInstructionType.POP:
                 case AdhocInstructionType.POP_OLD:
@@ -180,6 +189,12 @@ namespace GTAdhocCompiler
                     Stack.StackStorageCounter -= push.StringCount;
                     Stack.StackStorageCounter++;
                     break;
+                case AdhocInstructionType.LIST_ASSIGN:
+                    InsListAssign listAssign = ins as InsListAssign;
+                    Stack.StackStorageCounter -= listAssign.VariableCount;
+                    Stack.StackStorageCounter--; // Array
+                    Stack.StackStorageCounter++;
+                    break;
                 // These have no effect on stack
                 case AdhocInstructionType.CLASS_DEFINE:
                 case AdhocInstructionType.EVAL:
@@ -211,10 +226,37 @@ namespace GTAdhocCompiler
             // VA_CALL
         }
 
-
         public int GetLastInstructionIndex()
         {
             return Instructions.Count;
+        }
+
+        public int AddScopeVariable(AdhocSymbol symbol, bool isVariableDeclaration = true)
+        {
+            var scope = CurrentScope;
+            if (VariableHeap.Contains(symbol.Name))
+                return VariableHeap.IndexOf(symbol.Name); // Already from the heap from a parent scope?
+
+            VariableHeap.Add(symbol.Name);
+            scope.ScopeVariables.Add(symbol.Name, symbol);
+
+            if (isVariableDeclaration && !DeclaredVariables.Contains(symbol.Name))
+                DeclaredVariables.Add(symbol.Name);
+
+            if (VariableHeap.Count > MaxVariableHeapSize)
+                MaxVariableHeapSize = VariableHeap.Count;
+
+            return VariableHeap.Count - 1;
+        }
+
+        public int GetDeclaredVariableIndex(AdhocSymbol adhoc)
+        {
+            return VariableHeap.IndexOf(adhoc.Name);
+        }
+
+        public void RewindVariableHeap(int count)
+        {
+            VariableHeap.RemoveRange(VariableHeap.Count - count, count);
         }
     }
 }
