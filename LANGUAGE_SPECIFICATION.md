@@ -98,6 +98,21 @@ import main::*; // Imports all modules within the main module.
 import main::pdistd::MWebAd::webad::*; // Imports all modules within a specific module path.
 ```
 
+### Includes
+C-type includes are supported.
+```c
+#include "projects/gt6/my_project/myinclude.ad"
+```
+
+### Function Expression Variable Capture
+Variables outside function expressions are captured.
+```js
+var myVariable = 0;
+var myFunc = function (){
+  return myVariable + 100;
+}
+```
+
 ### Not supported
 * Anything modern ECMAScript-ish features (arguably not needed).
 * `let`, `const` keywords are not implemented.
