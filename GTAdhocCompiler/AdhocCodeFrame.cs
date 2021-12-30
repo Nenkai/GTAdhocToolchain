@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
+using Esprima.Ast;
 using GTAdhocCompiler.Instructions;
 
 namespace GTAdhocCompiler
@@ -257,6 +258,18 @@ namespace GTAdhocCompiler
         public void RewindVariableHeap(int count)
         {
             VariableHeap.RemoveRange(VariableHeap.Count - count, count);
+        }
+
+        public ScopeContext GetLastBreakControlledScope()
+        {
+            for (int i = CurrentScopes.Count - 1; i >= 0; i--)
+            {
+                var scope = CurrentScopes.ElementAt(i);
+                if (scope is LoopContext || scope is SwitchContext)
+                    return scope;
+            }
+
+            return null;
         }
     }
 }

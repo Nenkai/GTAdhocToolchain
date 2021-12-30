@@ -91,7 +91,7 @@ namespace GTAdhocCompiler
                     CompileContinue(block, node as ContinueStatement);
                     break;
                 case Nodes.BreakStatement:
-                    // TODO
+                    CompileBreak(block, node as BreakStatement);
                     break;
                 case Nodes.IncludeStatement:
                     CompileIncludeStatement(block, node as IncludeStatement);
@@ -137,6 +137,27 @@ namespace GTAdhocCompiler
             // Resume
             InsSourceFile ogSrcFileIns = new InsSourceFile(block.SourceFilePath);
             block.AddInstruction(ogSrcFileIns, include.Location.Start.Line);
+        }
+
+        public void CompileBreak(AdhocCodeFrame block, BreakStatement breakStatement)
+        {
+            var scope = block.GetLastBreakControlledScope();
+            if (scope is LoopContext loopCtx)
+            {
+                InsJump breakJmp = new InsJump();
+                loopCtx.BreakJumps.Add(breakJmp);
+                block.Instructions.Add(breakJmp);
+            }
+            else if (scope is SwitchContext swContext)
+            {
+                InsJump breakJmp = new InsJump();
+                swContext.BreakJumps.Add(breakJmp);
+                block.Instructions.Add(breakJmp);
+            }
+            else
+            {
+                ThrowCompilationError(breakStatement, "Expected break statement to be in a loop or switch block.");
+            }
         }
 
         public void CompileClassDeclaration(AdhocCodeFrame block, ClassDeclaration classDecl)
@@ -453,8 +474,7 @@ namespace GTAdhocCompiler
         public void CompileSwitch(AdhocCodeFrame block, SwitchStatement switchStatement)
         {
             CompileExpression(block, switchStatement.Discriminant); // switch (type)
-            LoopContext loopCtx = new LoopContext(switchStatement);
-            block.CurrentScopes.Push(loopCtx);
+            SwitchContext switchCtx = EnterSwitch(block, switchStatement);
 
             // Create a label for the temporary switch variable
             string tmpCaseVariable = $"case#{SymbolMap.SwitchCaseTempValues++}";
@@ -462,7 +482,6 @@ namespace GTAdhocCompiler
             block.AddInstruction(InsAssignPop.Default, 0);
 
             Dictionary<SwitchCase, InsJumpIfTrue> caseBodyJumps = new();
-            Dictionary<SwitchCase, InsJump> caseLeaveJumps = new();
             InsJump defaultJump = null;
 
             // Write switch table jumps
@@ -504,26 +523,23 @@ namespace GTAdhocCompiler
             for (int i = 0; i < switchStatement.Cases.Count; i++)
             {
                 SwitchCase swCase = switchStatement.Cases[i];
-                InsJump leaveJump = new InsJump();
 
                 // Update body jump location
                 if (swCase.Test != null)
                     caseBodyJumps[swCase].JumpIndex = block.GetLastInstructionIndex();
                 else
                     defaultJump.JumpInstructionIndex = block.GetLastInstructionIndex();
-                caseLeaveJumps.Add(swCase, leaveJump);
 
+                // Not counting as scopes
                 foreach (var statement in swCase.Consequent)
                     CompileStatement(block, statement);
-
-                block.AddInstruction(leaveJump, 0);
             }
 
-            // Update exit jumps
-            for (int i = 0; i < switchStatement.Cases.Count; i++)
+            // Update break case jumps
+            for (int i = 0; i < switchCtx.BreakJumps.Count; i++)
             {
-                SwitchCase swCase = switchStatement.Cases[i];
-                caseLeaveJumps[swCase].JumpInstructionIndex = block.GetLastInstructionIndex();
+                InsJump swCase = switchCtx.BreakJumps[i];
+                swCase.JumpInstructionIndex = block.GetLastInstructionIndex();
             }
 
             // Leave switch block.
@@ -1567,6 +1583,13 @@ namespace GTAdhocCompiler
             block.CurrentLoops.Push(loopCtx);
             block.CurrentScopes.Push(loopCtx);
             return loopCtx;
+        }
+
+        private SwitchContext EnterSwitch(AdhocCodeFrame block, SwitchStatement node)
+        {
+            var scope = new SwitchContext(node);
+            block.CurrentScopes.Push(scope);
+            return scope;
         }
 
         private ScopeContext EnterScope(AdhocCodeFrame block, Node node)

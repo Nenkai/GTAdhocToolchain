@@ -10,19 +10,14 @@ using Esprima.Ast;
 
 namespace GTAdhocCompiler
 {
-    public class LoopContext : ScopeContext
+    public class SwitchContext : ScopeContext
     {
         /// <summary>
-        /// Direct jumps for continues
-        /// </summary>
-        public List<InsJump> ContinueJumps { get; set; } = new();
-
-        /// <summary>
-        /// Direct jumps for breaks to exit loops
+        /// Direct jumps for breaks to exit cases
         /// </summary>
         public List<InsJump> BreakJumps { get; set; } = new();
 
-        public LoopContext(Node srcNode)
+        public SwitchContext(Node srcNode)
             : base(srcNode)
         {
             
