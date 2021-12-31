@@ -19,7 +19,7 @@ namespace GTAdhocCompiler
             ProjectDirectory = dir;
         }
 
-        public void Compile(Script script)
+        public void CompileScript(Script script)
         {
             EnterScope(this, script);
 
@@ -96,6 +96,9 @@ namespace GTAdhocCompiler
                 case Nodes.IncludeStatement:
                     CompileIncludeStatement(block, node as IncludeStatement);
                     break;
+                case Nodes.ThrowStatement:
+                    CompileThrowStatement(block, node as ThrowStatement);
+                    break;
                 default:
                     ThrowCompilationError(node, "Statement not supported");
                     break;
@@ -132,11 +135,17 @@ namespace GTAdhocCompiler
             InsSourceFile srcFileIns = new InsSourceFile(SymbolMap.RegisterSymbol(include.Path, false));
             block.AddInstruction(srcFileIns, include.Location.Start.Line);
 
-            Compile(includeScript);
+            CompileStatements(this, includeScript.Body);
 
             // Resume
             InsSourceFile ogSrcFileIns = new InsSourceFile(block.SourceFilePath);
             block.AddInstruction(ogSrcFileIns, include.Location.Start.Line);
+        }
+
+        public void CompileThrowStatement(AdhocCodeFrame block, ThrowStatement throwStatement)
+        {
+            CompileExpression(block, throwStatement.Argument);
+            block.AddInstruction(InsThrow.Default, throwStatement.Location.Start.Line);
         }
 
         public void CompileBreak(AdhocCodeFrame block, BreakStatement breakStatement)
@@ -162,36 +171,43 @@ namespace GTAdhocCompiler
 
         public void CompileClassDeclaration(AdhocCodeFrame block, ClassDeclaration classDecl)
         {
-            if (classDecl.Id is null || classDecl.Id is not Identifier)
+            CompileNewClass(block, classDecl.Id, classDecl.SuperClass, classDecl.Body, classDecl.IsModule);
+        }
+
+        private void CompileNewClass(AdhocCodeFrame block, Identifier id, Node superClass, ClassBody body, bool isModule = false)
+        {
+            if (id is null || id is not Identifier)
             {
-                ThrowCompilationError(classDecl, "Class or module name must have a valid identifier.");
+                ThrowCompilationError(id, "Class or module name must have a valid identifier.");
                 return;
             }
 
-            if (classDecl.IsModule)
+            EnterScope(block, body);
+
+            if (isModule)
             {
                 InsModuleDefine mod = new InsModuleDefine();
-                mod.Names.Add(SymbolMap.RegisterSymbol(classDecl.Id.Name));
-                block.AddInstruction(mod, classDecl.Location.Start.Line);
+                mod.Names.Add(SymbolMap.RegisterSymbol(id.Name));
+                block.AddInstruction(mod, id.Location.Start.Line);
             }
             else
             {
                 InsClassDefine @class = new InsClassDefine();
-                @class.Name = SymbolMap.RegisterSymbol(classDecl.Id.Name);
-                var superClassIdent = classDecl.SuperClass as Identifier;
+                @class.Name = SymbolMap.RegisterSymbol(id.Name);
+                var superClassIdent = superClass as Identifier;
                 if (superClassIdent != null)
                 {
                     @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol(superClassIdent.Name));
                 }
-                else if (classDecl.SuperClass != null)
+                else if (superClass != null)
                 {
                     string fullSuperClassName = "";
-                    foreach (var node in classDecl.SuperClass.ChildNodes)
+                    foreach (var node in superClass.ChildNodes)
                     {
                         var nodeIdent = node as Identifier;
                         if (nodeIdent == null)
                         {
-                            ThrowCompilationError(classDecl, "Superclasses must be identifiers or module::identifiers.");
+                            ThrowCompilationError(superClass, "Superclasses must be identifiers or module::identifiers.");
                             return;
                         }
                         @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol(nodeIdent.Name));
@@ -200,10 +216,12 @@ namespace GTAdhocCompiler
                     fullSuperClassName = fullSuperClassName.Remove(fullSuperClassName.Length - 2);
                     @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol(fullSuperClassName));
                 }
-                block.AddInstruction(@class, classDecl.Location.Start.Line);
+                block.AddInstruction(@class, id.Location.Start.Line);
             }
 
-            CompileClassBody(block, classDecl.Body);
+            CompileClassBody(block, body);
+
+            LeaveScope(block);
 
             // Exit class or module scope. Important.
             InsSetState state = new InsSetState(AdhocRunState.EXIT);
@@ -275,7 +293,7 @@ namespace GTAdhocCompiler
 
                 endOrNextIfJump.JumpIndex = block.GetLastInstructionIndex();
 
-                CompileStatement(block, ifStatement.Alternate);
+                CompileStatementWithScope(block, ifStatement.Alternate);
 
                 skipAlternateJmp.JumpInstructionIndex = block.GetLastInstructionIndex();
             }
@@ -284,7 +302,7 @@ namespace GTAdhocCompiler
                 endOrNextIfJump.JumpIndex = block.GetLastInstructionIndex();
             }
 
-            LeaveScope(block);
+            LeaveScope(block, insertLeaveInstruction: false);
         }
 
         public void CompileFor(AdhocCodeFrame block, ForStatement forStatement)
@@ -321,7 +339,7 @@ namespace GTAdhocCompiler
                 block.AddInstruction(jumpIfFalse, 0);
             }
 
-            CompileStatementWithScope(block, forStatement.Body);
+            CompileStatement(block, forStatement.Body);
 
             // Reached bottom, proceed to do update
             // But first, process continue if any
@@ -446,19 +464,23 @@ namespace GTAdhocCompiler
             // Entering body, but we need to unbox the iterator's value into our declared variable
             InsertVariableEval(block, itorIdentifier);
             block.AddInstruction(InsEval.Default, 0);
-            CompileStatement(block, foreachStatement.Left);
+
+            if (foreachStatement.Left is not VariableDeclaration)
+                ThrowCompilationError(foreachStatement, "Expected foreach to have a variable declaration.");
+
+            CompileVariableDeclaration(block, foreachStatement.Left as VariableDeclaration, pushWhenNoInit: true); // We're unboxing, gotta push anyway
 
             // Compile body.
             CompileStatementWithScope(block, foreachStatement.Body);
+
+            // continue's...
+            foreach (var continueJmp in loopCtx.ContinueJumps)
+                continueJmp.JumpInstructionIndex = block.GetLastInstructionIndex(); // To the jump that jumps to the test back
 
             // Add the jump back to the test
             InsJump beginJump = new InsJump();
             beginJump.JumpInstructionIndex = testInsIndex;
             block.AddInstruction(beginJump, 0);
-
-            // continue's...
-            foreach (var continueJmp in loopCtx.ContinueJumps)
-                continueJmp.JumpInstructionIndex = testInsIndex;
 
             // Main exit...
             int loopExitIndex = block.GetLastInstructionIndex();
@@ -567,7 +589,7 @@ namespace GTAdhocCompiler
                     subroutine.CodeFrame.DeclaredVariables.Add(paramSymb.Name);
 
                     // Function param is uninitialized, push nil
-                    block.AddInstruction(InsNilConst.Empty, parentNode.Location.Start.Line);
+                    block.AddInstruction(InsNilConst.Empty, paramIdent.Location.Start.Line);
                     
                 }
                 else if (param is AssignmentExpression assignmentExpression)
@@ -604,8 +626,8 @@ namespace GTAdhocCompiler
             if (!subroutine.CodeFrame.HasTopLevelReturnValue)
             {
                 // All functions return a value internally, even if they don't in the code.
-                subroutine.CodeFrame.AddInstruction(InsVoidConst.Empty, 0);
-                subroutine.CodeFrame.AddInstruction(new InsSetState(AdhocRunState.RETURN), parentNode.Location.End.Line);
+                subroutine.CodeFrame.AddInstruction(InsVoidConst.Empty, body.Location.End.Line);
+                subroutine.CodeFrame.AddInstruction(new InsSetState(AdhocRunState.RETURN), 0);
             }
         }
 
@@ -630,7 +652,7 @@ namespace GTAdhocCompiler
                 block.HasTopLevelReturnValue = true;
         }
 
-        public void CompileVariableDeclaration(AdhocCodeFrame block, VariableDeclaration varDeclaration)
+        public void CompileVariableDeclaration(AdhocCodeFrame block, VariableDeclaration varDeclaration, bool pushWhenNoInit = false)
         {
             NodeList<VariableDeclarator> declarators = varDeclaration.Declarations;
             VariableDeclarator declarator = declarators[0];
@@ -647,7 +669,7 @@ namespace GTAdhocCompiler
 
             if (id is Identifier idIdentifier) // var hello [= world];
             {
-                if (initValue != null)
+                if (initValue != null || pushWhenNoInit)
                 {
                     // Variable is being defined with a value.
                     InsertVariablePush(block, idIdentifier);
@@ -780,10 +802,18 @@ namespace GTAdhocCompiler
                 case StaticExpression staticExpr:
                     CompileStaticExpression(block, staticExpr);
                     break;
+                case ClassExpression classExpr:
+                    CompileClassExpression(block, classExpr);
+                    break;
                 default:
                     ThrowCompilationError(exp, $"Expression {exp.Type} not supported");
                     break;
             }
+        }
+
+        private void CompileClassExpression(AdhocCodeFrame block, ClassExpression classExpression)
+        {
+            CompileNewClass(block, classExpression.Id, classExpression.SuperClass, classExpression.Body, classExpression.IsModule);
         }
 
         private void CompileStaticExpression(AdhocCodeFrame block, StaticExpression staticExpression)
@@ -824,19 +854,39 @@ namespace GTAdhocCompiler
 
         private void CompilePropertyDefinition(AdhocCodeFrame block, PropertyDefinition propDefinition)
         {
-            if (propDefinition.Static)
-                ThrowCompilationError(propDefinition, "Implement this");
-
-            CompileExpression(block, propDefinition.Value);
-
             if (propDefinition.Key is not Identifier)
-                ThrowCompilationError(propDefinition, "Expected property key to be an identifier.");
+            {
+                // Not actually a property definition - esprima hack
+                CompileExpression(block, propDefinition.Value);
+                CompileExpression(block, propDefinition.Key);
+            }
+            else
+            {
 
-            // Declaring a class attribute, so we don't push anything
-            var ident = propDefinition.Key as Identifier;
-            InsAttributeDefine attrDefine = new InsAttributeDefine();
-            attrDefine.AttributeName = SymbolMap.RegisterSymbol(ident.Name);
-            block.AddInstruction(attrDefine, ident.Location.Start.Line);
+                var ident = propDefinition.Key as Identifier;
+                var symb = SymbolMap.RegisterSymbol(ident.Name);
+
+                if (propDefinition.Static)
+                {
+                    InsStaticDefine staticDefine = new InsStaticDefine(symb);
+                    block.AddInstruction(staticDefine, propDefinition.Location.End.Line);
+
+                    CompileExpression(block, propDefinition.Value);
+
+                    // Assign
+                    InsertVariablePush(block, ident, staticVariableDoubleSymbol: true);
+                    block.AddInstruction(InsAssignPop.Default, 0);
+                }
+                else
+                {
+                    CompileExpression(block, propDefinition.Value);
+
+                    // Declaring a class attribute, so we don't push anything
+                    InsAttributeDefine attrDefine = new InsAttributeDefine();
+                    attrDefine.AttributeName = SymbolMap.RegisterSymbol(ident.Name);
+                    block.AddInstruction(attrDefine, ident.Location.Start.Line);
+                }
+            }
         }
 
         private void CompileArrayExpression(AdhocCodeFrame block, ArrayExpression arrayExpression)
@@ -1021,7 +1071,22 @@ namespace GTAdhocCompiler
             else if (IsAdhocAssignWithOperandOperator(assignExpression.Operator))
             {
                 // Assigning to self (+=)
-                InsertVariablePush(block, assignExpression.Left as Identifier); // Push current value first
+                if (assignExpression.Left is Identifier)
+                {
+                    // Pushing to variable
+                    InsertVariablePush(block, assignExpression.Left as Identifier); // Push current value first
+                }
+                else if (assignExpression.Left is AttributeMemberExpression attr)
+                {
+                    InsertAttributeMemberAssignmentPush(block, attr);
+                }
+                else if (assignExpression.Left is ComputedMemberExpression compExpression)
+                {
+                    CompileComputedMemberExpressionAssignment(block, compExpression);
+                }
+                else
+                    ThrowCompilationError(assignExpression, "Unimplemented");
+
                 CompileExpression(block, assignExpression.Right);
 
                 InsertBinaryAssignOperator(block, assignExpression, assignExpression.Operator, assignExpression.Location.Start.Line);
@@ -1046,23 +1111,14 @@ namespace GTAdhocCompiler
             }
             else if (expression is AttributeMemberExpression attrMember) // Pushing into an object i.e hello.world = "!"
             {
-                CompileExpression(block, attrMember.Object);
-                if (attrMember.Property is not Identifier)
-                    ThrowCompilationError(attrMember.Property, "Expected attribute member property identifier");
-
-                var propIdent = attrMember.Property as Identifier;
-
-                InsAttributePush attrPush = new InsAttributePush();
-                AdhocSymbol attrSymbol = SymbolMap.RegisterSymbol(propIdent.Name);
-                attrPush.AttributeSymbols.Add(attrSymbol);
-                if (staticVariableDoubleSymbol)
-                    attrPush.AttributeSymbols.Add(attrSymbol);
-                block.AddInstruction(attrPush, propIdent.Location.Start.Line);
+                InsertAttributeMemberAssignmentPush(block, attrMember);
             }
             else if (expression is ComputedMemberExpression compExpression)
             {
                 CompileComputedMemberExpressionAssignment(block, compExpression);
             }
+            else
+                ThrowCompilationError(expression, "Unimplemented");
 
             block.AddInstruction(InsAssignPop.Default, 0);
         }
@@ -1266,6 +1322,8 @@ namespace GTAdhocCompiler
             }
             else if (binExp.Operator == BinaryOperator.InstanceOf)
             {
+                CompileExpression(block, binExp.Left);
+
                 // Object.isInstanceOf - No idea if adhoc supports it, but eh, why not
                 InsertAttributeEval(block, new Identifier("isInstanceOf"));
 
@@ -1277,8 +1335,9 @@ namespace GTAdhocCompiler
             }
             else
             {
+                
                 CompileExpression(block, binExp.Right);
-
+                        
                 AdhocSymbol opSymbol = null;
                 switch (binExp.Operator)
                 {
@@ -1342,20 +1401,24 @@ namespace GTAdhocCompiler
         /// <exception cref="NotImplementedException"></exception>
         private void CompileUnaryExpression(AdhocCodeFrame block, UnaryExpression unaryExp)
         {
-            // We need to push instead
-            if (unaryExp.Argument is Identifier leftIdent)
-                InsertVariablePush(block, leftIdent);
-            else if (unaryExp.Argument is AttributeMemberExpression attr)
-                InsertVariablePush(block, attr.Property as Identifier);
-            else if (unaryExp.Argument is ComputedMemberExpression comp)
-                CompileComputedMemberExpression(block, comp);
-            else if (unaryExp.Argument is Literal literal) // -1 -> int const + unary op
-                CompileLiteral(block, literal);
-            else
-                ThrowCompilationError(unaryExp.Argument, "Unsupported");
-
             if (unaryExp is UpdateExpression upd)
             {
+                // Assigning - we need to push
+                if (unaryExp.Argument is Identifier leftIdent)
+                    InsertVariablePush(block, leftIdent);
+                else if (unaryExp.Argument is AttributeMemberExpression attr)
+                    InsertVariablePush(block, attr.Property as Identifier);
+                else if (unaryExp.Argument is ComputedMemberExpression comp)
+                    CompileComputedMemberExpression(block, comp);
+                else if (unaryExp.Argument is Literal literal) // -1 -> int const + unary op
+                    CompileLiteral(block, literal);
+                else if (unaryExp.Argument is CallExpression call)
+                    CompileCall(block, call);
+                else if (unaryExp.Argument is BinaryExpression binaryExp)
+                    CompileBinaryExpression(block, binaryExp);
+                else
+                    ThrowCompilationError(unaryExp.Argument, "Unsupported");
+
                 bool preIncrement = unaryExp.Prefix;
 
                 string op = unaryExp.Operator switch
@@ -1374,6 +1437,8 @@ namespace GTAdhocCompiler
             }
             else
             {
+                CompileExpression(block, unaryExp.Argument);
+
                 string op = unaryExp.Operator switch
                 {
                     UnaryOperator.LogicalNot => "!",
@@ -1410,6 +1475,7 @@ namespace GTAdhocCompiler
                     InstructionBase ins = literal.NumericTokenType switch
                     {
                         NumericTokenType.Integer => new InsIntConst((int)literal.NumericValue),
+                        NumericTokenType.Float => new InsFloatConst((float)literal.NumericValue),
                         _ => throw GetCompilationError(literal, "Unknown numeric literal type"),
                     };
                     block.AddInstruction(ins, literal.Location.Start.Line);
@@ -1475,6 +1541,26 @@ namespace GTAdhocCompiler
             block.AddInstruction(varPush, identifier.Location.Start.Line);
 
             return varSymb;
+        }
+
+        /// <summary>
+        /// Inserts a push to an object attribute
+        /// </summary>
+        /// <param name="block"></param>
+        /// <param name="attr"></param>
+        private void InsertAttributeMemberAssignmentPush(AdhocCodeFrame block, AttributeMemberExpression attr)
+        {
+            // Pushing to object attribute
+            CompileExpression(block, attr.Object);
+            if (attr.Property is not Identifier)
+                ThrowCompilationError(attr.Property, "Expected attribute member property identifier");
+
+            var propIdent = attr.Property as Identifier;
+
+            InsAttributePush attrPush = new InsAttributePush();
+            AdhocSymbol attrSymbol = SymbolMap.RegisterSymbol(propIdent.Name);
+            attrPush.AttributeSymbols.Add(attrSymbol);
+            block.AddInstruction(attrPush, propIdent.Location.Start.Line);
         }
 
         /// <summary>
@@ -1627,6 +1713,12 @@ namespace GTAdhocCompiler
         {
             if (statement is BlockStatement)
             {
+                CompileStatement(block, statement);
+            }
+            else if (statement is ContinueStatement
+                || statement is BreakStatement)
+            {
+                // continues are not a scope
                 CompileStatement(block, statement);
             }
             else

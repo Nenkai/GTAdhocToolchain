@@ -157,6 +157,9 @@ namespace GTAdhocCompiler
                     WriteStringPush(instruction as InsStringPush); break;
                 case AdhocInstructionType.INT_CONST:
                     WriteIntConst(instruction as InsIntConst); break;
+                case AdhocInstructionType.FLOAT_CONST:
+                    WriteFloatConst(instruction as InsFloatConst);
+                    break;
                 case AdhocInstructionType.SET_STATE:
                     WriteSetState(instruction as InsSetState); break;
                 case AdhocInstructionType.LEAVE:
@@ -179,6 +182,7 @@ namespace GTAdhocCompiler
                 case AdhocInstructionType.ELEMENT_EVAL:
                 case AdhocInstructionType.ELEMENT_PUSH:
                 case AdhocInstructionType.EVAL:
+                case AdhocInstructionType.THROW:
                     break;
                 default:
                     throw new NotImplementedException();
@@ -247,6 +251,11 @@ namespace GTAdhocCompiler
         private void WriteIntConst(InsIntConst intConst)
         {
             stream.WriteInt32(intConst.Value);
+        }
+
+        private void WriteFloatConst(InsFloatConst floatConst)
+        {
+            stream.WriteSingle(floatConst.Value);
         }
 
         private void WriteStringConst(InsStringConst stringConst)

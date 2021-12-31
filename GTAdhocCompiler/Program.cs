@@ -37,7 +37,7 @@ namespace GTAdhocCompiler
                 var compiler = new AdhocScriptCompiler();
                 compiler.SetProjectDirectory(args[0]);
                 compiler.SetSourcePath(compiler.SymbolMap, "www/gt7sp/adhoc/get_car_parameter.ad");
-                compiler.Compile(program);
+                compiler.CompileScript(program);
 
                 AdhocCodeGen codeGen = new AdhocCodeGen(compiler, compiler.SymbolMap);
                 codeGen.Generate();

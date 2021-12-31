@@ -115,7 +115,6 @@ namespace GTAdhocCompiler
                 case AdhocInstructionType.U_LONG_CONST:
                 case AdhocInstructionType.BOOL_CONST:
                 case AdhocInstructionType.DOUBLE_CONST:
-                case AdhocInstructionType.THROW:
                 case AdhocInstructionType.VARIABLE_PUSH:
                 case AdhocInstructionType.VARIABLE_EVAL:
                 case AdhocInstructionType.SYMBOL_CONST:
@@ -139,6 +138,7 @@ namespace GTAdhocCompiler
                 case AdhocInstructionType.REQUIRE:
                 case AdhocInstructionType.ARRAY_PUSH:
                 case AdhocInstructionType.MODULE_CONSTRUCTOR:
+                case AdhocInstructionType.THROW:
                     Stack.StackStorageCounter--; break;
                 case AdhocInstructionType.ASSIGN_POP:
                 case AdhocInstructionType.MAP_INSERT:
@@ -262,9 +262,8 @@ namespace GTAdhocCompiler
 
         public ScopeContext GetLastBreakControlledScope()
         {
-            for (int i = CurrentScopes.Count - 1; i >= 0; i--)
+            foreach (var scope in CurrentScopes)
             {
-                var scope = CurrentScopes.ElementAt(i);
                 if (scope is LoopContext || scope is SwitchContext)
                     return scope;
             }
