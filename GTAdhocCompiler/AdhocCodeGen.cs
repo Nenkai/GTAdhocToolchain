@@ -73,10 +73,11 @@ namespace GTAdhocCompiler
                 }
 
                 stream.WriteInt32(block.CapturedCallbackVariables.Count);
-                foreach (var capturedVariable in block.CapturedCallbackVariables)
+                for (int i = 0; i < block.CapturedCallbackVariables.Count; i++)
                 {
-                    stream.WriteSymbol(capturedVariable.Key);
-                    stream.WriteInt32(capturedVariable.Value); // TODO: Proper Index?
+                    AdhocSymbol capturedVariable = block.CapturedCallbackVariables[i];
+                    stream.WriteSymbol(capturedVariable);
+                    stream.WriteInt32(-(i + 1));
                 }
 
                 stream.WriteInt32(0); // Some stack variable index

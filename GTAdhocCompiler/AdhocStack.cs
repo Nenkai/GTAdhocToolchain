@@ -16,7 +16,7 @@ namespace GTAdhocCompiler
             null, // Always an empty one
         };
 
-        public int MaxLocalVariableStorageSize { get; set; }
+        public int MaxLocalVariableStorageSize { get; set; } = 1;
 
         // Used for counting the stack size within a block
         private int _stackStorageCounter;

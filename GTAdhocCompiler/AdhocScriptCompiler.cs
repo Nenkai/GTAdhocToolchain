@@ -19,17 +19,28 @@ namespace GTAdhocCompiler
             ProjectDirectory = dir;
         }
 
+        /// <summary>
+        /// Compiles a script.
+        /// </summary>
+        /// <param name="script"></param>
         public void CompileScript(Script script)
         {
             EnterScope(this, script);
-
-            // "this" is main + declarations
-            CompileStatements(this, script.Body);
-
+            CompileScriptBody(this, script);
             LeaveScope(this);
 
             // Script done.
             this.AddInstruction(new InsSetState(AdhocRunState.EXIT), 0);
+        }
+
+        /// <summary>
+        /// Compiles a script body into a frame.
+        /// </summary>
+        /// <param name="frame"></param>
+        /// <param name="script"></param>
+        public void CompileScriptBody(AdhocCodeFrame frame, Script script)
+        {
+            CompileStatements(frame, script.Body);
         }
 
         public void CompileStatements(AdhocCodeFrame frame, Node node)
@@ -132,10 +143,12 @@ namespace GTAdhocCompiler
             var parser = new AdhocAbstractSyntaxTree(file);
             Script includeScript = parser.ParseScript();
 
+            // Alert interpreter that the current source file has changed for debugging
             InsSourceFile srcFileIns = new InsSourceFile(SymbolMap.RegisterSymbol(include.Path, false));
             frame.AddInstruction(srcFileIns, include.Location.Start.Line);
 
-            CompileStatements(this, includeScript.Body);
+            // Copy include into current frame
+            CompileScriptBody(frame, includeScript);
 
             // Resume
             InsSourceFile ogSrcFileIns = new InsSourceFile(frame.SourceFilePath);
@@ -612,26 +625,25 @@ namespace GTAdhocCompiler
             frame.AddScopeVariable(subroutine.Name, isVariableDeclaration: false);
             frame.AddInstruction(subroutine, parentNode.Location.Start.Line);
 
-            var funcBody = body;
-            if (funcBody is BlockStatement BlockStatement)
+            if (body is BlockStatement blockStatement)
             {
                 EnterScope(subroutine.CodeFrame, parentNode);
                 foreach (var param in subroutine.CodeFrame.FunctionParameters)
                     subroutine.CodeFrame.AddScopeVariable(param);
                 
-                CompileBlockStatement(subroutine.CodeFrame, BlockStatement, openScope: false, insertLeaveInstruction: false);
+                CompileBlockStatement(subroutine.CodeFrame, blockStatement, openScope: false, insertLeaveInstruction: false);
             }
             else
-                ThrowCompilationError(funcBody, "Expected subroutine body to be frame statement.");
+                ThrowCompilationError(body, "Expected subroutine body to be frame statement.");
 
-            if (!subroutine.CodeFrame.HasTopLevelReturnValue)
-            {
-                // All functions return a value internally, even if they don't in the code.
-                subroutine.CodeFrame.AddInstruction(InsVoidConst.Empty, body.Location.End.Line);
-                subroutine.CodeFrame.AddInstruction(new InsSetState(AdhocRunState.RETURN), 0);
-            }
+            InsertFrameExitIfNeeded(subroutine.CodeFrame, body);
         }
 
+        /// <summary>
+        /// Compiles: 'return <expression>;' .
+        /// </summary>
+        /// <param name="frame"></param>
+        /// <param name="retStatement"></param>
         public void CompileReturnStatement(AdhocCodeFrame frame, ReturnStatement retStatement)
         {
             if (retStatement.Argument is not null) // Return has argument?
@@ -709,6 +721,11 @@ namespace GTAdhocCompiler
             }
         }
 
+        /// <summary>
+        /// Compiles an import declaration. 'import main::*'
+        /// </summary>
+        /// <param name="frame"></param>
+        /// <param name="import"></param>
         public void CompileImport(AdhocCodeFrame frame, ImportDeclaration import)
         {
             if (import.Specifiers.Count == 0)
@@ -822,31 +839,47 @@ namespace GTAdhocCompiler
         /// <param name="arrowFuncExpr"></param>
         private void CompileArrowFunctionExpression(AdhocCodeFrame frame, ArrowFunctionExpression arrowFuncExpr)
         {
-            NodeList<Expression> funcParams = arrowFuncExpr.Params;
-
             InsFunctionConst funcConst = new InsFunctionConst();
             funcConst.CodeFrame.ParentFrame = frame;
             funcConst.CodeFrame.SourceFilePath = frame.SourceFilePath;
+
+            /* Unlike JS, adhoc can capture variables from the parent frame
+             * Example:
+             *    var arr = [0, 1, 2];
+             *    var map = Map();               
+             *    arr.each(e => {
+             *        map[e.toString()] = e * 100; -> Inserts a new key/value pair into map, which is from the parent frame
+             *    });
+             */
             funcConst.CodeFrame.CanCaptureVariablesFromParentFrame = true;
-            
-            foreach (Expression param in funcParams)
+
+            EnterScope(funcConst.CodeFrame, arrowFuncExpr);
+
+            foreach (Expression param in arrowFuncExpr.Params)
             {
                 if (param is not Identifier)
                     ThrowCompilationError(param, "Expected function parameter to be an identifier.");
 
                 Identifier paramIdent = param as Identifier;
-                funcConst.CodeFrame.FunctionParameters.Add(SymbolMap.RegisterSymbol(paramIdent.Name));
+                AdhocSymbol paramSymbol = SymbolMap.RegisterSymbol(paramIdent.Name);
+                funcConst.CodeFrame.FunctionParameters.Add(paramSymbol);
+                funcConst.CodeFrame.AddScopeVariable(paramSymbol, isVariableDeclaration: true);
             }
 
+            EnterScope(funcConst.CodeFrame, arrowFuncExpr);
             CompileStatement(funcConst.CodeFrame, arrowFuncExpr.Body as BlockStatement);
+            LeaveScope(funcConst.CodeFrame, insertLeaveInstruction: false);
 
             for (int i = 0; i < funcConst.CodeFrame.FunctionParameters.Count; i++)
                 frame.AddInstruction(InsNilConst.Empty, 0);
 
+            // "Insert" by evaluating each captured variable
             foreach (var capturedVariable in funcConst.CodeFrame.CapturedCallbackVariables)
-                InsertVariablePush(frame, new Identifier(capturedVariable.Key.Name));
+                InsertVariableEval(frame, new Identifier(capturedVariable.Name));
 
             frame.AddInstruction(funcConst, arrowFuncExpr.Location.Start.Line);
+
+            LeaveScope(funcConst.CodeFrame, false);
         }
 
         private void CompileClassExpression(AdhocCodeFrame frame, ClassExpression classExpression)
@@ -856,7 +889,7 @@ namespace GTAdhocCompiler
 
         private void CompileStaticExpression(AdhocCodeFrame frame, StaticExpression staticExpression)
         {
-            if (staticExpression.VarExpression is not AssignmentExpression staticAssignment)
+            if (staticExpression.VarExpression is not AssignmentExpression)
                 ThrowCompilationError(staticExpression, "Expected static keyword to be a variable assignment.");
 
             AssignmentExpression assignmentExpression = staticExpression.VarExpression as AssignmentExpression;
@@ -1069,7 +1102,7 @@ namespace GTAdhocCompiler
             else
             {
                 /* Adhoc expects all literals and interpolated values to be all in a row, one per string push */
-                List<Node> literalNodes = new List<Node>();
+            List<Node> literalNodes = new List<Node>();
                 literalNodes.AddRange(templateLiteral.Quasis);
                 literalNodes.AddRange(templateLiteral.Expressions);
 
@@ -1622,23 +1655,19 @@ namespace GTAdhocCompiler
         }
 
         /// <summary>
-        /// Inserts an unary assign operator.
+        /// Inserts an empty return instruction if the frame wasn't explicitly exited with a return statement.
         /// </summary>
         /// <param name="frame"></param>
-        /// <param name="parentNode"></param>
-        /// <param name="unaryOperator"></param>
-        /// <param name="lineNumber"></param>
-        /// <returns></returns>
-        private AdhocSymbol InsertUnaryAssignOperator(AdhocCodeFrame frame, UnaryExpression parentNode, UnaryOperator unaryOperator, int lineNumber)
+        private void InsertFrameExitIfNeeded(AdhocCodeFrame frame, Node bodyNode)
         {
-            bool postIncrement = parentNode.Prefix;
-            string op = UnaryOperatorToString(parentNode.Operator, postIncrement);
-
-            AdhocSymbol symb = SymbolMap.RegisterSymbol(op);
-            InsUnaryAssignOperator unaryIns = new InsUnaryAssignOperator(symb);
-            frame.AddInstruction(unaryIns, parentNode.Location.Start.Line);
-
-            return symb;
+            // Was a return explicitly specified?
+            if (!frame.HasTopLevelReturnValue)
+            {
+                // All functions return a value internally, even if they don't in the code.
+                // So, add one.
+                frame.AddInstruction(InsVoidConst.Empty, bodyNode.Location.End.Line);
+                frame.AddInstruction(new InsSetState(AdhocRunState.RETURN), 0);
+            }
         }
 
         private static string AssignOperatorToString(AssignmentOperator op)
@@ -1698,6 +1727,12 @@ namespace GTAdhocCompiler
             throw GetCompilationError(node, message);
         }
 
+        /// <summary>
+        /// Gets a new compilation exception.
+        /// </summary>
+        /// <param name="node"></param>
+        /// <param name="message"></param>
+        /// <returns></returns>
         private AdhocCompilationException GetCompilationError(Node node, string message)
         {
             return new AdhocCompilationException($"{message}. Line {node.Location.Start.Line}:{node.Location.Start.Column}");
@@ -1725,12 +1760,21 @@ namespace GTAdhocCompiler
             return scope;
         }
 
+        /// <summary>
+        /// Leaves a loop scope for the frame.
+        /// </summary>
+        /// <param name="frame"></param>
         private void LeaveLoop(AdhocCodeFrame frame)
         {
             frame.CurrentLoops.Pop();
             LeaveScope(frame);
         }
 
+        /// <summary>
+        /// Leaves a scope for the frame, inserts a leave scope instruction.
+        /// </summary>
+        /// <param name="frame"></param>
+        /// <param name="insertLeaveInstruction"></param>
         private void LeaveScope(AdhocCodeFrame frame, bool insertLeaveInstruction = true)
         {
             var lastScope = frame.CurrentScopes.Pop();
@@ -1747,6 +1791,11 @@ namespace GTAdhocCompiler
             }
         }
 
+        /// <summary>
+        /// Compiles a statement and opens a new scope (unless it is a continue or break statement.).
+        /// </summary>
+        /// <param name="frame"></param>
+        /// <param name="statement"></param>
         private void CompileStatementWithScope(AdhocCodeFrame frame, Statement statement)
         {
             if (statement is BlockStatement)

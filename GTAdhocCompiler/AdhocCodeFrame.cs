@@ -42,7 +42,7 @@ namespace GTAdhocCompiler
         /// <summary>
         /// Captured variables for function consts
         /// </summary>
-        public Dictionary<AdhocSymbol, int> CapturedCallbackVariables { get; set; } = new();
+        public List<AdhocSymbol> CapturedCallbackVariables { get; set; } = new();
 
         /// <summary>
         /// Current stack for the block.
@@ -240,23 +240,25 @@ namespace GTAdhocCompiler
 
         public int AddScopeVariable(AdhocSymbol symbol, bool isVariableDeclaration = true)
         {
-            var scope = CurrentScope;
             if (!isVariableDeclaration && CanCaptureVariablesFromParentFrame && ParentFrame is not null)
             {
                 // Is a captured variable for function const?
-                if (ParentFrame.DeclaredVariables.Contains(symbol.Name) && !CapturedCallbackVariables.ContainsKey(symbol)
+                if (ParentFrame.DeclaredVariables.Contains(symbol.Name) && !CapturedCallbackVariables.Contains(symbol)
                     && !DeclaredVariables.Contains(symbol.Name))
                 {
-                    if (Stack.TryAddOrGetVariableIndex(symbol, out int varIndex))
-                        CapturedCallbackVariables.Add(symbol, varIndex);
-
-                    return varIndex;
+                    CapturedCallbackVariables.Add(symbol);
+                    DeclaredVariables.Add(symbol.Name); 
                 }
-
             }
 
+            // Captured variables do not count towards the local storage size
+            if (CapturedCallbackVariables.Contains(symbol))
+                return -(CapturedCallbackVariables.IndexOf(symbol) + 1); // 0 -> -1, 1 -> -2 etc
+            
             if (!Stack.TryAddOrGetVariableIndex(symbol, out int index))
                 return index;
+
+            var scope = CurrentScope;
 
             // We added a variable to the stack storage, add it to scope variables
             scope.ScopeVariables.Add(symbol.Name, symbol);
