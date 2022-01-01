@@ -73,10 +73,10 @@ namespace GTAdhocCompiler
                 }
 
                 stream.WriteInt32(block.CapturedCallbackVariables.Count);
-                for (int i = 0; i < block.CapturedCallbackVariables.Count; i++)
+                foreach (var capturedVariable in block.CapturedCallbackVariables)
                 {
-                    stream.WriteSymbol(block.CapturedCallbackVariables[i]);
-                    stream.WriteInt32(1 + i); // TODO: Proper Index?
+                    stream.WriteSymbol(capturedVariable.Key);
+                    stream.WriteInt32(capturedVariable.Value); // TODO: Proper Index?
                 }
 
                 stream.WriteInt32(0); // Some stack variable index
@@ -85,7 +85,7 @@ namespace GTAdhocCompiler
             if (Version <= 10)
             {
                 stream.WriteInt32(block.Stack.MaxStackStorageSize);
-                stream.WriteInt32(block.MaxVariableHeapSize);
+                stream.WriteInt32(block.Stack.MaxLocalVariableStorageSize);
             }
             else
             {
@@ -93,7 +93,7 @@ namespace GTAdhocCompiler
                 stream.WriteInt32(block.Stack.MaxStackStorageSize);
 
                 /* These two are combined to make the size of the heap for variables */
-                stream.WriteInt32(block.MaxVariableHeapSize);
+                stream.WriteInt32(block.Stack.MaxLocalVariableStorageSize);
                 stream.WriteInt32(0); // Space for variables that have their symbols written twice - static
             }
 
@@ -118,7 +118,9 @@ namespace GTAdhocCompiler
                 case AdhocInstructionType.IMPORT:
                     WriteImport(instruction as InsImport); break;
                 case AdhocInstructionType.FUNCTION_DEFINE:
-                    WriteFunction(instruction as InsFunctionDefine); break;
+                    WriteFunctionDefine(instruction as InsFunctionDefine); break;
+                case AdhocInstructionType.FUNCTION_CONST:
+                    WriteFunctionConst(instruction as InsFunctionConst); break;
                 case AdhocInstructionType.METHOD_DEFINE:
                     WriteMethod(instruction as InsMethodDefine); break;
                 case AdhocInstructionType.VARIABLE_EVAL:
@@ -215,10 +217,15 @@ namespace GTAdhocCompiler
             stream.WriteSymbol(staticDefine.Name);
         }
 
-        private void WriteFunction(InsFunctionDefine function)
+        private void WriteFunctionDefine(InsFunctionDefine function)
         {
             stream.WriteSymbol(function.Name);
             WriteCodeBlock(function.CodeFrame);
+        }
+
+        private void WriteFunctionConst(InsFunctionConst functionConst)
+        {
+            WriteCodeBlock(functionConst.CodeFrame);
         }
 
         private void WriteMethod(InsMethodDefine method)

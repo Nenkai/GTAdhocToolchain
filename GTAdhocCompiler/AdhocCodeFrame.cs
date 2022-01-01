@@ -15,6 +15,16 @@ namespace GTAdhocCompiler
     public class AdhocCodeFrame
     {
         /// <summary>
+        /// Parent frame for this frame, if exists.
+        /// </summary>
+        public AdhocCodeFrame ParentFrame { get; set; }
+
+        /// <summary>
+        /// Used for function variables/callbacks. Should be true for function consts.
+        /// </summary>
+        public bool CanCaptureVariablesFromParentFrame { get; set; }
+
+        /// <summary>
         /// Current instructions for this block.
         /// </summary>
         public List<InstructionBase> Instructions { get; set; } = new();
@@ -32,7 +42,7 @@ namespace GTAdhocCompiler
         /// <summary>
         /// Captured variables for function consts
         /// </summary>
-        public List<AdhocSymbol> CapturedCallbackVariables { get; set; } = new List<AdhocSymbol>();
+        public Dictionary<AdhocSymbol, int> CapturedCallbackVariables { get; set; } = new();
 
         /// <summary>
         /// Current stack for the block.
@@ -60,14 +70,6 @@ namespace GTAdhocCompiler
         public bool IsTopLevel => CurrentScopes.Count == 1;
 
         /// <summary>
-        /// Heap for all variables for the current block.
-        /// </summary>
-        public List<string> VariableHeap { get; set; } = new()
-        {
-            null, // Always an empty one
-        };
-
-        /// <summary>
         /// Used to keep track of all declared variables, mostly for telling whether a variable is static or not
         /// </summary>
         public List<string> DeclaredVariables { get; set; } = new();
@@ -76,8 +78,6 @@ namespace GTAdhocCompiler
         /// Whether the current block has a return statement, to manually add the return instructions if false.
         /// </summary>
         public bool HasTopLevelReturnValue { get; set; }
-
-        public int MaxVariableHeapSize { get; set; }
 
         /// <summary>
         /// Gets the current/last loop.
@@ -129,6 +129,12 @@ namespace GTAdhocCompiler
                     InsMethodDefine method = ins as InsMethodDefine;
                     Stack.StackStorageCounter -= method.CodeFrame.FunctionParameters.Count; // Ver > 8
                     Stack.StackStorageCounter -= method.CodeFrame.CapturedCallbackVariables.Count; // Ver > 7
+                    break;
+                case AdhocInstructionType.FUNCTION_CONST:
+                    InsFunctionConst funcConst = ins as InsFunctionConst;
+                    Stack.StackStorageCounter -= funcConst.CodeFrame.FunctionParameters.Count; // Ver > 8
+                    Stack.StackStorageCounter -= funcConst.CodeFrame.CapturedCallbackVariables.Count; // Ver > 7
+                    Stack.StackStorageCounter++; // Function itself
                     break;
                 case AdhocInstructionType.POP:
                 case AdhocInstructionType.POP_OLD:
@@ -235,30 +241,33 @@ namespace GTAdhocCompiler
         public int AddScopeVariable(AdhocSymbol symbol, bool isVariableDeclaration = true)
         {
             var scope = CurrentScope;
-            if (VariableHeap.Contains(symbol.Name))
-                return VariableHeap.IndexOf(symbol.Name); // Already from the heap from a parent scope?
+            if (!isVariableDeclaration && CanCaptureVariablesFromParentFrame && ParentFrame is not null)
+            {
+                // Is a captured variable for function const?
+                if (ParentFrame.DeclaredVariables.Contains(symbol.Name) && !CapturedCallbackVariables.ContainsKey(symbol)
+                    && !DeclaredVariables.Contains(symbol.Name))
+                {
+                    if (Stack.TryAddOrGetVariableIndex(symbol, out int varIndex))
+                        CapturedCallbackVariables.Add(symbol, varIndex);
 
-            VariableHeap.Add(symbol.Name);
+                    return varIndex;
+                }
+
+            }
+
+            if (!Stack.TryAddOrGetVariableIndex(symbol, out int index))
+                return index;
+
+            // We added a variable to the stack storage, add it to scope variables
             scope.ScopeVariables.Add(symbol.Name, symbol);
 
+            // And declared variables if it is a declaration
             if (isVariableDeclaration && !DeclaredVariables.Contains(symbol.Name))
                 DeclaredVariables.Add(symbol.Name);
 
-            if (VariableHeap.Count > MaxVariableHeapSize)
-                MaxVariableHeapSize = VariableHeap.Count;
-
-            return VariableHeap.Count - 1;
+            return index;
         }
 
-        public int GetDeclaredVariableIndex(AdhocSymbol adhoc)
-        {
-            return VariableHeap.IndexOf(adhoc.Name);
-        }
-
-        public void RewindVariableHeap(int count)
-        {
-            VariableHeap.RemoveRange(VariableHeap.Count - count, count);
-        }
 
         public ScopeContext GetLastBreakControlledScope()
         {
