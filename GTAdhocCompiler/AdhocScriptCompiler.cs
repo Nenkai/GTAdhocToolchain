@@ -583,11 +583,15 @@ namespace GTAdhocCompiler
 
         public void CompileFunctionDeclaration(AdhocCodeFrame frame, FunctionDeclaration funcDecl)
         {
-            CompileSubroutine(frame, funcDecl, funcDecl.Body, funcDecl.Id, funcDecl.Params, isMethod: false);
+            if (funcDecl.Id is not null)
+                CompileSubroutine(frame, funcDecl, funcDecl.Body, funcDecl.Id, funcDecl.Params, isMethod: false);
         }
 
         public void CompileSubroutine(AdhocCodeFrame frame, Node parentNode, Node body, Identifier id, NodeList<Expression> subParams, bool isMethod)
         {
+            if (id is null)
+                ThrowCompilationError(parentNode, "Expected subroutine to have an identifier.");
+
             SubroutineBase subroutine = isMethod ? new InsMethodDefine() : new InsFunctionDefine();
             if (id is not null)
                 subroutine.Name = SymbolMap.RegisterSymbol(id.Name);
@@ -832,12 +836,17 @@ namespace GTAdhocCompiler
             }
         }
 
+        private void CompileArrowFunctionExpression(AdhocCodeFrame frame, ArrowFunctionExpression arrowFuncExpr)
+        {
+            CompileAnonymousFunction(frame, arrowFuncExpr, arrowFuncExpr.Body, arrowFuncExpr.Params);
+        }
+
         /// <summary>
         /// Compiles: .doThing(e => <statement>)
         /// </summary>
         /// <param name="frame"></param>
         /// <param name="arrowFuncExpr"></param>
-        private void CompileArrowFunctionExpression(AdhocCodeFrame frame, ArrowFunctionExpression arrowFuncExpr)
+        private void CompileAnonymousFunction(AdhocCodeFrame frame, Node parentNode, Node body, NodeList<Expression> funcParams)
         {
             InsFunctionConst funcConst = new InsFunctionConst();
             funcConst.CodeFrame.ParentFrame = frame;
@@ -853,8 +862,8 @@ namespace GTAdhocCompiler
              */
             funcConst.CodeFrame.CanCaptureVariablesFromParentFrame = true;
 
-            EnterScope(funcConst.CodeFrame, arrowFuncExpr);
-            foreach (Expression param in arrowFuncExpr.Params)
+            EnterScope(funcConst.CodeFrame, parentNode);
+            foreach (Expression param in funcParams)
             {
                 if (param is not Identifier)
                     ThrowCompilationError(param, "Expected function parameter to be an identifier.");
@@ -865,7 +874,19 @@ namespace GTAdhocCompiler
                 funcConst.CodeFrame.AddScopeVariable(paramSymbol, isVariableDeclaration: true);
             }
 
-            CompileStatement(funcConst.CodeFrame, arrowFuncExpr.Body as BlockStatement);
+            if (body is BlockStatement)
+            {
+                CompileStatement(funcConst.CodeFrame, body as BlockStatement);
+                InsertFrameExitIfNeeded(funcConst.CodeFrame, body);
+            }
+            else
+            {
+                CompileExpression(funcConst.CodeFrame, body as Expression);
+
+                // Add implicit return
+                funcConst.CodeFrame.AddInstruction(new InsSetState(AdhocRunState.RETURN), 0);
+            }
+
             LeaveScope(funcConst.CodeFrame, insertLeaveInstruction: false);
 
             for (int i = 0; i < funcConst.CodeFrame.FunctionParameters.Count; i++)
@@ -875,9 +896,7 @@ namespace GTAdhocCompiler
             foreach (var capturedVariable in funcConst.CodeFrame.CapturedCallbackVariables)
                 InsertVariableEval(frame, new Identifier(capturedVariable.Name));
 
-            InsertFrameExitIfNeeded(funcConst.CodeFrame, arrowFuncExpr.Body);
-
-            frame.AddInstruction(funcConst, arrowFuncExpr.Location.Start.Line);
+            frame.AddInstruction(funcConst, parentNode.Location.Start.Line);
         }
 
         private void CompileClassExpression(AdhocCodeFrame frame, ClassExpression classExpression)
@@ -1009,7 +1028,16 @@ namespace GTAdhocCompiler
 
         private void CompileFunctionExpression(AdhocCodeFrame frame, FunctionExpression funcExp)
         {
-            CompileSubroutine(frame, funcExp, funcExp.Body, funcExp.Id, funcExp.Params, isMethod: false);
+            if (funcExp.Id is not null)
+            {
+                // Assume its a regular function or method
+                CompileSubroutine(frame, funcExp, funcExp.Body, funcExp.Id, funcExp.Params, isMethod: false);
+            }
+            else
+            {
+                // Assume it's an anonymous function, where variables can be captured
+                CompileAnonymousFunction(frame, funcExp, funcExp.Body, funcExp.Params);
+            }
         }
 
         // Combination of string literals/templates
