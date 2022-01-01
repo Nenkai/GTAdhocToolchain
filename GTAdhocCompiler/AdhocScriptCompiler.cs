@@ -854,7 +854,6 @@ namespace GTAdhocCompiler
             funcConst.CodeFrame.CanCaptureVariablesFromParentFrame = true;
 
             EnterScope(funcConst.CodeFrame, arrowFuncExpr);
-
             foreach (Expression param in arrowFuncExpr.Params)
             {
                 if (param is not Identifier)
@@ -866,7 +865,6 @@ namespace GTAdhocCompiler
                 funcConst.CodeFrame.AddScopeVariable(paramSymbol, isVariableDeclaration: true);
             }
 
-            EnterScope(funcConst.CodeFrame, arrowFuncExpr);
             CompileStatement(funcConst.CodeFrame, arrowFuncExpr.Body as BlockStatement);
             LeaveScope(funcConst.CodeFrame, insertLeaveInstruction: false);
 
@@ -877,9 +875,9 @@ namespace GTAdhocCompiler
             foreach (var capturedVariable in funcConst.CodeFrame.CapturedCallbackVariables)
                 InsertVariableEval(frame, new Identifier(capturedVariable.Name));
 
-            frame.AddInstruction(funcConst, arrowFuncExpr.Location.Start.Line);
+            InsertFrameExitIfNeeded(funcConst.CodeFrame, arrowFuncExpr.Body);
 
-            LeaveScope(funcConst.CodeFrame, false);
+            frame.AddInstruction(funcConst, arrowFuncExpr.Location.Start.Line);
         }
 
         private void CompileClassExpression(AdhocCodeFrame frame, ClassExpression classExpression)
