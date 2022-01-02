@@ -474,7 +474,7 @@ namespace GTAdhocCompiler
             InsJumpIfFalse exitJump = new InsJumpIfFalse(); // End loop jumper
             frame.AddInstruction(exitJump, 0);
 
-            // Entering body, but we need to unbox the iterator's value into our declared variable
+            // Entering body, but we need to get the iterator's value into our declared variable, equivalent to *iterator
             InsertVariableEval(frame, itorIdentifier);
             frame.AddInstruction(InsEval.Default, 0);
 
@@ -622,8 +622,20 @@ namespace GTAdhocCompiler
                     // Push default value
                     CompileLiteral(frame, assignmentExpression.Right as Literal);
                 }
+                else if (param is AssignmentPattern pattern)
+                {
+                    if (pattern.Right is not Literal)
+                        ThrowCompilationError(parentNode, "Subroutine parameter assignment must be an identifier to a literal.");
+
+                    AdhocSymbol paramSymb = SymbolMap.RegisterSymbol((pattern.Left as Identifier).Name);
+                    subroutine.CodeFrame.FunctionParameters.Add(paramSymb);
+                    subroutine.CodeFrame.DeclaredVariables.Add(paramSymb.Name);
+
+                    // Push default value
+                    CompileLiteral(frame, pattern.Right as Literal);
+                }
                 else
-                    ThrowCompilationError(parentNode, "Subroutine definition parameters must all be identifiers.");
+                    ThrowCompilationError(parentNode, "Subroutine definition parameters must all be identifier or assignment to a literal.");
             }
 
             frame.AddScopeVariable(subroutine.Name, isVariableDeclaration: false);
@@ -946,7 +958,15 @@ namespace GTAdhocCompiler
             {
                 // Not actually a property definition - esprima hack
                 CompileExpression(frame, propDefinition.Value);
-                CompileExpression(frame, propDefinition.Key);
+
+                if (propDefinition.Key is AttributeMemberExpression attrMemberExpression)
+                {
+                    InsertAttributeMemberAssignmentPush(frame, attrMemberExpression);
+                }
+                else
+                    ThrowCompilationError(propDefinition.Value, "Not implemented");
+
+                frame.AddInstruction(InsAssignPop.Default, 0);
             }
             else
             {
@@ -988,7 +1008,7 @@ namespace GTAdhocCompiler
 
                 CompileExpression(frame, elem);
 
-                frame.AddInstruction(InsArrayPush.Default, elem.Location.Start.Line);
+                frame.AddInstruction(InsArrayPush.Default, 0);
             }
         }
 
@@ -1213,6 +1233,13 @@ namespace GTAdhocCompiler
             else if (expression is ComputedMemberExpression compExpression)
             {
                 CompileComputedMemberExpressionAssignment(frame, compExpression);
+            }
+            else if (expression is UnaryExpression unaryExp && unaryExp.Operator == UnaryOperator.Indirection)
+            {
+                if (unaryExp.Argument is AttributeMemberExpression)
+                    CompileExpression(frame, unaryExp.Argument);
+                else
+                    ThrowCompilationError(expression, "TODO: Ref stuff");
             }
             else
                 ThrowCompilationError(expression, "Unimplemented");
@@ -1534,19 +1561,43 @@ namespace GTAdhocCompiler
             }
             else
             {
-                CompileExpression(frame, unaryExp.Argument);
-
-                string op = unaryExp.Operator switch
+                if (unaryExp.Operator == UnaryOperator.Indirection) // *
                 {
-                    UnaryOperator.LogicalNot => "!",
-                    UnaryOperator.Minus => "-@",
-                    UnaryOperator.Plus => "+@",
-                    _ => throw new NotImplementedException("TODO"),
-                };
+                    CompileExpression(frame, unaryExp.Argument);
+                    frame.AddInstruction(InsEval.Default, 0);
+                }
+                else if (unaryExp.Operator == UnaryOperator.ReferenceOf) // &
+                {
+                    CompileReferenceOfUnaryExpression(frame, unaryExp);
+                }
+                else
+                {
+                    CompileExpression(frame, unaryExp.Argument);
+                    string op = unaryExp.Operator switch
+                    {
+                        UnaryOperator.LogicalNot => "!",
+                        UnaryOperator.Minus => "-@",
+                        UnaryOperator.Plus => "+@",
+                        _ => throw new NotImplementedException("TODO"),
+                    };
 
-                AdhocSymbol symb = SymbolMap.RegisterSymbol(op);
-                InsUnaryOperator unaryIns = new InsUnaryOperator(symb);
-                frame.AddInstruction(unaryIns, unaryExp.Location.Start.Line);
+                    AdhocSymbol symb = SymbolMap.RegisterSymbol(op);
+                    InsUnaryOperator unaryIns = new InsUnaryOperator(symb);
+                    frame.AddInstruction(unaryIns, unaryExp.Location.Start.Line);
+                }
+            }
+        }
+
+        private void CompileReferenceOfUnaryExpression(AdhocCodeFrame frame, UnaryExpression unaryExp)
+        {
+            if (unaryExp.Argument is AttributeMemberExpression attrMemberExp)
+            {
+                // We need to push the object's reference, instead of simply evaluating it
+                InsertAttributeMemberAssignmentPush(frame, attrMemberExp);
+            }
+            else
+            {
+                ThrowCompilationError(unaryExp.Argument, "Not implemented");
             }
         }
 
