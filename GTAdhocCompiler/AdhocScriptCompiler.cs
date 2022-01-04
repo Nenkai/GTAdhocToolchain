@@ -1387,18 +1387,6 @@ namespace GTAdhocCompiler
         /// <param name="call"></param>
         private void CompileCall(AdhocCodeFrame frame, CallExpression call, bool popReturnValue = false)
         {
-            /* NOTE: So adhoc has this "EVAL" instruction which seems to be called as such: myArray[] 
-             * Obviously this is weird and Javascript doesnt support it normally
-             * So instead we're shortcuting calls to eval of an object property to the actual instruction
-             * It's a hack, but when you don't know the actual language syntax (and it may be a pain to implement anyway), this is the best compromise
-             * Just don't name your method "eval" i guess  */
-            if (call.Callee is AttributeMemberExpression exp && exp.Property is Identifier ident && ident.Name == "eval")
-            {
-                CompileAttributeMemberExpression(frame, exp, compileProperty: false);
-                frame.AddInstruction(InsEval.Default, 0);
-                return;
-            }
-
             CompileExpression(frame, call.Callee);
 
             for (int i = 0; i < call.Arguments.Count; i++)
