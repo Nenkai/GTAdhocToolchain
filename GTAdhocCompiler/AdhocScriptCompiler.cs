@@ -13,6 +13,15 @@ namespace GTAdhocCompiler
     {
         public AdhocSymbolMap SymbolMap { get; set; } = new();
 
+        public Stack<AdhocModule> Modules { get; set; } = new();
+
+        public AdhocScriptCompiler()
+        {
+            var topLevelModule = new AdhocModule();
+            Modules.Push(topLevelModule); // Top Level Module
+            this.CurrentModule = topLevelModule;
+        }
+
         public string ProjectDirectory { get; set; }
         public void SetProjectDirectory(string dir)
         {
@@ -200,18 +209,22 @@ namespace GTAdhocCompiler
                 return;
             }
 
-            EnterScope(frame, body);
+
+            AdhocModule moduleOrClass = EnterModuleOrClass(frame, body);
 
             if (isModule)
             {
                 InsModuleDefine mod = new InsModuleDefine();
                 mod.Names.Add(SymbolMap.RegisterSymbol(id.Name));
                 frame.AddInstruction(mod, id.Location.Start.Line);
+                moduleOrClass.Name = id.Name;
             }
             else
             {
                 InsClassDefine @class = new InsClassDefine();
                 @class.Name = SymbolMap.RegisterSymbol(id.Name);
+                moduleOrClass.Name = id.Name;
+
                 var superClassIdent = superClass as Identifier;
                 if (superClassIdent != null)
                 {
@@ -239,7 +252,7 @@ namespace GTAdhocCompiler
 
             CompileClassBody(frame, body);
 
-            LeaveScope(frame);
+            LeaveModuleOrClass(frame);
 
             // Exit class or module scope. Important.
             InsSetState state = new InsSetState(AdhocRunState.EXIT);
@@ -460,7 +473,7 @@ namespace GTAdhocCompiler
             frame.AddInstruction(attrIns, foreachStatement.Right.Location.Start.Line);
 
             // Assign it to a temporary value for the iteration
-            string itorVariable = $"in#{SymbolMap.InTempValues++}";
+            string itorVariable = $"in#{SymbolMap.TempVariableCounter++}";
             Identifier itorIdentifier = new Identifier(itorVariable)
             {
                 Location = foreachStatement.Right.Location,
@@ -517,7 +530,7 @@ namespace GTAdhocCompiler
             SwitchContext switchCtx = EnterSwitch(frame, switchStatement);
 
             // Create a label for the temporary switch variable
-            string tmpCaseVariable = $"case#{SymbolMap.SwitchCaseTempValues++}";
+            string tmpCaseVariable = $"case#{SymbolMap.TempVariableCounter++}";
             AdhocSymbol labelSymb = InsertVariablePush(frame, new Identifier(tmpCaseVariable));
             frame.AddInstruction(InsAssignPop.Default, 0);
 
@@ -602,6 +615,7 @@ namespace GTAdhocCompiler
                 subroutine.Name = SymbolMap.RegisterSymbol(id.Name);
             subroutine.CodeFrame.SourceFilePath = frame.SourceFilePath;
             subroutine.CodeFrame.ParentFrame = this;
+            subroutine.CodeFrame.CurrentModule = frame.CurrentModule;
 
             foreach (Expression param in subParams)
             {
@@ -868,6 +882,7 @@ namespace GTAdhocCompiler
             InsFunctionConst funcConst = new InsFunctionConst();
             funcConst.CodeFrame.ParentFrame = frame;
             funcConst.CodeFrame.SourceFilePath = frame.SourceFilePath;
+            funcConst.CodeFrame.CurrentModule = frame.CurrentModule;
 
             /* Unlike JS, adhoc can capture variables from the parent frame
              * Example:
@@ -936,16 +951,19 @@ namespace GTAdhocCompiler
             InsStaticDefine staticDefine = new InsStaticDefine(idSymb);
             frame.AddInstruction(staticDefine, staticExpression.Location.End.Line);
 
+            if (!frame.CurrentModule.DefineStatic(idSymb))
+                ThrowCompilationError(assignmentExpression, $"Static member {idSymb.Name} was already declared in this module.");
+
             if (assignmentExpression.Operator == AssignmentOperator.Assign)
             {
                 // Assigning to something new
                 CompileExpression(frame, assignmentExpression.Right);
-                CompileVariableAssignment(frame, assignmentExpression.Left, staticVariableDoubleSymbol: true);
+                CompileVariableAssignment(frame, assignmentExpression.Left);
             }
             else if (IsAdhocAssignWithOperandOperator(assignmentExpression.Operator))
             {
                 // Assigning to self (+=)
-                InsertVariablePush(frame, assignmentExpression.Left as Identifier, staticVariableDoubleSymbol: true); // Push current value first
+                InsertVariablePush(frame, assignmentExpression.Left as Identifier); // Push current value first
                 CompileExpression(frame, assignmentExpression.Right);
 
                 InsertBinaryAssignOperator(frame, assignmentExpression, assignmentExpression.Operator, assignmentExpression.Location.Start.Line);
@@ -983,12 +1001,17 @@ namespace GTAdhocCompiler
                 {
                     InsStaticDefine staticDefine = new InsStaticDefine(symb);
                     frame.AddInstruction(staticDefine, propDefinition.Location.End.Line);
+                    if (!frame.CurrentModule.DefineStatic(symb))
+                        ThrowCompilationError(propDefinition, $"Static member {symb.Name} was already declared in this module.");
 
-                    CompileExpression(frame, propDefinition.Value);
+                    if (propDefinition.Value is not null)
+                    {
+                        CompileExpression(frame, propDefinition.Value);
 
-                    // Assign
-                    InsertVariablePush(frame, ident, staticVariableDoubleSymbol: true);
-                    frame.AddInstruction(InsAssignPop.Default, 0);
+                        // Assign
+                        InsertVariablePush(frame, ident);
+                        frame.AddInstruction(InsAssignPop.Default, 0);
+                    }
                 }
                 else
                 {
@@ -1225,11 +1248,11 @@ namespace GTAdhocCompiler
         /// </summary>
         /// <param name="frame"></param>
         /// <param name="expression"></param>
-        public void CompileVariableAssignment(AdhocCodeFrame frame, Expression expression, bool staticVariableDoubleSymbol = false)
+        public void CompileVariableAssignment(AdhocCodeFrame frame, Expression expression)
         {
             if (expression is Identifier ident) // hello = world
             {
-                InsertVariablePush(frame, ident, staticVariableDoubleSymbol);
+                InsertVariablePush(frame, ident);
             }
             else if (expression is AttributeMemberExpression attrMember) // Pushing into an object i.e hello.world = "!"
             {
@@ -1539,7 +1562,7 @@ namespace GTAdhocCompiler
             CompileExpression(frame, finalizerStatement.Body);
 
             // add temp value & set finally
-            InsertVariablePush(frame, new Identifier($"fin#{SymbolMap.FinalizeTempValues}") { Location = finalizerStatement.Body.Location });
+            InsertVariablePush(frame, new Identifier($"fin#{SymbolMap.TempVariableCounter++}") { Location = finalizerStatement.Body.Location });
 
             InsAttributePush push = new InsAttributePush();
             push.AttributeSymbols.Add(SymbolMap.RegisterSymbol("finally"));
@@ -1693,7 +1716,11 @@ namespace GTAdhocCompiler
             varEval.VariableSymbols.Add(symb); // Only one
             frame.AddInstruction(varEval, identifier.Location.Start.Line);
 
-            if (!frame.DeclaredVariables.Contains(symb.Name) && identifier.Name != "self") // Ignore self keyword
+            // Static references or pushes always have double their own symbol
+            // If its a static reference, do not add it as a declared variable within this scope
+            // "self" keyword is ignored
+            if (frame.CurrentModule.IsDefinedStatic(symb) || (!symb.Name.Equals("self") && 
+                !frame.DeclaredVariables.Contains(symb.Name)))
                 varEval.VariableSymbols.Add(symb); // Static, two symbols
 
             return symb;
@@ -1705,16 +1732,23 @@ namespace GTAdhocCompiler
         /// <param name="frame"></param>
         /// <param name="identifier"></param>
         /// <returns></returns>
-        private AdhocSymbol InsertVariablePush(AdhocCodeFrame frame, Identifier identifier, bool staticVariableDoubleSymbol = false)
+        private AdhocSymbol InsertVariablePush(AdhocCodeFrame frame, Identifier identifier)
         {
             AdhocSymbol varSymb = SymbolMap.RegisterSymbol(identifier.Name);
             int idx = frame.AddScopeVariable(varSymb);
 
             var varPush = new InsVariablePush();
             varPush.VariableSymbols.Add(varSymb);
-            if (staticVariableDoubleSymbol)
-                varPush.VariableSymbols.Add(varSymb);
 
+            // Refer to comment in InsertVariableEval
+            if (!frame.CurrentModule.IsDefinedStatic(varSymb) && !varSymb.Name.Equals("self") &&
+                !frame.DeclaredVariables.Contains(identifier.Name))
+                frame.DeclaredVariables.Add(identifier.Name);
+            
+            // At this point, if it's not added that means itsa local variable that we address with one unique symbol
+            if (!frame.DeclaredVariables.Contains(identifier.Name))
+                varPush.VariableSymbols.Add(varSymb);
+                
             varPush.VariableStorageIndex = idx;
             frame.AddInstruction(varPush, identifier.Location.Start.Line);
 
@@ -1867,6 +1901,18 @@ namespace GTAdhocCompiler
             return scope;
         }
 
+        private AdhocModule EnterModuleOrClass(AdhocCodeFrame frame, Node node)
+        {
+            var scope = new ScopeContext(node);
+            frame.CurrentScopes.Push(scope);
+
+            AdhocModule newModule = new AdhocModule();
+            Modules.Push(newModule);
+            frame.CurrentModule = newModule;
+
+            return newModule;
+        }
+
         /// <summary>
         /// Leaves a loop scope for the frame.
         /// </summary>
@@ -1896,6 +1942,13 @@ namespace GTAdhocCompiler
                 leave.VariableHeapRewindIndex = frame.Stack.LocalVariableStorage.Count;
                 frame.AddInstruction(leave, 0);
             }
+        }
+
+        private void LeaveModuleOrClass(AdhocCodeFrame frame)
+        {
+            LeaveScope(frame);
+            Modules.Pop();
+            frame.CurrentModule = Modules.Peek();
         }
 
         /// <summary>

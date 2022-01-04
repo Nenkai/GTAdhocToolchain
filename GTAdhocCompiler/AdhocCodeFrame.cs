@@ -20,6 +20,11 @@ namespace GTAdhocCompiler
         public AdhocCodeFrame ParentFrame { get; set; }
 
         /// <summary>
+        /// Module for this frame.
+        /// </summary>
+        public AdhocModule CurrentModule { get; set; }
+
+        /// <summary>
         /// Used for function variables/callbacks. Should be true for function consts.
         /// </summary>
         public bool CanCaptureVariablesFromParentFrame { get; set; }
@@ -260,13 +265,16 @@ namespace GTAdhocCompiler
             // We added a variable to the stack storage, add it to scope variables
             scope.ScopeVariables.Add(symbol.Name, symbol);
 
-            // And declared variables if it is a declaration
-            if (isVariableDeclaration && !DeclaredVariables.Contains(symbol.Name))
-                DeclaredVariables.Add(symbol.Name);
-
             return index;
         }
 
+        public bool IsStaticVariable(string str)
+        {
+            if (DeclaredVariables.Contains(str))
+                return false;
+
+            return true;
+        }
 
         public ScopeContext GetLastBreakControlledScope()
         {

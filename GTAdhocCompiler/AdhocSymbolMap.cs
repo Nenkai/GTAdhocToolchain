@@ -11,19 +11,10 @@ namespace GTAdhocCompiler
         public Dictionary<string, AdhocSymbol> Symbols { get; set; } = new();
 
         /// <summary>
-        /// case#<number> counter
+        /// case#/in#/catch# etc counter
         /// </summary>
-        public int SwitchCaseTempValues { get; set; } = 0;
+        public int TempVariableCounter { get; set; } = 0;
 
-        /// <summary>
-        /// in#<number> counter
-        /// </summary>
-        public int InTempValues { get; set; } = 0;
-
-        /// <summary>
-        /// fin#<number> counter
-        /// </summary>
-        public int FinalizeTempValues { get; set; } = 0;
 
         /// <summary>
         /// Adds a new symbol to the map if it doesn't already exists.
@@ -73,6 +64,7 @@ namespace GTAdhocCompiler
                 ">>" => "__rshift__", // Right Shift
                 "~" => "__invert__", // Invert
                 "|" => "__or__", // Or
+                "&" => "__and__",
 
                 "-@" => "__uminus__", // Unary Minus
                 "+@" => "__uplus__", // Unary Plus
