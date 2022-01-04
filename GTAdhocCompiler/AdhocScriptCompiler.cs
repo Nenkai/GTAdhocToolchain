@@ -110,6 +110,11 @@ namespace GTAdhocCompiler
                 case Nodes.ThrowStatement:
                     CompileThrowStatement(frame, node as ThrowStatement);
                     break;
+                case Nodes.FinalizerStatement:
+                    CompileFinalizerStatement(frame, node as FinalizerStatement);
+                    break;
+                case Nodes.EmptyStatement:
+                    break;
                 default:
                     ThrowCompilationError(node, "Statement not supported");
                     break;
@@ -455,7 +460,7 @@ namespace GTAdhocCompiler
             frame.AddInstruction(attrIns, foreachStatement.Right.Location.Start.Line);
 
             // Assign it to a temporary value for the iteration
-            string itorVariable = $"in#{SymbolMap.SwitchCaseTempValues++}";
+            string itorVariable = $"in#{SymbolMap.InTempValues++}";
             Identifier itorIdentifier = new Identifier(itorVariable)
             {
                 Location = foreachStatement.Right.Location,
@@ -1446,16 +1451,7 @@ namespace GTAdhocCompiler
             }
             else if (binExp.Operator == BinaryOperator.InstanceOf)
             {
-                CompileExpression(frame, binExp.Left);
-
-                // Object.isInstanceOf - No idea if adhoc supports it, but eh, why not
-                InsertAttributeEval(frame, new Identifier("isInstanceOf"));
-
-                // Eval right identifier (if its one)
-                CompileExpression(frame, binExp.Right);
-
-                // Call.
-                frame.AddInstruction(new InsCall(argumentCount: 1), binExp.Location.Start.Line);
+                CompileInstanceOfOperator(frame, binExp);
             }
             else
             {
@@ -1515,6 +1511,52 @@ namespace GTAdhocCompiler
                 InsBinaryOperator binOpIns = new InsBinaryOperator(opSymbol);
                 frame.AddInstruction(binOpIns, binExp.Location.Start.Line);
             }
+        }
+
+        private void CompileInstanceOfOperator(AdhocCodeFrame frame, BinaryExpression binExp)
+        {
+            CompileExpression(frame, binExp.Left);
+
+            // Object.isInstanceOf - No idea if adhoc supports it, but eh, why not
+            InsertAttributeEval(frame, new Identifier("isInstanceOf"));
+
+            // Eval right identifier (if its one)
+            CompileExpression(frame, binExp.Right);
+
+            // Call.
+            frame.AddInstruction(new InsCall(argumentCount: 1), binExp.Location.Start.Line);
+        }
+
+        private void CompileFinalizerStatement(AdhocCodeFrame frame, FinalizerStatement finalizerStatement)
+        {
+            if (finalizerStatement.Body is FunctionExpression funcExp)
+            {
+                if (funcExp.Id is not null)
+                    ThrowCompilationError(funcExp, "Finalizer function expression must not have a name.");
+                if (funcExp.Params.Count > 0)
+                    ThrowCompilationError(funcExp, "Finalizer function expression must not have arguments.");
+            }
+            else if (finalizerStatement.Body is ArrowFunctionExpression arrowFuncExp)
+            {
+                if (arrowFuncExp.Id is not null)
+                    ThrowCompilationError(arrowFuncExp, "Finalizer arrow function expression must not have a name.");
+                if (arrowFuncExp.Params.Count > 0)
+                    ThrowCompilationError(arrowFuncExp, "Finalizer arrow function expression must not have arguments.");
+            }
+            else
+            {
+                ThrowCompilationError(finalizerStatement.Body, "Expected finalizer to be a function expression or function lambda.");
+            }
+
+            CompileExpression(frame, finalizerStatement.Body);
+
+            // add temp value & set finally
+            InsertVariablePush(frame, new Identifier($"fin#{SymbolMap.FinalizeTempValues}") { Location = finalizerStatement.Body.Location });
+
+            InsAttributePush push = new InsAttributePush();
+            push.AttributeSymbols.Add(SymbolMap.RegisterSymbol("finally"));
+            frame.AddInstruction(push, finalizerStatement.Body.Location.Start.Line);
+            frame.AddInstruction(InsAssignPop.Default, 0);
         }
 
         /// <summary>

@@ -224,9 +224,6 @@ namespace GTAdhocCompiler
                     throw new Exception("Not implemented");
             }
 
-            // FUNCTION_CONST
-            // METHOD_CONST
-            // LIST_ASSIGN
             // CALL_OLD
             // LEAVE
             // SET_STATE

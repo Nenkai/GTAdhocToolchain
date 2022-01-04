@@ -32,7 +32,7 @@ namespace GTAdhocCompiler
 
                 var source = File.ReadAllText(args[1]);
                 var parser = new AdhocAbstractSyntaxTree(source);
-                var program = parser.ParseScript();
+               var program = parser.ParseScript();
 
                 var compiler = new AdhocScriptCompiler();
                 compiler.SetProjectDirectory(args[0]);
