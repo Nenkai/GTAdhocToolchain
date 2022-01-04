@@ -110,7 +110,6 @@ namespace GTAdhocCompiler
             {
                 case AdhocInstructionType.ARRAY_CONST:
                 case AdhocInstructionType.MAP_CONST:
-                case AdhocInstructionType.ATTRIBUTE_DEFINE: // Note: Investigate check potential pop by attribute_define only if Version > 6
                 case AdhocInstructionType.FLOAT_CONST:
                 case AdhocInstructionType.INT_CONST:
                 case AdhocInstructionType.U_INT_CONST:
@@ -150,6 +149,7 @@ namespace GTAdhocCompiler
                 case AdhocInstructionType.ARRAY_PUSH:
                 case AdhocInstructionType.MODULE_CONSTRUCTOR:
                 case AdhocInstructionType.THROW:
+                case AdhocInstructionType.ATTRIBUTE_DEFINE: // Note: Investigate check potential pop by attribute_define only if Version > 6
                     Stack.StackStorageCounter--; break;
                 case AdhocInstructionType.ASSIGN_POP:
                 case AdhocInstructionType.MAP_INSERT:
@@ -240,7 +240,7 @@ namespace GTAdhocCompiler
             return Instructions.Count;
         }
 
-        public int AddScopeVariable(AdhocSymbol symbol, bool isVariableDeclaration = true)
+        public int AddScopeVariable(AdhocSymbol symbol, bool isVariableDeclaration = true, bool isStaticDefinition = false)
         {
             if (!isVariableDeclaration && CanCaptureVariablesFromParentFrame && ParentFrame is not null)
             {
@@ -256,9 +256,13 @@ namespace GTAdhocCompiler
             // Captured variables do not count towards the local storage size
             if (CapturedCallbackVariables.Contains(symbol))
                 return -(CapturedCallbackVariables.IndexOf(symbol) + 1); // 0 -> -1, 1 -> -2 etc
-            
+
             if (!Stack.TryAddOrGetVariableIndex(symbol, out int index))
+            {
+                if (isStaticDefinition)
+                    Stack.MaxLocalVariableStorageSize++; // Relevant when the frame is the same when exiting/entering modules, which may have identical identifier names
                 return index;
+            }
 
             var scope = CurrentScope;
 

@@ -3,6 +3,7 @@ using Esprima;
 using Esprima.Ast;
 
 using GTAdhocCompiler.Instructions;
+using GTAdhocCompiler.Project;
 
 namespace GTAdhocCompiler
 {
@@ -23,6 +24,8 @@ namespace GTAdhocCompiler
         }
 
         public string ProjectDirectory { get; set; }
+        public string BaseDirectory { get; set; }
+
         public void SetProjectDirectory(string dir)
         {
             ProjectDirectory = dir;
@@ -215,12 +218,24 @@ namespace GTAdhocCompiler
             if (isModule)
             {
                 InsModuleDefine mod = new InsModuleDefine();
-                mod.Names.Add(SymbolMap.RegisterSymbol(id.Name));
+
+                if (id.Name.Contains("::"))
+                {
+                    foreach (string identifier in id.Name.Split("::"))
+                        mod.Names.Add(SymbolMap.RegisterSymbol(identifier));
+                    mod.Names.Add(SymbolMap.RegisterSymbol(id.Name)); // Full
+                }
+                else
+                    mod.Names.Add(SymbolMap.RegisterSymbol(id.Name));
+
                 frame.AddInstruction(mod, id.Location.Start.Line);
                 moduleOrClass.Name = id.Name;
             }
             else
             {
+                if (id.Name.Contains("::"))
+                    ThrowCompilationError(superClass, "Class name must be an identifier without a scope path (::).");
+
                 InsClassDefine @class = new InsClassDefine();
                 @class.Name = SymbolMap.RegisterSymbol(id.Name);
                 moduleOrClass.Name = id.Name;
@@ -263,11 +278,17 @@ namespace GTAdhocCompiler
         {
             foreach (var prop in classBody.Body)
             {
-                if (prop is Expression exp)
-                    CompileExpression(frame, exp);
+                if (prop is CallExpression callExp)
+                {
+                    CompileCall(frame, callExp, popReturnValue: true);
+                }
                 else if (prop is IncludeStatement includeStatement)
                 {
                     CompileIncludeStatement(frame, includeStatement);
+                }
+                else if (prop is Expression exp)
+                {
+                    CompileExpression(frame, exp);
                 }
                 else
                 {
@@ -657,7 +678,9 @@ namespace GTAdhocCompiler
                     ThrowCompilationError(parentNode, "Subroutine definition parameters must all be identifier or assignment to a literal.");
             }
 
-            frame.AddScopeVariable(subroutine.Name, isVariableDeclaration: false);
+            frame.AddScopeVariable(subroutine.Name, isVariableDeclaration: false, isStaticDefinition: true);
+            frame.Stack.MaxLocalVariableStorageSize++;
+
             frame.AddInstruction(subroutine, parentNode.Location.Start.Line);
 
             if (body is BlockStatement blockStatement)
@@ -861,6 +884,9 @@ namespace GTAdhocCompiler
                 case ArrowFunctionExpression arrowFuncExpr:
                     CompileArrowFunctionExpression(frame, arrowFuncExpr);
                     break;
+                case ImportExpression importExpression:
+                    CompileImport(frame, importExpression.Declaration);
+                    break;
                 default:
                     ThrowCompilationError(exp, $"Expression {exp.Type} not supported");
                     break;
@@ -1016,6 +1042,9 @@ namespace GTAdhocCompiler
                 else
                 {
                     CompileExpression(frame, propDefinition.Value);
+
+                    // Counts towards a constant for the current frame
+                    frame.Stack.MaxLocalVariableStorageSize++;
 
                     // Declaring a class attribute, so we don't push anything
                     InsAttributeDefine attrDefine = new InsAttributeDefine();
@@ -1410,6 +1439,9 @@ namespace GTAdhocCompiler
         /// <param name="call"></param>
         private void CompileCall(AdhocCodeFrame frame, CallExpression call, bool popReturnValue = false)
         {
+            if (call.Location.Start.Line == 740)
+                ;
+
             CompileExpression(frame, call.Callee);
 
             for (int i = 0; i < call.Arguments.Count; i++)
@@ -1584,7 +1616,7 @@ namespace GTAdhocCompiler
                 if (unaryExp.Argument is Identifier leftIdent)
                     InsertVariablePush(frame, leftIdent);
                 else if (unaryExp.Argument is AttributeMemberExpression attr)
-                    InsertVariablePush(frame, attr.Property as Identifier);
+                    InsertAttributeMemberAssignmentPush(frame, attr);
                 else if (unaryExp.Argument is ComputedMemberExpression comp)
                     CompileComputedMemberExpression(frame, comp);
                 else if (unaryExp.Argument is Literal literal) // -1 -> int const + unary op
@@ -1928,10 +1960,13 @@ namespace GTAdhocCompiler
         /// </summary>
         /// <param name="frame"></param>
         /// <param name="insertLeaveInstruction"></param>
-        private void LeaveScope(AdhocCodeFrame frame, bool insertLeaveInstruction = true)
+        /// <param name="isModuleLeave"></param>
+        private void LeaveScope(AdhocCodeFrame frame, bool insertLeaveInstruction = true, bool isModuleLeave = true)
         {
             var lastScope = frame.CurrentScopes.Pop();
-            frame.Stack.RewindLocalVariableStorage(lastScope.ScopeVariables.Count);
+
+            if (!isModuleLeave) // Module leaves don't actually reset the max.
+                frame.Stack.RewindLocalVariableStorage(lastScope.ScopeVariables.Count);
 
             foreach (var variable in lastScope.ScopeVariables)
                 frame.DeclaredVariables.Remove(variable.Value.Name);
@@ -1939,14 +1974,14 @@ namespace GTAdhocCompiler
             if (insertLeaveInstruction)
             {
                 InsLeaveScope leave = new InsLeaveScope();
-                leave.VariableHeapRewindIndex = frame.Stack.LocalVariableStorage.Count;
+                leave.VariableHeapRewindIndex = !isModuleLeave ? frame.Stack.LocalVariableStorage.Count : 1; // Modules set this to 1.
                 frame.AddInstruction(leave, 0);
             }
         }
 
         private void LeaveModuleOrClass(AdhocCodeFrame frame)
         {
-            LeaveScope(frame);
+            LeaveScope(frame, isModuleLeave: true);
             Modules.Pop();
             frame.CurrentModule = Modules.Peek();
         }
