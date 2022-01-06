@@ -12,6 +12,8 @@ namespace GTAdhocCompiler
 {
     public class AdhocCodeGen
     {
+        private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
+
         public const string Magic = "ADCH";
 
         public byte Version { get; set; } = 12;
@@ -30,6 +32,7 @@ namespace GTAdhocCompiler
 
         public void Generate()
         {
+            Logger.Info("Generating code...");
             var ms = new MemoryStream();
             stream = new AdhocStream(ms, Version);
 
@@ -41,12 +44,16 @@ namespace GTAdhocCompiler
                 SerializeSymbolTable();
 
             WriteCodeBlock(MainBlock);
+
+            Logger.Info($"Code generated (Size: {stream.Length} bytes)");
         }
 
         public void SaveTo(string path)
         {
+            Logger.Info($"Saving compiled script to {path}");
             File.WriteAllBytes(path, (stream.BaseStream as MemoryStream).ToArray());
         }
+
         private void WriteCodeBlock(AdhocCodeFrame block)
         {
             if (Version >= 8)
@@ -363,6 +370,8 @@ namespace GTAdhocCompiler
 
         private void SerializeSymbolTable()
         {
+            Logger.Debug($"Serializing symbol table ({SymbolMap.Symbols.Count} symbols)");
+
             stream.WriteVarInt(SymbolMap.Symbols.Count);
             foreach (AdhocSymbol symb in SymbolMap.Symbols.Values)
                 stream.WriteVarString(symb.Name);

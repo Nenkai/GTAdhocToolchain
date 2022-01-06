@@ -240,7 +240,8 @@ namespace GTAdhocCompiler
             return Instructions.Count;
         }
 
-        public int AddScopeVariable(AdhocSymbol symbol, bool isVariableDeclaration = true, bool isStaticDefinition = false)
+        public int AddScopeVariable(AdhocSymbol symbol, bool isVariableDeclaration = true, 
+            bool isStaticDefinition = false)
         {
             if (!isVariableDeclaration && CanCaptureVariablesFromParentFrame && ParentFrame is not null)
             {
@@ -256,7 +257,7 @@ namespace GTAdhocCompiler
             // Captured variables do not count towards the local storage size
             if (CapturedCallbackVariables.Contains(symbol))
                 return -(CapturedCallbackVariables.IndexOf(symbol) + 1); // 0 -> -1, 1 -> -2 etc
-
+            
             if (!Stack.TryAddOrGetVariableIndex(symbol, out int index))
             {
                 if (isStaticDefinition)
@@ -266,18 +267,25 @@ namespace GTAdhocCompiler
 
             var scope = CurrentScope;
 
-            // We added a variable to the stack storage, add it to scope variables
-            scope.ScopeVariables.Add(symbol.Name, symbol);
+            if (isVariableDeclaration && !DeclaredVariables.Contains(symbol.Name))
+                AddDeclaredVariable(symbol);
+
+            // Static variables pushed don't count towards a rewind heap
+            if (!IsStaticVariable(symbol))
+                scope.ScopeVariables.Add(symbol.Name, symbol); // We added a variable to the stack storage, add it to scope variables
 
             return index;
         }
 
-        public bool IsStaticVariable(string str)
+        public void AddDeclaredVariable(AdhocSymbol varSymb)
         {
-            if (DeclaredVariables.Contains(str))
-                return false;
+            if (!DeclaredVariables.Contains(varSymb.Name))
+                DeclaredVariables.Add(varSymb.Name);
+        }
 
-            return true;
+        public bool IsStaticVariable(AdhocSymbol symb)
+        {
+            return CurrentModule.IsDefinedStaticMember(symb) || (!symb.Name.Equals("self") && !DeclaredVariables.Contains(symb.Name));
         }
 
         public ScopeContext GetLastBreakControlledScope()

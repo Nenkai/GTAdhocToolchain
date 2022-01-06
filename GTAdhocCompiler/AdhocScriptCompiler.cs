@@ -16,6 +16,8 @@ namespace GTAdhocCompiler
 
         public Stack<AdhocModule> Modules { get; set; } = new();
 
+        private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
+
         public AdhocScriptCompiler()
         {
             var topLevelModule = new AdhocModule();
@@ -37,12 +39,16 @@ namespace GTAdhocCompiler
         /// <param name="script"></param>
         public void CompileScript(Script script)
         {
+            Logger.Info("Started script compilation.");
+
             EnterScope(this, script);
             CompileScriptBody(this, script);
             LeaveScope(this);
 
             // Script done.
             this.AddInstruction(new InsSetState(AdhocRunState.EXIT), 0);
+
+            Logger.Debug($"Script successfully compiled.");
         }
 
         /// <summary>
@@ -155,6 +161,8 @@ namespace GTAdhocCompiler
             if (!File.Exists(pathToIncludeFile))
                 ThrowCompilationError(include, $"Include file does not exist: {pathToIncludeFile}.");
 
+            Logger.Info($"Linking include file {include.Path} for {frame.SourceFilePath}.");
+
             string file = File.ReadAllText(pathToIncludeFile);
 
             var parser = new AdhocAbstractSyntaxTree(file);
@@ -212,7 +220,7 @@ namespace GTAdhocCompiler
                 return;
             }
 
-
+            Logger.Debug($"L{id.Location.Start.Line} - Compiling {(isModule ? "module" : "class")} '{id.Name}'");
             AdhocModule moduleOrClass = EnterModuleOrClass(frame, body);
 
             if (isModule)
@@ -631,6 +639,8 @@ namespace GTAdhocCompiler
             if (id is null)
                 ThrowCompilationError(parentNode, "Expected subroutine to have an identifier.");
 
+            Logger.Debug($"L{parentNode.Location.Start.Line} - Compiling subroutine '{id.Name}'");
+
             SubroutineBase subroutine = isMethod ? new InsMethodDefine() : new InsFunctionDefine();
             if (id is not null)
                 subroutine.Name = SymbolMap.RegisterSymbol(id.Name);
@@ -644,7 +654,7 @@ namespace GTAdhocCompiler
                 {
                     AdhocSymbol paramSymb = SymbolMap.RegisterSymbol(paramIdent.Name);
                     subroutine.CodeFrame.FunctionParameters.Add(paramSymb);
-                    subroutine.CodeFrame.DeclaredVariables.Add(paramSymb.Name);
+                    subroutine.CodeFrame.AddDeclaredVariable(paramSymb);
 
                     // Function param is uninitialized, push nil
                     frame.AddInstruction(InsNilConst.Empty, paramIdent.Location.Start.Line);
@@ -657,7 +667,7 @@ namespace GTAdhocCompiler
 
                     AdhocSymbol paramSymb = SymbolMap.RegisterSymbol((assignmentExpression.Left as Identifier).Name);
                     subroutine.CodeFrame.FunctionParameters.Add(paramSymb);
-                    subroutine.CodeFrame.DeclaredVariables.Add(paramSymb.Name);
+                    subroutine.CodeFrame.AddDeclaredVariable(paramSymb);
 
                     // Push default value
                     CompileLiteral(frame, assignmentExpression.Right as Literal);
@@ -669,7 +679,7 @@ namespace GTAdhocCompiler
 
                     AdhocSymbol paramSymb = SymbolMap.RegisterSymbol((pattern.Left as Identifier).Name);
                     subroutine.CodeFrame.FunctionParameters.Add(paramSymb);
-                    subroutine.CodeFrame.DeclaredVariables.Add(paramSymb.Name);
+                    subroutine.CodeFrame.AddDeclaredVariable(paramSymb);
 
                     // Push default value
                     CompileLiteral(frame, pattern.Right as Literal);
@@ -695,6 +705,9 @@ namespace GTAdhocCompiler
                 ThrowCompilationError(body, "Expected subroutine body to be frame statement.");
 
             InsertFrameExitIfNeeded(subroutine.CodeFrame, body);
+
+            Logger.Debug($"Subroutine '{id.Name}' compiled ({subroutine.CodeFrame.Instructions.Count} ins, " +
+                $"Stack Size:{subroutine.CodeFrame.Stack.MaxStackStorageSize}, variable Storage Size: {subroutine.CodeFrame.Stack.MaxLocalVariableStorageSize})");
         }
 
         /// <summary>
@@ -1408,6 +1421,7 @@ namespace GTAdhocCompiler
             string fullPath = string.Join("::", pathParts);
             AdhocSymbol fullPathSymb = SymbolMap.RegisterSymbol(fullPath);
             eval.VariableSymbols.Add(fullPathSymb);
+            fullPathSymb.IsStatic = true;
 
             int idx = frame.AddScopeVariable(fullPathSymb, isVariableDeclaration: false);
             eval.VariableHeapIndex = idx;
@@ -1439,9 +1453,6 @@ namespace GTAdhocCompiler
         /// <param name="call"></param>
         private void CompileCall(AdhocCodeFrame frame, CallExpression call, bool popReturnValue = false)
         {
-            if (call.Location.Start.Line == 740)
-                ;
-
             CompileExpression(frame, call.Callee);
 
             for (int i = 0; i < call.Arguments.Count; i++)
@@ -1743,7 +1754,7 @@ namespace GTAdhocCompiler
         private AdhocSymbol InsertVariableEval(AdhocCodeFrame frame, Identifier identifier)
         {
             AdhocSymbol symb = SymbolMap.RegisterSymbol(identifier.Name);
-            int idx = frame.AddScopeVariable(symb, isVariableDeclaration: false);
+            int idx = identifier.Name != "self" ? frame.AddScopeVariable(symb, isVariableDeclaration: false) : 0;
             var varEval = new InsVariableEvaluation(idx);
             varEval.VariableSymbols.Add(symb); // Only one
             frame.AddInstruction(varEval, identifier.Location.Start.Line);
@@ -1751,8 +1762,7 @@ namespace GTAdhocCompiler
             // Static references or pushes always have double their own symbol
             // If its a static reference, do not add it as a declared variable within this scope
             // "self" keyword is ignored
-            if (frame.CurrentModule.IsDefinedStatic(symb) || (!symb.Name.Equals("self") && 
-                !frame.DeclaredVariables.Contains(symb.Name)))
+            if (frame.IsStaticVariable(symb))
                 varEval.VariableSymbols.Add(symb); // Static, two symbols
 
             return symb;
@@ -1766,19 +1776,17 @@ namespace GTAdhocCompiler
         /// <returns></returns>
         private AdhocSymbol InsertVariablePush(AdhocCodeFrame frame, Identifier identifier)
         {
+            if (identifier.Name.Contains("in#"))
+                ;
+
             AdhocSymbol varSymb = SymbolMap.RegisterSymbol(identifier.Name);
-            int idx = frame.AddScopeVariable(varSymb);
+            int idx = frame.AddScopeVariable(varSymb, isVariableDeclaration: true);
 
             var varPush = new InsVariablePush();
             varPush.VariableSymbols.Add(varSymb);
 
             // Refer to comment in InsertVariableEval
-            if (!frame.CurrentModule.IsDefinedStatic(varSymb) && !varSymb.Name.Equals("self") &&
-                !frame.DeclaredVariables.Contains(identifier.Name))
-                frame.DeclaredVariables.Add(identifier.Name);
-            
-            // At this point, if it's not added that means itsa local variable that we address with one unique symbol
-            if (!frame.DeclaredVariables.Contains(identifier.Name))
+            if (frame.IsStaticVariable(varSymb))
                 varPush.VariableSymbols.Add(varSymb);
                 
             varPush.VariableStorageIndex = idx;
@@ -1961,7 +1969,7 @@ namespace GTAdhocCompiler
         /// <param name="frame"></param>
         /// <param name="insertLeaveInstruction"></param>
         /// <param name="isModuleLeave"></param>
-        private void LeaveScope(AdhocCodeFrame frame, bool insertLeaveInstruction = true, bool isModuleLeave = true)
+        private void LeaveScope(AdhocCodeFrame frame, bool insertLeaveInstruction = true, bool isModuleLeave = false)
         {
             var lastScope = frame.CurrentScopes.Pop();
 
@@ -1974,7 +1982,7 @@ namespace GTAdhocCompiler
             if (insertLeaveInstruction)
             {
                 InsLeaveScope leave = new InsLeaveScope();
-                leave.VariableHeapRewindIndex = !isModuleLeave ? frame.Stack.LocalVariableStorage.Count : 1; // Modules set this to 1.
+                leave.VariableHeapRewindIndex = !isModuleLeave ? frame.Stack.LocalVariableStorage.Count : 1; // Module/Class exits set this to 1.
                 frame.AddInstruction(leave, 0);
             }
         }

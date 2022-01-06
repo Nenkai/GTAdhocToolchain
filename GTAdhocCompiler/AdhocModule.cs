@@ -21,7 +21,7 @@ namespace GTAdhocCompiler
             return true;
         }
 
-        public bool IsDefinedStatic(AdhocSymbol symbol)
+        public bool IsDefinedStaticMember(AdhocSymbol symbol)
             => DefinedStaticVariables.Contains(symbol);
     }
 }

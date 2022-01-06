@@ -11,6 +11,8 @@ namespace GTAdhocCompiler
         public int Id { get; set; }
         public string Name { get; set; }
 
+        public bool IsStatic { get; set; }
+
         public AdhocSymbol(int id, string name)
         {
             Id = id;
