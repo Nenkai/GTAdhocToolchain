@@ -14,7 +14,6 @@ Adhoc is very similar to javascript but with a few changes and additions. Refer 
 * Improve syntatic analysis during compilation.
 * Local Variable Storage improvements, such as recycling variable slots when prior variables are no longer used within a scope.
 * Further document the language and instructions themselves.
-* Implement Map `[:]` syntax
 * Implement async/await
 * Examples
 * Possibly tests
