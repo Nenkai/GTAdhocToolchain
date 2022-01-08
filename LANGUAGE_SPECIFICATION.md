@@ -19,10 +19,17 @@ module MyModule
 }
 ```
 
+##### Class Inheritance
+
 ```
 class BetterObject extends System::Object
 {
   ...
+}
+
+class EvenBetterObject extends BetterObject
+{
+ ...
 }
 ```
 
@@ -54,33 +61,32 @@ foreach (var i in arr)
 // combined = "one two three "
 ```
 
+Also works with maps.
+```
+var map = ["Name":"Age"];
+foreach (var [name, age] in map) // Pair deconstruction
+{
+    // ...
+}
+```
+
 ### Map
 Maps are Key/Value collections, similar to javascript's map or C#'s dictionaries. Adhoc supports them natively.
 ```js
 var myMap = Map();
 var myMap2 = [:]; // Shortcut to creation
+var myMapWithElements ["MyKey":"MyValue", "MyKey2": "MyValue2"]; // Creation with 2 pairs
 
 myMap["hello"] = "world!";
 myMap.getMapCount(); // 1
-```
-
-### Enums
-Adhoc supports enums by default.
-```csharp
-enum MyEnum
-{
-    zero,
-    one,
-    two,
-    three = 3,
-}
+myMapWithElements.getMapCount(); // 1
 ```
 
 ### Macros
 Supported as C supports it.
 ```c
-#define SET_INDEX(INDEX) \
-  arr[INDEX] = INDEX;
+#define SET_INDEX(#INDEX) \
+  arr[#INDEX] = #INDEX;
   
 var arr = Array();
 SET_INDEX(0);
@@ -112,6 +118,40 @@ var myFunc = function (){
   return myVariable + 100;
 }
 ```
+
+### Module/Class properties
+Properties are called `attributes` in adhoc. They are defined with the `attribute` keyword, just like how you would declare a `var` or `static`.
+
+Without value: 
+- `attribute myAttribute` - Will be defaulted to `nil`
+
+With value: 
+- `attribute myAttribute = []`
+
+### Code allowed everywhere
+Top level, in module or class bodies, code is allowed everywhere.
+```
+module MyModule
+{
+    attribute myAttribute = [];
+    myAttribute.push("hello world");
+}
+```
+
+Module extensions are also allowed within function themselves.
+```
+function myFunction()
+{
+    module main
+    {
+        // Anything put here will be part of the "main" module.
+        // Declaring a static variable will make it belong to the "main" module.
+    }
+}
+```
+
+### Requires
+[TODO]
 
 ### Not supported
 * Anything modern ECMAScript-ish features (arguably not needed).
