@@ -83,6 +83,9 @@ namespace GTAdhocCompiler
                 case Nodes.FunctionDeclaration:
                     CompileFunctionDeclaration(frame, node as FunctionDeclaration);
                     break;
+                case Nodes.MethodDeclaration:
+                    CompileMethodDeclaration(frame, node as MethodDeclaration);
+                    break;
                 case Nodes.ForStatement:
                     CompileFor(frame, node as ForStatement);
                     break;
@@ -212,7 +215,7 @@ namespace GTAdhocCompiler
             CompileNewClass(frame, classDecl.Id, classDecl.SuperClass, classDecl.Body, classDecl.IsModule);
         }
 
-        private void CompileNewClass(AdhocCodeFrame frame, Identifier id, Node superClass, ClassBody body, bool isModule = false)
+        private void CompileNewClass(AdhocCodeFrame frame, Identifier id, Node superClass, Statement body, bool isModule = false)
         {
             if (id is null || id is not Identifier)
             {
@@ -273,36 +276,13 @@ namespace GTAdhocCompiler
                 frame.AddInstruction(@class, id.Location.Start.Line);
             }
 
-            CompileClassBody(frame, body);
+            CompileStatement(frame, body);
 
             LeaveModuleOrClass(frame);
 
             // Exit class or module scope. Important.
             InsSetState state = new InsSetState(AdhocRunState.EXIT);
             frame.AddInstruction(state, 0);
-        }
-
-        public void CompileClassBody(AdhocCodeFrame frame, ClassBody classBody)
-        {
-            foreach (var prop in classBody.Body)
-            {
-                if (prop is CallExpression callExp)
-                {
-                    CompileCall(frame, callExp, popReturnValue: true);
-                }
-                else if (prop is IncludeStatement includeStatement)
-                {
-                    CompileIncludeStatement(frame, includeStatement);
-                }
-                else if (prop is Expression exp)
-                {
-                    CompileExpression(frame, exp);
-                }
-                else
-                {
-                    ThrowCompilationError(prop, "Unsupported class body element");
-                }
-            }
         }
 
         public void CompileContinue(AdhocCodeFrame frame, ContinueStatement continueStatement)
@@ -316,17 +296,6 @@ namespace GTAdhocCompiler
             frame.AddInstruction(continueJmp, continueStatement.Location.Start.Line);
 
             loop.ContinueJumps.Add(continueJmp);
-        }
-
-        public void CompileClassProperty(AdhocCodeFrame frame, ClassProperty classProp)
-        {
-            // For some reason the underlaying function expression has its id null when in a class
-            if (classProp is MethodDefinition methodDef)
-            {
-                (classProp.Value as FunctionExpression).Id = classProp.Key as Identifier;
-            }
-
-            CompileExpression(frame, classProp.Value);
         }
 
         public void CompileIfStatement(AdhocCodeFrame frame, IfStatement ifStatement)
@@ -840,14 +809,12 @@ namespace GTAdhocCompiler
         {
             switch (exp)
             {
+                
                 case Identifier initIdentifier:
                     CompileIdentifier(frame, initIdentifier);
                     break;
                 case FunctionExpression funcExpression:
                     CompileFunctionExpression(frame, funcExpression);
-                    break;
-                case MethodDefinition methodDefinition: // May also be a function!
-                    CompileMethodDefinition(frame, methodDefinition);
                     break;
                 case CallExpression callExp:
                     CompileCall(frame, callExp);
@@ -888,11 +855,11 @@ namespace GTAdhocCompiler
                 case TaggedTemplateExpression taggedTemplateExpression:
                     CompileTaggedTemplateExpression(frame, taggedTemplateExpression);
                     break;
-                case PropertyDefinition propDefinition:
-                    CompilePropertyDefinition(frame, propDefinition);
+                case StaticVariableDefinition staticExpr:
+                    CompileStaticVariableDefinition(frame, staticExpr);
                     break;
-                case StaticExpression staticExpr:
-                    CompileStaticExpression(frame, staticExpr);
+                case AttributeVariableDefinition attrDefinition:
+                    CompileAttributeDefinition(frame, attrDefinition);
                     break;
                 case ClassExpression classExpr:
                     CompileClassExpression(frame, classExpr);
@@ -978,96 +945,92 @@ namespace GTAdhocCompiler
             CompileNewClass(frame, classExpression.Id, classExpression.SuperClass, classExpression.Body, classExpression.IsModule);
         }
 
-        private void CompileStaticExpression(AdhocCodeFrame frame, StaticExpression staticExpression)
+        private void CompileStaticVariableDefinition(AdhocCodeFrame frame, StaticVariableDefinition staticExpression)
         {
-            if (staticExpression.VarExpression is not AssignmentExpression)
-                ThrowCompilationError(staticExpression, "Expected static keyword to be a variable assignment.");
-
-            AssignmentExpression assignmentExpression = staticExpression.VarExpression as AssignmentExpression;
-            if (assignmentExpression.Left is not Identifier)
-                ThrowCompilationError(assignmentExpression, "Expected static declaration to be an identifier.");
-
-            Identifier identifier = assignmentExpression.Left as Identifier;
-            var idSymb = SymbolMap.RegisterSymbol(identifier.Name);
-
-            InsStaticDefine staticDefine = new InsStaticDefine(idSymb);
-            frame.AddInstruction(staticDefine, staticExpression.Location.End.Line);
-
-            if (!frame.CurrentModule.DefineStatic(idSymb))
-                ThrowCompilationError(assignmentExpression, $"Static member {idSymb.Name} was already declared in this module.");
-
-            if (assignmentExpression.Operator == AssignmentOperator.Assign)
+            if (staticExpression.VarExpression is Identifier ident)
             {
-                // Assigning to something new
-                CompileExpression(frame, assignmentExpression.Right);
-                CompileVariableAssignment(frame, assignmentExpression.Left);
-            }
-            else if (IsAdhocAssignWithOperandOperator(assignmentExpression.Operator))
-            {
-                // Assigning to self (+=)
-                InsertVariablePush(frame, assignmentExpression.Left as Identifier); // Push current value first
-                CompileExpression(frame, assignmentExpression.Right);
-
-                InsertBinaryAssignOperator(frame, assignmentExpression, assignmentExpression.Operator, assignmentExpression.Location.Start.Line);
-                frame.AddInstruction(InsPop.Default, 0);
+                // static definition with no value
+                var idSymb = SymbolMap.RegisterSymbol(ident.Name);
+                InsStaticDefine staticDefine = new InsStaticDefine(idSymb);
+                frame.AddInstruction(staticDefine, staticExpression.Location.End.Line);
             }
             else
             {
-                ThrowCompilationError(assignmentExpression, $"Unimplemented operator assignment {assignmentExpression.Operator}");
+                // static definition with value
+                if (staticExpression.VarExpression is not AssignmentExpression)
+                    ThrowCompilationError(staticExpression, "Expected static keyword to be a variable assignment.");
+
+                AssignmentExpression assignmentExpression = staticExpression.VarExpression as AssignmentExpression;
+                if (assignmentExpression.Left is not Identifier)
+                    ThrowCompilationError(assignmentExpression, "Expected static declaration to be an identifier.");
+
+                Identifier identifier = assignmentExpression.Left as Identifier;
+                var idSymb = SymbolMap.RegisterSymbol(identifier.Name);
+
+                InsStaticDefine staticDefine = new InsStaticDefine(idSymb);
+                frame.AddInstruction(staticDefine, staticExpression.Location.End.Line);
+
+                if (!frame.CurrentModule.DefineStatic(idSymb))
+                    ThrowCompilationError(assignmentExpression, $"Static member {idSymb.Name} was already declared in this module.");
+
+                if (assignmentExpression.Operator == AssignmentOperator.Assign)
+                {
+                    // Assigning to something new
+                    CompileExpression(frame, assignmentExpression.Right);
+                    CompileVariableAssignment(frame, assignmentExpression.Left);
+                }
+                else if (IsAdhocAssignWithOperandOperator(assignmentExpression.Operator))
+                {
+                    // Assigning to self (+=)
+                    InsertVariablePush(frame, assignmentExpression.Left as Identifier); // Push current value first
+                    CompileExpression(frame, assignmentExpression.Right);
+
+                    InsertBinaryAssignOperator(frame, assignmentExpression, assignmentExpression.Operator, assignmentExpression.Location.Start.Line);
+                    frame.AddInstruction(InsPop.Default, 0);
+                }
+                else
+                {
+                    ThrowCompilationError(assignmentExpression, $"Unimplemented operator assignment {assignmentExpression.Operator}");
+                }
             }
         }
 
-        private void CompilePropertyDefinition(AdhocCodeFrame frame, PropertyDefinition propDefinition)
+
+        private void CompileAttributeDefinition(AdhocCodeFrame frame, AttributeVariableDefinition attrVariableDefinition)
         {
-            if (propDefinition.Key is not Identifier)
+            if (attrVariableDefinition.VarExpression is Identifier ident)
             {
-                // Not actually a property definition - esprima hack
-                CompileExpression(frame, propDefinition.Value);
+                // attribute definition with no value
 
-                if (propDefinition.Key is AttributeMemberExpression attrMemberExpression)
-                {
-                    InsertAttributeMemberAssignmentPush(frame, attrMemberExpression);
-                }
-                else
-                    ThrowCompilationError(propDefinition.Value, "Not implemented");
+                // defaults to nil
+                frame.AddInstruction(InsNilConst.Empty, ident.Location.Start.Line);
 
-                frame.AddInstruction(InsAssignPop.Default, 0);
+                var idSymb = SymbolMap.RegisterSymbol(ident.Name);
+                InsAttributeDefine staticDefine = new InsAttributeDefine(idSymb);
+                frame.AddInstruction(staticDefine, attrVariableDefinition.Location.End.Line);
             }
             else
             {
+                if (attrVariableDefinition.VarExpression is not AssignmentExpression)
+                    ThrowCompilationError(attrVariableDefinition, "Expected attribute keyword to be a variable assignment.");
 
-                var ident = propDefinition.Key as Identifier;
-                var symb = SymbolMap.RegisterSymbol(ident.Name);
+                AssignmentExpression assignmentExpression = attrVariableDefinition.VarExpression as AssignmentExpression;
+                if (assignmentExpression.Left is not Identifier)
+                    ThrowCompilationError(assignmentExpression, "Expected attribute declaration to be an identifier.");
 
-                if (propDefinition.Static)
-                {
-                    InsStaticDefine staticDefine = new InsStaticDefine(symb);
-                    frame.AddInstruction(staticDefine, propDefinition.Location.End.Line);
-                    if (!frame.CurrentModule.DefineStatic(symb))
-                        ThrowCompilationError(propDefinition, $"Static member {symb.Name} was already declared in this module.");
+                // Value if any
+                CompileExpression(frame, assignmentExpression.Right);
 
-                    if (propDefinition.Value is not null)
-                    {
-                        CompileExpression(frame, propDefinition.Value);
+                Identifier identifier = assignmentExpression.Left as Identifier;
+                var idSymb = SymbolMap.RegisterSymbol(identifier.Name);
 
-                        // Assign
-                        InsertVariablePush(frame, ident);
-                        frame.AddInstruction(InsAssignPop.Default, 0);
-                    }
-                }
-                else
-                {
-                    CompileExpression(frame, propDefinition.Value);
-
-                    // Counts towards a constant for the current frame
-                    frame.Stack.MaxLocalVariableStorageSize++;
-
-                    // Declaring a class attribute, so we don't push anything
-                    InsAttributeDefine attrDefine = new InsAttributeDefine();
-                    attrDefine.AttributeName = SymbolMap.RegisterSymbol(ident.Name);
-                    frame.AddInstruction(attrDefine, ident.Location.Start.Line);
-                }
+                // Declaring a class attribute, so we don't push anything
+                InsAttributeDefine attrDefine = new InsAttributeDefine(idSymb);
+                frame.AddInstruction(attrDefine, identifier.Location.Start.Line);
             }
+
+            // Counts towards variable storage
+            frame.Stack.MaxLocalVariableStorageSize++;
         }
 
         /// <summary>
@@ -1121,24 +1084,9 @@ namespace GTAdhocCompiler
             }
         }
 
-        private void CompileMethodDefinition(AdhocCodeFrame frame, MethodDefinition methodDefinition)
+        private void CompileMethodDeclaration(AdhocCodeFrame frame, MethodDeclaration methodDefinition)
         {
-            if (methodDefinition.Kind == PropertyKind.Function)
-            {
-                var funcExp = methodDefinition.Value as FunctionExpression;
-                CompileSubroutine(frame, funcExp, funcExp.Body, methodDefinition.Key as Identifier, funcExp.Params, isMethod: false);
-            }
-            else if (methodDefinition.Kind == PropertyKind.Method)
-            {
-                if (methodDefinition.Value is not FunctionExpression methodFunc)
-                    ThrowCompilationError(methodDefinition, "Unexpected non-function expression value for method");
-
-                if (methodDefinition.Key is not Identifier)
-                    ThrowCompilationError(methodDefinition, "Unexpected non-function identifier key for method");
-
-                methodFunc = methodDefinition.Value as FunctionExpression;
-                CompileSubroutine(frame, methodDefinition, methodFunc.Body, methodDefinition.Key as Identifier, methodFunc.Params, isMethod: true);
-            }
+            CompileSubroutine(frame, methodDefinition, methodDefinition.Body, methodDefinition.Id as Identifier, methodDefinition.Params, isMethod: true);
         }
 
         private void CompileFunctionExpression(AdhocCodeFrame frame, FunctionExpression funcExp)

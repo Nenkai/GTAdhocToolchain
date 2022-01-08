@@ -16,5 +16,10 @@ namespace GTAdhocCompiler.Instructions
         public override string InstructionName => "ATTRIBUTE_DEFINE";
 
         public AdhocSymbol AttributeName { get; set; }
+
+        public InsAttributeDefine(AdhocSymbol attrSymbol)
+        {
+            AttributeName = attrSymbol;
+        }
     }
 }
