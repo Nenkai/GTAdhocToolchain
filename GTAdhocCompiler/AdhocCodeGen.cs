@@ -45,7 +45,7 @@ namespace GTAdhocCompiler
 
             WriteCodeBlock(MainBlock);
 
-            Logger.Info($"Code generated (Size: {stream.Length} bytes)");
+            Logger.Info($"Code generated (Size: {stream.Length} bytes, {MainBlock.Instructions.Count} main instructions)");
         }
 
         public void SaveTo(string path)
@@ -191,6 +191,8 @@ namespace GTAdhocCompiler
                 case AdhocInstructionType.POP:
                 case AdhocInstructionType.ELEMENT_EVAL:
                 case AdhocInstructionType.ELEMENT_PUSH:
+                case AdhocInstructionType.MAP_CONST:
+                case AdhocInstructionType.MAP_INSERT:
                 case AdhocInstructionType.EVAL:
                 case AdhocInstructionType.THROW:
                     break;

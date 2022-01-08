@@ -39,20 +39,7 @@ namespace GTAdhocCompiler
 
                 t = current;
 
-                var source = File.ReadAllText(input);
-                var parser = new AdhocAbstractSyntaxTree(source);
-                var program = parser.ParseScript();
-
-                var compiler = new AdhocScriptCompiler();
-                compiler.SetProjectDirectory(projectDir);
-                compiler.SetSourcePath(compiler.SymbolMap, "www/gt7sp/adhoc/get_car_parameter.ad");
-                compiler.CompileScript(program);
-
-                AdhocCodeGen codeGen = new AdhocCodeGen(compiler, compiler.SymbolMap);
-                codeGen.Generate();
-                codeGen.SaveTo(output);
-
-                Console.WriteLine($"Compiled {input}");
+                BuildScript(input, output);
             }
         }
 
@@ -70,7 +57,8 @@ namespace GTAdhocCompiler
             }
             else if (Path.GetExtension(project.InputPath) == ".ad")
             {
-
+                string output = !string.IsNullOrEmpty(project.OutputPath) ? project.OutputPath : project.InputPath;
+                BuildScript(project.InputPath, Path.ChangeExtension(output, ".adc"));
             }
             else
             {
@@ -118,9 +106,36 @@ namespace GTAdhocCompiler
             Logger.Error("Project build failed.");
         }
 
-        private static void BuildScript(string inputPath)
+        private static void BuildScript(string inputPath, string output)
         {
-            
+            var source = File.ReadAllText(inputPath);
+            var parser = new AdhocAbstractSyntaxTree(source);
+            var program = parser.ParseScript();
+
+            Logger.Info($"Started script build ({inputPath}).");
+            try
+            {
+                var compiler = new AdhocScriptCompiler();
+                compiler.SetSourcePath(compiler.SymbolMap, inputPath);
+                compiler.CompileScript(program);
+
+                AdhocCodeGen codeGen = new AdhocCodeGen(compiler, compiler.SymbolMap);
+                codeGen.Generate();
+                codeGen.SaveTo(output);
+
+                Logger.Info($"Script build successful.");
+                return;
+            }
+            catch (AdhocCompilationException compileException)
+            {
+                Logger.Fatal($"Compilation error: {compileException.Message}");
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Internal error in compilation");
+            }
+
+            Logger.Error("Script build failed.");
         }
     }
 
@@ -129,5 +144,8 @@ namespace GTAdhocCompiler
     {
         [Option('i', "input", Required = true, HelpText = "Input project file or source script.")]
         public string InputPath { get; set; }
+
+        [Option('o', "output", Required = false, HelpText = "Output compiled scripts when compiling standalone scripts (not projects).")]
+        public string OutputPath { get; set; }
     }
 }

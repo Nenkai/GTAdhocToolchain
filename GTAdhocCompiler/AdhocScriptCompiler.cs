@@ -48,7 +48,7 @@ namespace GTAdhocCompiler
             // Script done.
             this.AddInstruction(new InsSetState(AdhocRunState.EXIT), 0);
 
-            Logger.Debug($"Script successfully compiled.");
+            Logger.Info($"Script successfully compiled.");
         }
 
         /// <summary>
@@ -870,6 +870,9 @@ namespace GTAdhocCompiler
                 case ArrayExpression arr:
                     CompileArrayExpression(frame, arr);
                     break;
+                case MapExpression map:
+                    CompileMapExpression(frame, map);
+                    break;
                 case ComputedMemberExpression comp:
                     CompileComputedMemberExpression(frame, comp);
                     break;
@@ -1067,6 +1070,11 @@ namespace GTAdhocCompiler
             }
         }
 
+        /// <summary>
+        /// Compiles: [] or [<expr>,<expr>,...]
+        /// </summary>
+        /// <param name="frame"></param>
+        /// <param name="arrayExpression"></param>
         private void CompileArrayExpression(AdhocCodeFrame frame, ArrayExpression arrayExpression)
         {
             frame.AddInstruction(new InsArrayConst((uint)arrayExpression.Elements.Count), arrayExpression.Location.Start.Line);
@@ -1079,6 +1087,23 @@ namespace GTAdhocCompiler
                 CompileExpression(frame, elem);
 
                 frame.AddInstruction(InsArrayPush.Default, 0);
+            }
+        }
+
+        /// <summary>
+        /// Compiles: [:] or [k:v, k:v, ...]
+        /// </summary>
+        /// <param name="frame"></param>
+        /// <param name="mapExpression"></param>
+        private void CompileMapExpression(AdhocCodeFrame frame, MapExpression mapExpression)
+        {
+            frame.AddInstruction(InsMapConst.Default, mapExpression.Location.Start.Line);
+
+            foreach (var (key, value) in mapExpression.Elements)
+            {
+                CompileExpression(frame, key);
+                CompileExpression(frame, value);
+                frame.AddInstruction(InsMapInsert.Default, 0);
             }
         }
 
