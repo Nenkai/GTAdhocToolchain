@@ -15,7 +15,7 @@ Modules also act as namespaces, and can be browsed.
 module MyModule
 {
    function myFunction() { ... }
-   myMethod() { ... }
+   method myMethod() { ... } // Note the keyword 'method'
 }
 ```
 
