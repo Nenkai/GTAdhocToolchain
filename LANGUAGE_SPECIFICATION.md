@@ -21,7 +21,7 @@ module MyModule
 
 ##### Class Inheritance
 
-```
+```java
 class BetterObject extends System::Object
 {
   ...
@@ -62,7 +62,7 @@ foreach (var i in arr)
 ```
 
 Also works with maps.
-```
+```js
 var map = ["Name":"Age"];
 foreach (var [name, age] in map) // Pair deconstruction
 {
@@ -130,7 +130,7 @@ With value:
 
 ### Code allowed everywhere
 Top level, in module or class bodies, code is allowed everywhere.
-```
+```js
 module MyModule
 {
     attribute myAttribute = [];
@@ -139,7 +139,7 @@ module MyModule
 ```
 
 Module extensions are also allowed within function themselves.
-```
+```js
 function myFunction()
 {
     module main
