@@ -92,17 +92,17 @@ namespace GTAdhocCompiler
 
             if (Version <= 10)
             {
-                stream.WriteInt32(block.Stack.MaxStackStorageSize);
-                stream.WriteInt32(block.Stack.MaxLocalVariableStorageSize);
+                stream.WriteInt32(block.Stack.StackSize);
+                stream.WriteInt32(block.Stack.LocalVariableStorageSize);
             }
             else
             {
                 // Actual stack size
-                stream.WriteInt32(block.Stack.MaxStackStorageSize);
+                stream.WriteInt32(block.Stack.StackSize);
 
-                /* These two are combined to make the size of the heap for variables */
-                stream.WriteInt32(block.Stack.MaxLocalVariableStorageSize);
-                stream.WriteInt32(0); // Space for variables that have their symbols written twice - static
+                /* These two are combined to make the size of the storage for variables */
+                stream.WriteInt32(block.Stack.LocalVariableStorageSize + block.Stack.StaticVariableStorageSize);
+                stream.WriteInt32(0);
             }
 
             stream.WriteInt32(block.Instructions.Count);
@@ -167,9 +167,14 @@ namespace GTAdhocCompiler
                     WriteStringPush(instruction as InsStringPush); break;
                 case AdhocInstructionType.INT_CONST:
                     WriteIntConst(instruction as InsIntConst); break;
+                case AdhocInstructionType.U_INT_CONST:
+                    WriteUIntConst(instruction as InsUIntConst); break;
+                case AdhocInstructionType.LONG_CONST:
+                    WriteLongConst(instruction as InsLongConst); break;
                 case AdhocInstructionType.FLOAT_CONST:
-                    WriteFloatConst(instruction as InsFloatConst);
-                    break;
+                    WriteFloatConst(instruction as InsFloatConst); break;
+                case AdhocInstructionType.SYMBOL_CONST:
+                    WriteSymbolConst(instruction as InsSymbolConst); break;
                 case AdhocInstructionType.SET_STATE:
                     WriteSetState(instruction as InsSetState); break;
                 case AdhocInstructionType.LEAVE:
@@ -194,6 +199,7 @@ namespace GTAdhocCompiler
                 case AdhocInstructionType.MAP_CONST:
                 case AdhocInstructionType.MAP_INSERT:
                 case AdhocInstructionType.EVAL:
+                case AdhocInstructionType.REQUIRE:
                 case AdhocInstructionType.THROW:
                     break;
                 default:
@@ -220,6 +226,16 @@ namespace GTAdhocCompiler
         private void WriteArrayConst(InsArrayConst arrayConst)
         {
             stream.WriteUInt32(arrayConst.ArraySize);
+        }
+
+        private void WriteUIntConst(InsUIntConst uintConst)
+        {
+            stream.WriteUInt32(uintConst.Value);
+        }
+
+        private void WriteLongConst(InsLongConst longConst)
+        {
+            stream.WriteInt64(longConst.Value);
         }
 
         private void WriteStaticDefine(InsStaticDefine staticDefine)
@@ -280,6 +296,11 @@ namespace GTAdhocCompiler
             stream.WriteSymbol(stringConst.String);
         }
 
+        private void WriteSymbolConst(InsSymbolConst symbolConst)
+        {
+            stream.WriteSymbol(symbolConst.String);
+        }
+
         private void WriteStringPush(InsStringPush strPush)
         {
             stream.WriteInt32(strPush.StringCount);
@@ -337,14 +358,14 @@ namespace GTAdhocCompiler
 
         private void WriteLeave(InsLeaveScope leave)
         {
-            stream.WriteInt32(0); // Unused
-            stream.WriteInt32(leave.VariableHeapRewindIndex);
+            stream.WriteInt32(leave.ModuleOrClassDepth); // Unused by the engine, TODO
+            stream.WriteInt32(leave.VariableStorageRewindIndex);
         }
 
         private void WriteVariableEval(InsVariableEvaluation variableEval)
         {
             stream.WriteSymbols(variableEval.VariableSymbols);
-            stream.WriteInt32(variableEval.VariableHeapIndex);
+            stream.WriteInt32(variableEval.VariableStorageIndex);
         }
 
         private void WriteAttributeEval(InsAttributeEvaluation attributeEval)

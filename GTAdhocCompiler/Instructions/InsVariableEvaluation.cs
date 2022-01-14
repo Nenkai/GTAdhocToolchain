@@ -17,11 +17,11 @@ namespace GTAdhocCompiler.Instructions
 
         public List<AdhocSymbol> VariableSymbols { get; set; } = new();
 
-        public int VariableHeapIndex { get; set; }
+        public int VariableStorageIndex { get; set; }
 
         public InsVariableEvaluation(int index)
         {
-            VariableHeapIndex = index;
+            VariableStorageIndex = index;
         }
 
         public InsVariableEvaluation()

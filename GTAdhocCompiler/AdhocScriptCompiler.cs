@@ -4,6 +4,7 @@ using Esprima.Ast;
 
 using GTAdhocCompiler.Instructions;
 using GTAdhocCompiler.Project;
+using GTAdhocCompiler.Variables;
 
 namespace GTAdhocCompiler
 {
@@ -17,6 +18,8 @@ namespace GTAdhocCompiler
         public Stack<AdhocModule> Modules { get; set; } = new();
 
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
+
+        public int Version { get; set; }
 
         public AdhocScriptCompiler()
         {
@@ -128,6 +131,9 @@ namespace GTAdhocCompiler
                 case Nodes.IncludeStatement:
                     CompileIncludeStatement(frame, node as IncludeStatement);
                     break;
+                case Nodes.RequireStatement:
+                    CompileRequireStatement(frame, node as RequireStatement);
+                    break;
                 case Nodes.ThrowStatement:
                     CompileThrowStatement(frame, node as ThrowStatement);
                     break;
@@ -183,6 +189,12 @@ namespace GTAdhocCompiler
             frame.AddInstruction(ogSrcFileIns, include.Location.Start.Line);
         }
 
+        public void CompileRequireStatement(AdhocCodeFrame frame, RequireStatement require)
+        {
+            CompileExpression(frame, require.Path);
+            frame.AddInstruction(InsRequire.Default, require.Location.Start.Line);
+        }
+
         public void CompileThrowStatement(AdhocCodeFrame frame, ThrowStatement throwStatement)
         {
             CompileExpression(frame, throwStatement.Argument);
@@ -215,7 +227,7 @@ namespace GTAdhocCompiler
             CompileNewClass(frame, classDecl.Id, classDecl.SuperClass, classDecl.Body, classDecl.IsModule);
         }
 
-        private void CompileNewClass(AdhocCodeFrame frame, Identifier id, Node superClass, Statement body, bool isModule = false)
+        private void CompileNewClass(AdhocCodeFrame frame, Identifier id, Node superClass, Statement body, bool isModule = false, bool isStaticModule = false)
         {
             if (id is null || id is not Identifier)
             {
@@ -237,7 +249,13 @@ namespace GTAdhocCompiler
                     mod.Names.Add(SymbolMap.RegisterSymbol(id.Name)); // Full
                 }
                 else
+                {
                     mod.Names.Add(SymbolMap.RegisterSymbol(id.Name));
+
+                    // Static modules mean they belong to strictly one path, so main,main in any module context is absolute
+                    if (isStaticModule)
+                        mod.Names.Add(SymbolMap.RegisterSymbol(id.Name));
+                }
 
                 frame.AddInstruction(mod, id.Location.Start.Line);
                 moduleOrClass.Name = id.Name;
@@ -276,7 +294,7 @@ namespace GTAdhocCompiler
                 frame.AddInstruction(@class, id.Location.Start.Line);
             }
 
-            CompileStatement(frame, body);
+            CompileStatementWithScope(frame, body);
 
             LeaveModuleOrClass(frame);
 
@@ -359,6 +377,9 @@ namespace GTAdhocCompiler
 
             // Condition
             InsJumpIfFalse jumpIfFalse = null; // will only be inserted if the condition exists, else its essentially a while true loop
+            if (((forStatement.Test as BinaryExpression)?.Right as Literal)?.NumericValue as int? == 1)
+                ;
+
             if (forStatement.Test != null)
             {
                 CompileExpression(frame, forStatement.Test);
@@ -403,6 +424,7 @@ namespace GTAdhocCompiler
             LoopContext loopCtx = EnterLoop(frame, whileStatement);
 
             int loopStartInsIndex = frame.GetLastInstructionIndex();
+
             if (whileStatement.Test is not null)
                 CompileExpression(frame, whileStatement.Test);
 
@@ -437,6 +459,7 @@ namespace GTAdhocCompiler
             LoopContext loopCtx = EnterLoop(frame, doWhileStatement);
 
             int loopStartInsIndex = frame.GetLastInstructionIndex();
+
             CompileStatementWithScope(frame, doWhileStatement.Body);
 
             int testInsIndex = frame.GetLastInstructionIndex();
@@ -447,14 +470,19 @@ namespace GTAdhocCompiler
             foreach (var continueJmp in loopCtx.ContinueJumps)
                 continueJmp.JumpInstructionIndex = testInsIndex;
 
-            InsJumpIfTrue jumpIfTrue = new InsJumpIfTrue(); // Start loop jumper
-            jumpIfTrue.JumpIndex = loopStartInsIndex;
-            frame.AddInstruction(jumpIfTrue, 0);
+            InsJumpIfFalse jumpIfFalse = new InsJumpIfFalse(); // End loop jumper
+            frame.AddInstruction(jumpIfFalse, 0);
 
             // Process break jumps before doing the final exit
             int loopEndIndex = frame.GetLastInstructionIndex();
             foreach (var breakJmp in loopCtx.BreakJumps)
                 breakJmp.JumpInstructionIndex = loopEndIndex;
+
+            InsJump startJmp = new InsJump();
+            startJmp.JumpInstructionIndex = loopStartInsIndex;
+            frame.AddInstruction(startJmp, 0);
+
+            jumpIfFalse.JumpIndex = frame.GetLastInstructionIndex();
 
             LeaveLoop(frame);
         }
@@ -478,7 +506,7 @@ namespace GTAdhocCompiler
             };
 
             InsertVariablePush(frame, itorIdentifier);
-            frame.AddInstruction(InsAssignPop.Default, 0);
+            InsertAssignPop(frame);
 
             // Test - fetch_next returns whether the iterator is done or not
             int testInsIndex = frame.GetLastInstructionIndex();
@@ -530,10 +558,14 @@ namespace GTAdhocCompiler
             // Create a label for the temporary switch variable
             string tmpCaseVariable = $"case#{SymbolMap.TempVariableCounter++}";
             AdhocSymbol labelSymb = InsertVariablePush(frame, new Identifier(tmpCaseVariable));
-            frame.AddInstruction(InsAssignPop.Default, 0);
+            InsertAssignPop(frame);
+
+            LocalVariable caseVariable = frame.Stack.GetLocalVariableBySymbol(labelSymb);
+            int caseVariableStoreIdx = frame.Stack.GetGlobalVariableIndex(caseVariable);
 
             Dictionary<SwitchCase, InsJumpIfTrue> caseBodyJumps = new();
             InsJump defaultJump = null;
+            bool hasDefault = false;
 
             // Write switch table jumps
             for (int i = 0; i < switchStatement.Cases.Count; i++)
@@ -544,7 +576,7 @@ namespace GTAdhocCompiler
                     // Get temp variable
                     InsVariableEvaluation tempVar = new InsVariableEvaluation();
                     tempVar.VariableSymbols.Add(labelSymb);
-                    tempVar.VariableHeapIndex = frame.Stack.LocalVariableStorage.IndexOf(tmpCaseVariable);
+                    tempVar.VariableStorageIndex = caseVariableStoreIdx;
                     frame.AddInstruction(tempVar, swCase.Location.Start.Line);
 
                     // Write what we are comparing to 
@@ -561,13 +593,21 @@ namespace GTAdhocCompiler
                 }
                 else // Default
                 {
-                    if (defaultJump is not null)
-                        ThrowCompilationError(swCase, "Switch already has a default statement.");
+                    if (hasDefault)
+                        ThrowCompilationError(swCase, "Switch already has a default case.");
 
-                    InsJump jmp = new InsJump();
-                    defaultJump = jmp;
+                    hasDefault = true;
+                    defaultJump = new InsJump();
                     frame.AddInstruction(defaultJump, swCase.Location.Start.Line);
                 }
+            }
+
+            // Was a default case statement specified?
+            if (!hasDefault)
+            {
+                // Switch statement does not have an explicit default case, add a default jump
+                defaultJump = new InsJump();
+                frame.AddInstruction(defaultJump, 0);
             }
 
             // Write bodies
@@ -585,6 +625,10 @@ namespace GTAdhocCompiler
                 foreach (var statement in swCase.Consequent)
                     CompileStatement(frame, statement);
             }
+
+            // Update non explicit default case to jump to end
+            if (!hasDefault)
+                defaultJump.JumpInstructionIndex = frame.GetLastInstructionIndex();
 
             // Update break case jumps
             for (int i = 0; i < switchCtx.BreakJumps.Count; i++)
@@ -623,7 +667,6 @@ namespace GTAdhocCompiler
                 {
                     AdhocSymbol paramSymb = SymbolMap.RegisterSymbol(paramIdent.Name);
                     subroutine.CodeFrame.FunctionParameters.Add(paramSymb);
-                    subroutine.CodeFrame.AddDeclaredVariable(paramSymb);
 
                     // Function param is uninitialized, push nil
                     frame.AddInstruction(InsNilConst.Empty, paramIdent.Location.Start.Line);
@@ -636,7 +679,6 @@ namespace GTAdhocCompiler
 
                     AdhocSymbol paramSymb = SymbolMap.RegisterSymbol((assignmentExpression.Left as Identifier).Name);
                     subroutine.CodeFrame.FunctionParameters.Add(paramSymb);
-                    subroutine.CodeFrame.AddDeclaredVariable(paramSymb);
 
                     // Push default value
                     CompileLiteral(frame, assignmentExpression.Right as Literal);
@@ -648,7 +690,6 @@ namespace GTAdhocCompiler
 
                     AdhocSymbol paramSymb = SymbolMap.RegisterSymbol((pattern.Left as Identifier).Name);
                     subroutine.CodeFrame.FunctionParameters.Add(paramSymb);
-                    subroutine.CodeFrame.AddDeclaredVariable(paramSymb);
 
                     // Push default value
                     CompileLiteral(frame, pattern.Right as Literal);
@@ -657,16 +698,14 @@ namespace GTAdhocCompiler
                     ThrowCompilationError(parentNode, "Subroutine definition parameters must all be identifier or assignment to a literal.");
             }
 
-            frame.AddScopeVariable(subroutine.Name, isVariableDeclaration: false, isStaticDefinition: true);
-            frame.Stack.MaxLocalVariableStorageSize++;
-
+            frame.AddAttributeOrStaticMemberVariable(subroutine.Name);
             frame.AddInstruction(subroutine, parentNode.Location.Start.Line);
 
             if (body is BlockStatement blockStatement)
             {
                 EnterScope(subroutine.CodeFrame, parentNode);
                 foreach (var param in subroutine.CodeFrame.FunctionParameters)
-                    subroutine.CodeFrame.AddScopeVariable(param);
+                    subroutine.CodeFrame.AddScopeVariable(param, isDeclaration: true);
                 
                 CompileBlockStatement(subroutine.CodeFrame, blockStatement, openScope: false, insertLeaveInstruction: false);
             }
@@ -676,7 +715,7 @@ namespace GTAdhocCompiler
             InsertFrameExitIfNeeded(subroutine.CodeFrame, body);
 
             Logger.Debug($"Subroutine '{id.Name}' compiled ({subroutine.CodeFrame.Instructions.Count} ins, " +
-                $"Stack Size:{subroutine.CodeFrame.Stack.MaxStackStorageSize}, variable Storage Size: {subroutine.CodeFrame.Stack.MaxLocalVariableStorageSize})");
+                $"Stack Size:{subroutine.CodeFrame.Stack.StackSize}, variable Storage Size: {subroutine.CodeFrame.Stack.LocalVariableStorageSize})");
         }
 
         /// <summary>
@@ -713,6 +752,8 @@ namespace GTAdhocCompiler
             Expression? initValue = declarator.Init;
             Expression? id = declarator.Id;
 
+            // We need to add the defined value first
+
             if (initValue != null)
                 CompileExpression(frame, initValue);
 
@@ -728,37 +769,42 @@ namespace GTAdhocCompiler
                     InsertVariablePush(frame, idIdentifier);
 
                     // Perform assignment
-                    frame.AddInstruction(InsAssignPop.Default, 0);
+                    InsertAssignPop(frame);
                 }
                 else
                 {
                     // Variable is declared but not assigned to anything yet. Do not add any variable push.
                     AdhocSymbol varSymb = SymbolMap.RegisterSymbol(idIdentifier.Name);
-                    frame.AddScopeVariable(varSymb);
+                    frame.AddScopeVariable(varSymb, isDeclaration: true);
                 }
             }
             else if (id is ArrayPattern arrayPattern) // var [hello, world] = helloworld; - deconstruct array
             {
-                if (arrayPattern.Elements.Count == 0)
-                    ThrowCompilationError(arrayPattern, "Array pattern has no elements.");
-
-                foreach (Expression exp in arrayPattern.Elements)
-                {
-                    if (exp is not Identifier)
-                        ThrowCompilationError(exp, "Expected array element to be identifier.");
-
-                    Identifier arrElemIdentifier = exp as Identifier;
-                    InsertVariablePush(frame, arrElemIdentifier);
-                }
-
-                InsListAssign listAssign = new InsListAssign(arrayPattern.Elements.Count);
-                frame.AddInstruction(listAssign, arrayPattern.Location.Start.Line);
-                frame.AddInstruction(InsPop.Default, 0); // Pop array from stack 
+                CompileArrayPatternPush(frame, arrayPattern);
             }
             else
             {
                 ThrowCompilationError(varDeclaration, "Variable declaration for id is not an identifier.");
             }
+        }
+
+        private void CompileArrayPatternPush(AdhocCodeFrame frame, ArrayPattern arrayPattern)
+        {
+            if (arrayPattern.Elements.Count == 0)
+                ThrowCompilationError(arrayPattern, "Array pattern has no elements.");
+
+            foreach (Expression exp in arrayPattern.Elements)
+            {
+                if (exp is not Identifier)
+                    ThrowCompilationError(exp, "Expected array element to be identifier.");
+
+                Identifier arrElemIdentifier = exp as Identifier;
+                InsertVariablePush(frame, arrElemIdentifier);
+            }
+
+            InsListAssign listAssign = new InsListAssign(arrayPattern.Elements.Count);
+            frame.AddInstruction(listAssign, arrayPattern.Location.Start.Line);
+            frame.AddInstruction(InsPop.Default, 0); // Pop array from stack 
         }
 
         /// <summary>
@@ -807,68 +853,73 @@ namespace GTAdhocCompiler
 
         private void CompileExpression(AdhocCodeFrame frame, Expression exp)
         {
-            switch (exp)
+            switch (exp.Type)
             {
                 
-                case Identifier initIdentifier:
-                    CompileIdentifier(frame, initIdentifier);
+                case Nodes.Identifier:
+                    CompileIdentifier(frame, exp as Identifier);
                     break;
-                case FunctionExpression funcExpression:
-                    CompileFunctionExpression(frame, funcExpression);
+                case Nodes.FunctionExpression:
+                    CompileFunctionExpression(frame, exp as FunctionExpression);
                     break;
-                case CallExpression callExp:
-                    CompileCall(frame, callExp);
+                case Nodes.CallExpression:
+                    CompileCall(frame, exp as CallExpression);
                     break;
-                case UnaryExpression unaryExpression:
-                    CompileUnaryExpression(frame, unaryExpression);
+                case Nodes.UnaryExpression:
+                case Nodes.UpdateExpression:
+                    CompileUnaryExpression(frame, exp as UnaryExpression);
                     break;
-                case AttributeMemberExpression attributeMemberException:
-                    CompileAttributeMemberExpression(frame, attributeMemberException);
+                case Nodes.BinaryExpression:
+                case Nodes.LogicalExpression:
+                    CompileBinaryExpression(frame, exp as BinaryExpression);
                     break;
-                case StaticMemberExpression staticMemberExpression:
-                    CompileStaticMemberExpression(frame, staticMemberExpression);
+                case Nodes.Literal:
+                    CompileLiteral(frame, exp as Literal);
                     break;
-                case BinaryExpression binExpression:
-                    CompileBinaryExpression(frame, binExpression);
+                case Nodes.ArrayExpression:
+                    CompileArrayExpression(frame, exp as ArrayExpression);
                     break;
-                case Literal literal:
-                    CompileLiteral(frame, literal);
+                case Nodes.MapExpression:
+                    CompileMapExpression(frame, exp as MapExpression);
                     break;
-                case ArrayExpression arr:
-                    CompileArrayExpression(frame, arr);
+                case Nodes.MemberExpression when exp is ComputedMemberExpression:
+                    CompileComputedMemberExpression(frame, exp as ComputedMemberExpression);
                     break;
-                case MapExpression map:
-                    CompileMapExpression(frame, map);
+                case Nodes.MemberExpression when exp is StaticMemberExpression:
+                    CompileStaticMemberExpression(frame, exp as StaticMemberExpression);
                     break;
-                case ComputedMemberExpression comp:
-                    CompileComputedMemberExpression(frame, comp);
+                case Nodes.MemberExpression when exp is AttributeMemberExpression:
+                    CompileAttributeMemberExpression(frame, exp as AttributeMemberExpression);
                     break;
-                case AssignmentExpression assignExp:
-                    CompileAssignmentExpression(frame, assignExp);
+                case Nodes.AssignmentExpression:
+                    CompileAssignmentExpression(frame, exp as AssignmentExpression);
                     break;
-                case ConditionalExpression condExp:
-                    CompileConditionalExpression(frame, condExp);
+                case Nodes.ConditionalExpression:
+                    CompileConditionalExpression(frame, exp as ConditionalExpression);
                     break;
-                case TemplateLiteral templateLiteral:
-                    CompileTemplateLiteral(frame, templateLiteral);
+                case Nodes.TemplateLiteral:
+                    CompileTemplateLiteral(frame, exp as TemplateLiteral);
                     break;
-                case TaggedTemplateExpression taggedTemplateExpression:
-                    CompileTaggedTemplateExpression(frame, taggedTemplateExpression);
+                case Nodes.TaggedTemplateExpression:
+                    CompileTaggedTemplateExpression(frame, exp as TaggedTemplateExpression);
                     break;
-                case StaticVariableDefinition staticExpr:
-                    CompileStaticVariableDefinition(frame, staticExpr);
+                case Nodes.StaticDeclaration:
+                    CompileStaticVariableDefinition(frame, exp as StaticVariableDefinition);
                     break;
-                case AttributeVariableDefinition attrDefinition:
-                    CompileAttributeDefinition(frame, attrDefinition);
+                case Nodes.AttributeDeclaration:
+                    CompileAttributeDefinition(frame, exp as AttributeVariableDefinition);
                     break;
-                case ClassExpression classExpr:
-                    CompileClassExpression(frame, classExpr);
+                case Nodes.ClassExpression:
+                    CompileClassExpression(frame, exp as ClassExpression);
                     break;
-                case ArrowFunctionExpression arrowFuncExpr:
-                    CompileArrowFunctionExpression(frame, arrowFuncExpr);
+                case Nodes.ArrowFunctionExpression:
+                    CompileArrowFunctionExpression(frame, exp as ArrowFunctionExpression);
                     break;
-                case ImportExpression importExpression:
-                    CompileImport(frame, importExpression.Declaration);
+                case Nodes.ImportDeclaration:
+                    CompileImport(frame, (exp as ImportExpression).Declaration);
+                    break;
+                case Nodes.YieldExpression:
+                    CompileYield(frame, exp as YieldExpression);
                     break;
                 default:
                     ThrowCompilationError(exp, $"Expression {exp.Type} not supported");
@@ -879,6 +930,12 @@ namespace GTAdhocCompiler
         private void CompileArrowFunctionExpression(AdhocCodeFrame frame, ArrowFunctionExpression arrowFuncExpr)
         {
             CompileAnonymousFunction(frame, arrowFuncExpr, arrowFuncExpr.Body, arrowFuncExpr.Params);
+        }
+
+        private void CompileYield(AdhocCodeFrame frame, YieldExpression yield)
+        {
+            frame.AddInstruction(InsVoidConst.Empty, yield.Location.Start.Line);
+            frame.AddInstruction(new InsSetState(AdhocRunState.YIELD), 0);
         }
 
         /// <summary>
@@ -901,7 +958,7 @@ namespace GTAdhocCompiler
              *        map[e.toString()] = e * 100; -> Inserts a new key/value pair into map, which is from the parent frame
              *    });
              */
-            funcConst.CodeFrame.CanCaptureVariablesFromParentFrame = true;
+            funcConst.CodeFrame.ContextAllowsVariableCaptureFromParentFrame = true;
 
             EnterScope(funcConst.CodeFrame, parentNode);
             foreach (Expression param in funcParams)
@@ -912,7 +969,7 @@ namespace GTAdhocCompiler
                 Identifier paramIdent = param as Identifier;
                 AdhocSymbol paramSymbol = SymbolMap.RegisterSymbol(paramIdent.Name);
                 funcConst.CodeFrame.FunctionParameters.Add(paramSymbol);
-                funcConst.CodeFrame.AddScopeVariable(paramSymbol, isVariableDeclaration: true);
+                funcConst.CodeFrame.AddScopeVariable(paramSymbol, isDeclaration: true);
             }
 
             if (body is BlockStatement)
@@ -953,6 +1010,18 @@ namespace GTAdhocCompiler
                 var idSymb = SymbolMap.RegisterSymbol(ident.Name);
                 InsStaticDefine staticDefine = new InsStaticDefine(idSymb);
                 frame.AddInstruction(staticDefine, staticExpression.Location.End.Line);
+
+                if (!frame.CurrentModule.DefineStatic(idSymb))
+                    ThrowCompilationError(staticExpression, $"Static member {idSymb.Name} was already declared in this module.");
+
+                frame.AddAttributeOrStaticMemberVariable(idSymb);
+            }
+            else if (staticExpression.VarExpression is ClassExpression classExp) // Static Modules/Absolute
+            {
+                if (!classExp.IsModule)
+                    ThrowCompilationError(classExp, "Static class declarations are not supported.");
+
+                CompileNewClass(frame, classExp.Id, classExp.SuperClass, classExp.Body, isModule: true, isStaticModule: true);
             }
             else
             {
@@ -970,8 +1039,7 @@ namespace GTAdhocCompiler
                 InsStaticDefine staticDefine = new InsStaticDefine(idSymb);
                 frame.AddInstruction(staticDefine, staticExpression.Location.End.Line);
 
-                if (!frame.CurrentModule.DefineStatic(idSymb))
-                    ThrowCompilationError(assignmentExpression, $"Static member {idSymb.Name} was already declared in this module.");
+                frame.AddAttributeOrStaticMemberVariable(idSymb);
 
                 if (assignmentExpression.Operator == AssignmentOperator.Assign)
                 {
@@ -1008,6 +1076,9 @@ namespace GTAdhocCompiler
                 var idSymb = SymbolMap.RegisterSymbol(ident.Name);
                 InsAttributeDefine staticDefine = new InsAttributeDefine(idSymb);
                 frame.AddInstruction(staticDefine, attrVariableDefinition.Location.End.Line);
+
+                frame.CurrentModule.DefineAttribute(idSymb);
+                frame.AddAttributeOrStaticMemberVariable(idSymb);
             }
             else
             {
@@ -1027,10 +1098,10 @@ namespace GTAdhocCompiler
                 // Declaring a class attribute, so we don't push anything
                 InsAttributeDefine attrDefine = new InsAttributeDefine(idSymb);
                 frame.AddInstruction(attrDefine, identifier.Location.Start.Line);
-            }
 
-            // Counts towards variable storage
-            frame.Stack.MaxLocalVariableStorageSize++;
+                frame.CurrentModule.DefineAttribute(idSymb);
+                frame.AddAttributeOrStaticMemberVariable(idSymb);
+            }
         }
 
         /// <summary>
@@ -1284,10 +1355,19 @@ namespace GTAdhocCompiler
                 else
                     ThrowCompilationError(expression, "TODO: Ref stuff");
             }
+            else if (expression is StaticMemberExpression staticMembExpression) // main::hello = hi
+            {
+                CompileStaticMemberExpressionAssignment(frame, staticMembExpression);
+            }
+            else if (expression is ArrayPattern pattern) // var [hi, hello] = variable
+            {
+                CompileArrayPatternPush(frame, pattern);
+                return; // No need for assign pop
+            }
             else
                 ThrowCompilationError(expression, "Unimplemented");
 
-            frame.AddInstruction(InsAssignPop.Default, 0);
+            InsertAssignPop(frame);
         }
 
         /// <summary>
@@ -1396,27 +1476,39 @@ namespace GTAdhocCompiler
             eval.VariableSymbols.Add(fullPathSymb);
             fullPathSymb.IsStatic = true;
 
-            int idx = frame.AddScopeVariable(fullPathSymb, isVariableDeclaration: false);
-            eval.VariableHeapIndex = idx;
+            int idx = frame.AddScopeVariable(fullPathSymb, isDeclaration: false, isStatic: true);
+            eval.VariableStorageIndex = idx;
 
             frame.AddInstruction(eval, staticExp.Location.Start.Line);
-            void BuildStaticPath(StaticMemberExpression exp, ref List<string> pathParts)
-            {
-                if (exp.Object is StaticMemberExpression obj)
-                {
-                    BuildStaticPath(obj, ref pathParts);
-                }
-                else if (exp.Object is Identifier identifier)
-                {
-                    pathParts.Add(identifier.Name);
-                }
+        }
 
-                if (exp.Property is Identifier propIdentifier)
-                {
-                    pathParts.Add(propIdentifier.Name);
-                    return;
-                }
+        /// <summary>
+        /// Compiles a static member path assignment.
+        /// </summary>
+        /// <param name="frame"></param>
+        /// <param name="staticExp"></param>
+        private void CompileStaticMemberExpressionAssignment(AdhocCodeFrame frame, StaticMemberExpression staticExp)
+        {
+            // Recursively build the namespace path
+            List<string> pathParts = new(4);
+            BuildStaticPath(staticExp, ref pathParts);
+
+            InsVariablePush push = new InsVariablePush();
+            foreach (string part in pathParts)
+            {
+                AdhocSymbol symb = SymbolMap.RegisterSymbol(part);
+                push.VariableSymbols.Add(symb);
             }
+
+            string fullPath = string.Join("::", pathParts);
+            AdhocSymbol fullPathSymb = SymbolMap.RegisterSymbol(fullPath);
+            push.VariableSymbols.Add(fullPathSymb);
+            fullPathSymb.IsStatic = true;
+
+            int idx = frame.AddScopeVariable(fullPathSymb, isDeclaration: false, isStatic: true);
+            push.VariableStorageIndex = idx;
+
+            frame.AddInstruction(push, staticExp.Location.Start.Line);
         }
 
         /// <summary>
@@ -1484,57 +1576,33 @@ namespace GTAdhocCompiler
             {
                 
                 CompileExpression(frame, binExp.Right);
-                        
-                AdhocSymbol opSymbol = null;
-                switch (binExp.Operator)
-                {
-                    case BinaryOperator.Equal:
-                        opSymbol = SymbolMap.RegisterSymbol("==");
-                        break;
-                    case BinaryOperator.NotEqual:
-                        opSymbol = SymbolMap.RegisterSymbol("!=");
-                        break;
-                    case BinaryOperator.Less:
-                        opSymbol = SymbolMap.RegisterSymbol("<");
-                        break;
-                    case BinaryOperator.Greater:
-                        opSymbol = SymbolMap.RegisterSymbol(">");
-                        break;
-                    case BinaryOperator.LessOrEqual:
-                        opSymbol = SymbolMap.RegisterSymbol("<=");
-                        break;
-                    case BinaryOperator.GreaterOrEqual:
-                        opSymbol = SymbolMap.RegisterSymbol(">=");
-                        break;
-                    case BinaryOperator.Plus:
-                        opSymbol = SymbolMap.RegisterSymbol("+");
-                        break;
-                    case BinaryOperator.Minus:
-                        opSymbol = SymbolMap.RegisterSymbol("-");
-                        break;
-                    case BinaryOperator.Divide:
-                        opSymbol = SymbolMap.RegisterSymbol("/");
-                        break;
-                    case BinaryOperator.Times:
-                        opSymbol = SymbolMap.RegisterSymbol("*");
-                        break;
-                    case BinaryOperator.Modulo:
-                        opSymbol = SymbolMap.RegisterSymbol("%");
-                        break;
-                    case BinaryOperator.BitwiseOr:
-                        opSymbol = SymbolMap.RegisterSymbol("|");
-                        break;
-                    case BinaryOperator.BitwiseXOr:
-                        opSymbol = SymbolMap.RegisterSymbol("^");
-                        break;
-                    case BinaryOperator.BitwiseAnd:
-                        opSymbol = SymbolMap.RegisterSymbol("&");
-                        break;
-                    default:
-                        ThrowCompilationError(binExp, $"Binary operator {binExp.Operator} not implemented");
-                        break;
-                }
 
+                string opStr = binExp.Operator switch
+                {
+                    BinaryOperator.Equal => "==",
+                    BinaryOperator.NotEqual => "!=",
+                    BinaryOperator.Less => "<",
+                    BinaryOperator.Greater => ">",
+                    BinaryOperator.LessOrEqual => "<=",
+                    BinaryOperator.GreaterOrEqual => ">=",
+                    BinaryOperator.Plus => "+",
+                    BinaryOperator.Minus => "-",
+                    BinaryOperator.Divide => "/",
+                    BinaryOperator.Times => "*",
+                    BinaryOperator.Modulo => "%",
+                    BinaryOperator.BitwiseOr => "|",
+                    BinaryOperator.BitwiseXOr => "^",
+                    BinaryOperator.BitwiseAnd => "&",
+                    BinaryOperator.LeftShift => "<<",
+                    BinaryOperator.RightShift => ">>",
+                    BinaryOperator.Exponentiation => "**",
+                    _ => null
+                };
+
+                if (opStr is null)
+                    ThrowCompilationError(binExp, $"Binary operator {binExp.Operator} not implemented");
+
+                AdhocSymbol opSymbol = SymbolMap.RegisterSymbol(opStr);
                 InsBinaryOperator binOpIns = new InsBinaryOperator(opSymbol);
                 frame.AddInstruction(binOpIns, binExp.Location.Start.Line);
             }
@@ -1583,7 +1651,7 @@ namespace GTAdhocCompiler
             InsAttributePush push = new InsAttributePush();
             push.AttributeSymbols.Add(SymbolMap.RegisterSymbol("finally"));
             frame.AddInstruction(push, finalizerStatement.Body.Location.Start.Line);
-            frame.AddInstruction(InsAssignPop.Default, 0);
+            InsertAssignPop(frame);
         }
 
         /// <summary>
@@ -1591,26 +1659,33 @@ namespace GTAdhocCompiler
         /// </summary>
         /// <param name="frame"></param>
         /// <param name="unaryExp"></param>
-        /// <exception cref="NotImplementedException"></exception>
-        private void CompileUnaryExpression(AdhocCodeFrame frame, UnaryExpression unaryExp)
+        private void CompileUnaryExpression(AdhocCodeFrame frame, UnaryExpression unaryExp, bool isReference = false)
         {
             if (unaryExp is UpdateExpression upd)
             {
-                // Assigning - we need to push
-                if (unaryExp.Argument is Identifier leftIdent)
-                    InsertVariablePush(frame, leftIdent);
-                else if (unaryExp.Argument is AttributeMemberExpression attr)
-                    InsertAttributeMemberAssignmentPush(frame, attr);
-                else if (unaryExp.Argument is ComputedMemberExpression comp)
-                    CompileComputedMemberExpression(frame, comp);
-                else if (unaryExp.Argument is Literal literal) // -1 -> int const + unary op
-                    CompileLiteral(frame, literal);
-                else if (unaryExp.Argument is CallExpression call)
-                    CompileCall(frame, call);
-                else if (unaryExp.Argument is BinaryExpression binaryExp)
-                    CompileBinaryExpression(frame, binaryExp);
+                if (!isReference)
+                {
+                    // Assigning - we need to push
+                    if (unaryExp.Argument is Identifier leftIdent)
+                        InsertVariablePush(frame, leftIdent);
+                    else if (unaryExp.Argument is AttributeMemberExpression attr)
+                        InsertAttributeMemberAssignmentPush(frame, attr);
+                    else if (unaryExp.Argument is ComputedMemberExpression comp)
+                        CompileComputedMemberExpression(frame, comp);
+                    else if (unaryExp.Argument is Literal literal) // -1 -> int const + unary op
+                        CompileLiteral(frame, literal);
+                    else if (unaryExp.Argument is CallExpression call)
+                        CompileCall(frame, call);
+                    else if (unaryExp.Argument is BinaryExpression binaryExp)
+                        CompileBinaryExpression(frame, binaryExp);
+                    else
+                        ThrowCompilationError(unaryExp.Argument, "Unsupported");
+                }
                 else
-                    ThrowCompilationError(unaryExp.Argument, "Unsupported");
+                {
+                    // Reference objects can just be eval'd
+                    CompileExpression(frame, upd.Argument);
+                }
 
                 bool preIncrement = unaryExp.Prefix;
 
@@ -1647,6 +1722,7 @@ namespace GTAdhocCompiler
                         UnaryOperator.LogicalNot => "!",
                         UnaryOperator.Minus => "-@",
                         UnaryOperator.Plus => "+@",
+                        UnaryOperator.BitwiseNot => "~",
                         _ => throw new NotImplementedException("TODO"),
                     };
 
@@ -1663,6 +1739,14 @@ namespace GTAdhocCompiler
             {
                 // We need to push the object's reference, instead of simply evaluating it
                 InsertAttributeMemberAssignmentPush(frame, attrMemberExp);
+            }
+            else if (unaryExp.Argument is StaticMemberExpression staticExpr)
+            {
+                CompileStaticMemberExpressionAssignment(frame, staticExpr);
+            }
+            else if (unaryExp.Argument is UpdateExpression upd)
+            {
+                CompileUnaryExpression(frame, upd, isReference: true);
             }
             else
             {
@@ -1684,19 +1768,28 @@ namespace GTAdhocCompiler
                     InsNilConst nil = new InsNilConst();
                     frame.AddInstruction(nil, literal.Location.Start.Line);
                     break;
+
                 case TokenType.BooleanLiteral:
                     InsBoolConst boolConst = new InsBoolConst((literal.Value as bool?).Value);
                     frame.AddInstruction(boolConst, literal.Location.Start.Line);
                     break;
+
                 case TokenType.NumericLiteral:
                     InstructionBase ins = literal.NumericTokenType switch
                     {
                         NumericTokenType.Integer => new InsIntConst((int)literal.NumericValue),
                         NumericTokenType.Float => new InsFloatConst((float)literal.NumericValue),
+                        NumericTokenType.Long => new InsLongConst((long)literal.NumericValue),
                         _ => throw GetCompilationError(literal, "Unknown numeric literal type"),
                     };
                     frame.AddInstruction(ins, literal.Location.Start.Line);
                     break;
+
+                case TokenType.SymbolLiteral:
+                    InsSymbolConst symbConst = new InsSymbolConst(SymbolMap.RegisterSymbol(literal.Value as string));
+                    frame.AddInstruction(symbConst, literal.Location.Start.Line);
+                    break;
+
                 default:
                     throw new NotImplementedException($"Not implemented literal {literal.TokenType}");
             }
@@ -1724,10 +1817,13 @@ namespace GTAdhocCompiler
         /// <param name="frame"></param>
         /// <param name="identifier"></param>
         /// <returns></returns>
-        private AdhocSymbol InsertVariableEval(AdhocCodeFrame frame, Identifier identifier)
+        private void InsertVariableEval(AdhocCodeFrame frame, Identifier identifier)
         {
+            if (ProcessStringDefine(frame, identifier))
+                return;
+
             AdhocSymbol symb = SymbolMap.RegisterSymbol(identifier.Name);
-            int idx = identifier.Name != "self" ? frame.AddScopeVariable(symb, isVariableDeclaration: false) : 0;
+            int idx = identifier.Name != "self" ? frame.AddScopeVariable(symb, false) : 0;
             var varEval = new InsVariableEvaluation(idx);
             varEval.VariableSymbols.Add(symb); // Only one
             frame.AddInstruction(varEval, identifier.Location.Start.Line);
@@ -1737,8 +1833,22 @@ namespace GTAdhocCompiler
             // "self" keyword is ignored
             if (frame.IsStaticVariable(symb))
                 varEval.VariableSymbols.Add(symb); // Static, two symbols
+        }
 
-            return symb;
+        public bool ProcessStringDefine(AdhocCodeFrame frame, Identifier identifier)
+        {
+            if (identifier.Name == "__LINE__")
+            {
+                frame.AddInstruction(new InsUIntConst((uint)identifier.Location.Start.Line), identifier.Location.Start.Line);
+                return true;
+            }
+            else if (identifier.Name == "__FILE__")
+            {
+                frame.AddInstruction(new InsStringConst(frame.SourceFilePath), identifier.Location.Start.Line);
+                return true;
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -1749,11 +1859,8 @@ namespace GTAdhocCompiler
         /// <returns></returns>
         private AdhocSymbol InsertVariablePush(AdhocCodeFrame frame, Identifier identifier)
         {
-            if (identifier.Name.Contains("in#"))
-                ;
-
             AdhocSymbol varSymb = SymbolMap.RegisterSymbol(identifier.Name);
-            int idx = frame.AddScopeVariable(varSymb, isVariableDeclaration: true);
+            int idx = frame.AddScopeVariable(varSymb, isDeclaration: true);
 
             var varPush = new InsVariablePush();
             varPush.VariableSymbols.Add(varSymb);
@@ -1947,15 +2054,26 @@ namespace GTAdhocCompiler
             var lastScope = frame.CurrentScopes.Pop();
 
             if (!isModuleLeave) // Module leaves don't actually reset the max.
-                frame.Stack.RewindLocalVariableStorage(lastScope.ScopeVariables.Count);
-
-            foreach (var variable in lastScope.ScopeVariables)
-                frame.DeclaredVariables.Remove(variable.Value.Name);
+            {
+                // Clear up/rewind
+                foreach (var variable in lastScope.ScopeVariables)
+                    frame.FreeVariable(variable.Value);
+            }
 
             if (insertLeaveInstruction)
             {
                 InsLeaveScope leave = new InsLeaveScope();
-                leave.VariableHeapRewindIndex = !isModuleLeave ? frame.Stack.LocalVariableStorage.Count : 1; // Module/Class exits set this to 1.
+
+                if (isModuleLeave)
+                {
+                    leave.VariableStorageRewindIndex = 1;
+                    leave.ModuleOrClassDepth = Modules.Count - 1;
+                }
+                else
+                {
+                    leave.VariableStorageRewindIndex = frame.Stack.GetLastVariableStorageIndex();
+                }
+
                 frame.AddInstruction(leave, 0);
             }
         }
@@ -1989,6 +2107,42 @@ namespace GTAdhocCompiler
                 EnterScope(frame, statement);
                 CompileStatement(frame, statement);
                 LeaveScope(frame);
+            }
+        }
+
+        private void BuildStaticPath(StaticMemberExpression exp, ref List<string> pathParts)
+        {
+            if (exp.Object is StaticMemberExpression obj)
+            {
+                BuildStaticPath(obj, ref pathParts);
+            }
+            else if (exp.Object is Identifier identifier)
+            {
+                pathParts.Add(identifier.Name);
+            }
+
+            if (exp.Property is Identifier propIdentifier)
+            {
+                pathParts.Add(propIdentifier.Name);
+                return;
+            }
+        }
+
+        private void InsertAssignPop(AdhocCodeFrame frame)
+        {
+            if (frame.Version >= 11)
+            {
+                frame.AddInstruction(InsAssignPop.Default, 0);
+            }
+            else if (frame.Version >= 10)
+            {
+                frame.AddInstruction(InsAssign.Default, 0);
+                frame.AddInstruction(InsPopOld.Default, 0);
+            }
+            else // Assume under 10 that its the traditional assign + pop old
+            {
+                frame.AddInstruction(InsAssignOld.Default, 0);
+                frame.AddInstruction(InsPopOld.Default, 0);
             }
         }
     }

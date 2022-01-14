@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 
 using Esprima.Ast;
 using GTAdhocCompiler.Instructions;
+using GTAdhocCompiler.Variables;
 
 namespace GTAdhocCompiler
 {
@@ -14,6 +15,10 @@ namespace GTAdhocCompiler
     /// </summary>
     public class AdhocCodeFrame
     {
+        public const int ADHOC_VERSION_CURRENT = 12;
+
+        public int Version { get; set; } = ADHOC_VERSION_CURRENT;
+
         /// <summary>
         /// Parent frame for this frame, if exists.
         /// </summary>
@@ -27,7 +32,7 @@ namespace GTAdhocCompiler
         /// <summary>
         /// Used for function variables/callbacks. Should be true for function consts.
         /// </summary>
-        public bool CanCaptureVariablesFromParentFrame { get; set; }
+        public bool ContextAllowsVariableCaptureFromParentFrame { get; set; }
 
         /// <summary>
         /// Current instructions for this block.
@@ -73,11 +78,6 @@ namespace GTAdhocCompiler
         /// Returns whether the current scope is the top block level.
         /// </summary>
         public bool IsTopLevel => CurrentScopes.Count == 1;
-
-        /// <summary>
-        /// Used to keep track of all declared variables, mostly for telling whether a variable is static or not
-        /// </summary>
-        public List<string> DeclaredVariables { get; set; } = new();
 
         /// <summary>
         /// Whether the current block has a return statement, to manually add the return instructions if false.
@@ -240,52 +240,95 @@ namespace GTAdhocCompiler
             return Instructions.Count;
         }
 
-        public int AddScopeVariable(AdhocSymbol symbol, bool isVariableDeclaration = true, 
-            bool isStaticDefinition = false)
+        public void FreeVariable(AdhocSymbol symbol)
         {
-            if (!isVariableDeclaration && CanCaptureVariablesFromParentFrame && ParentFrame is not null)
+            var localVarToRemove = Stack.GetLocalVariableBySymbol(symbol);
+            Stack.FreeLocalVariable(localVarToRemove);
+        }
+
+        public int AddScopeVariable(AdhocSymbol symbol, bool isDeclaration = false, bool isStatic = false)
+        {
+            bool added;
+            Variable newVariable;
+            var lastScope = CurrentScope;
+
+            if (isDeclaration)
             {
-                // Is a captured variable for function const?
-                if (ParentFrame.DeclaredVariables.Contains(symbol.Name) && !CapturedCallbackVariables.Contains(symbol)
-                    && !DeclaredVariables.Contains(symbol.Name))
+                if (isStatic)
                 {
-                    CapturedCallbackVariables.Add(symbol);
-                    DeclaredVariables.Add(symbol.Name); 
+                    added = Stack.TryAddStaticVariable(symbol, out newVariable);
+                }
+                else
+                {
+                    // May also be a reassignment to a static
+                    if (Stack.HasStaticVariable(symbol))
+                    {
+                        added = Stack.TryAddStaticVariable(symbol, out newVariable);
+                    }
+                    else
+                    {
+                        added = Stack.TryAddLocalVariable(symbol, out newVariable);
+                        if (added)
+                            lastScope.ScopeVariables.Add(symbol.Name, symbol);
+                    }
+                }
+            }
+            else
+            {
+                // Undeclared variable accesses
+
+                // Captured variable from parent function?
+                if (ContextAllowsVariableCaptureFromParentFrame && ParentFrame is not null && ParentFrame.Stack.HasLocalVariable(symbol))
+                {
+                    if (!CapturedCallbackVariables.Contains(symbol))
+                    {
+                        CapturedCallbackVariables.Add(symbol);
+
+                        // Add captured variable to current frame
+                        Stack.TryAddLocalVariable(symbol, out newVariable);
+                        Stack.AddVariableToGlobalSpace(newVariable);
+                    }
+
+                    // Captured variables have backward indices
+                    return -(CapturedCallbackVariables.IndexOf(symbol) + 1); // 0 -> -1, 1 -> -2 etc
+                }
+
+                if (isStatic || !Stack.HasLocalVariable(symbol))
+                {
+                    added = Stack.TryAddStaticVariable(symbol, out newVariable);
+                }
+                else
+                {
+                    added = Stack.TryAddLocalVariable(symbol, out newVariable);
                 }
             }
 
-            // Captured variables do not count towards the local storage size
-            if (CapturedCallbackVariables.Contains(symbol))
-                return -(CapturedCallbackVariables.IndexOf(symbol) + 1); // 0 -> -1, 1 -> -2 etc
-            
-            if (!Stack.TryAddOrGetVariableIndex(symbol, out int index))
+            if (added)
             {
-                if (isStaticDefinition)
-                    Stack.MaxLocalVariableStorageSize++; // Relevant when the frame is the same when exiting/entering modules, which may have identical identifier names
-                return index;
+                return Stack.AddVariableToGlobalSpace(newVariable);
+            }
+            else
+            {
+                // Was already declared and registered
+                return Stack.GetGlobalVariableIndex(newVariable);
             }
 
-            var scope = CurrentScope;
-
-            if (isVariableDeclaration && !DeclaredVariables.Contains(symbol.Name))
-                AddDeclaredVariable(symbol);
-
-            // Static variables pushed don't count towards a rewind heap
-            if (!IsStaticVariable(symbol))
-                scope.ScopeVariables.Add(symbol.Name, symbol); // We added a variable to the stack storage, add it to scope variables
-
-            return index;
+            throw new Exception("wat?");
         }
 
-        public void AddDeclaredVariable(AdhocSymbol varSymb)
+        public void AddAttributeOrStaticMemberVariable(AdhocSymbol symbol)
         {
-            if (!DeclaredVariables.Contains(varSymb.Name))
-                DeclaredVariables.Add(varSymb.Name);
+            var newVar = new StaticVariable() { Symbol = symbol };
+            Stack.AddStaticVariable(newVar);
+            Stack.AddVariableToGlobalSpace(newVar);
         }
 
         public bool IsStaticVariable(AdhocSymbol symb)
         {
-            return CurrentModule.IsDefinedStaticMember(symb) || (!symb.Name.Equals("self") && !DeclaredVariables.Contains(symb.Name));
+            if (Stack.HasLocalVariable(symb))
+                return false; // Priorize local variables
+
+            return CurrentModule.IsDefinedStaticMember(symb) || CurrentModule.IsDefinedAttributeMember(symb) || !symb.Name.Equals("self");
         }
 
         public ScopeContext GetLastBreakControlledScope()

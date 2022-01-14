@@ -63,9 +63,9 @@ namespace GTAdhocCompiler.Instructions
         ASSIGN,
         LIST_ASSIGN,
         CALL_OLD,
-        OBJECT_SELECTOR,
+        OBJECT_SELECTOR, // Also known as SELF_SELECTOR earlier than GT5P Demo
         SYMBOL_CONST,
-        LEAVE,
+        LEAVE, // Also known as CODE_CONST earlier than GT5P Demo
         ARRAY_CONST,
         ARRAY_PUSH,
         MAP_CONST,

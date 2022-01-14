@@ -37,8 +37,32 @@ namespace GTAdhocCompiler
 
         public void WriteVarString(string str)
         {
-            WriteVarInt(Encoding.UTF8.GetByteCount(str));
-            StreamExtensions.WriteString(this, str, StringCoding.Raw);
+            if (IsAscii(str))
+            {
+                // Non UTF8 operation, incase the string is a escaped byte array as string
+                WriteVarInt(str.Length);
+                byte[] data = new byte[str.Length];
+                for (int i = 0; i < str.Length; i++)
+                    data[i] = (byte)str[i];
+
+                this.Write(data);
+            }
+            else
+            {
+                // Must convert, has some utf8 chars, i.e japanese
+                WriteVarInt(Encoding.UTF8.GetByteCount(str));
+                StreamExtensions.WriteString(this, str, StringCoding.Raw);
+            }
+        }
+
+        public bool IsAscii(string str) 
+        {
+            for (int i = 0; i<str.Length; i++) 
+            {
+                if (str[i] < 0 || str[i] > 0xFF)
+                    return false;
+            }
+            return true;
         }
 
         public void WriteVarInt(int val)

@@ -15,6 +15,8 @@ namespace GTAdhocCompiler.Instructions
 
         public override string InstructionName => "LEAVE";
 
-        public int VariableHeapRewindIndex { get; set; }
+        public int ModuleOrClassDepth { get; set; }
+
+        public int VariableStorageRewindIndex { get; set; }
     }
 }
