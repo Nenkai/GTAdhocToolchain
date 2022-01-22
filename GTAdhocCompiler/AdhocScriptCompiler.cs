@@ -143,12 +143,31 @@ namespace GTAdhocCompiler
                 case Nodes.TryStatement:
                     CompileTryStatement(frame, node as TryStatement);
                     break;
+                case Nodes.UndefStatement:
+                    CompileUndefStatement(frame, node as UndefStatement);
+                    break;
                 case Nodes.EmptyStatement:
                     break;
                 default:
                     ThrowCompilationError(node, "Statement not supported");
                     break;
             }
+        }
+
+        public void CompileUndefStatement(AdhocCodeFrame frame, UndefStatement undefStatement)
+        {
+            InsUndef undefIns = new InsUndef();
+            var parts = undefStatement.Symbol.Split("::");
+
+            if (parts.Length > 1)
+            {
+                foreach (string part in undefStatement.Symbol.Split("::"))
+                    undefIns.Symbols.Add(SymbolMap.RegisterSymbol(part));
+            }
+
+            undefIns.Symbols.Add(SymbolMap.RegisterSymbol(undefStatement.Symbol)); // full
+
+            frame.AddInstruction(undefIns, undefStatement.Location.Start.Line);
         }
 
         public void CompileTryStatement(AdhocCodeFrame frame, TryStatement tryStatement)
@@ -198,8 +217,6 @@ namespace GTAdhocCompiler
                 InsertVariablePush(frame, new Identifier(tmpCaseVariable));
                 InsertAssignPop(frame);
             }
-
-            
 
             CompileBlockStatement(frame, catchClause.Body);
         }

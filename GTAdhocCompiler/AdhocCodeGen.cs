@@ -191,6 +191,8 @@ namespace GTAdhocCompiler
                     WriteListAssign(instruction as InsListAssign); break;
                 case AdhocInstructionType.TRY_CATCH:
                     WriteTryCatch(instruction as InsTryCatch); break;
+                case AdhocInstructionType.UNDEF:
+                    WriteUndef(instruction as InsUndef); break;
                 case AdhocInstructionType.NIL_CONST:
                 case AdhocInstructionType.VOID_CONST:
                 case AdhocInstructionType.ASSIGN_POP:
@@ -208,6 +210,11 @@ namespace GTAdhocCompiler
                 default:
                     throw new NotImplementedException();
             }
+        }
+
+        private void WriteUndef(InsUndef undef)
+        {
+            stream.WriteSymbols(undef.Symbols);
         }
 
         private void WriteTryCatch(InsTryCatch tryCatch)
