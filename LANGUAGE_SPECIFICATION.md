@@ -19,6 +19,32 @@ module MyModule
 }
 ```
 
+##### Class Constructors & Attributes
+Properties are called `attributes` in adhoc. They are defined with the `attribute` keyword, just like how you would declare a `var` or `static`.
+
+Without value: 
+- `attribute myAttribute` - Will be defaulted to `nil`
+
+With value: 
+- `attribute myAttribute = []`
+Local attributes are accessed using the `self` keyword.
+
+Class constructors are defined with the `__init__` method identifier.
+
+```java
+class Dog extends System::Object
+{
+   attribute name;
+   
+   method __init__(name)
+   {
+      self.name = name;
+   }
+}
+
+var obj = MyObject("FooBar");
+```
+
 ##### Class Inheritance
 
 ```java
@@ -42,7 +68,7 @@ Example: `pdistd::MPjson::Encode(...)`.
 There is only one type of string declaration, quotes.
 ```js
 var str = "Hello world!";
-var multiLineString = "hello"
+var combinedStrings = "hello"
                       "world!";
 
 var interpolated = "hello, %{name}!"; // Notice %, instead of $ in javascript.
@@ -50,7 +76,7 @@ var interpolated = "hello, %{name}!"; // Notice %, instead of $ in javascript.
 
 ### Foreach
 Adhoc supports `foreach` clauses out of the box.
-```js
+```csharp
 var arr = ["one", "two", "three"];
 var combined;
 foreach (var i in arr)
@@ -75,7 +101,7 @@ Maps are Key/Value collections, similar to javascript's map or C#'s dictionaries
 ```js
 var myMap = Map();
 var myMap2 = [:]; // Shortcut to creation
-var myMapWithElements ["MyKey":"MyValue", "MyKey2": "MyValue2"]; // Creation with 2 pairs
+var myMapWithElements = ["MyKey":"MyValue", "MyKey2": "MyValue2"]; // Creation with 2 pairs
 
 myMap["hello"] = "world!";
 myMap.getMapCount(); // 1
@@ -95,7 +121,7 @@ SET_INDEX(0);
 ```
 
 ### Native Number Types
-`Byte`, `UByte`, `Short`, `UShort`, `Int`, `UInt`, `Long`, `ULong`, `Float`, `Double` respectively are all natively built-in types.
+`Bool`, `Int`, `UInt`, `Long`, `ULong`, `Float`, `Double` respectively are all natively built-in types.
 
 ### Imports
 Imports are mostly used java-like.
@@ -119,15 +145,6 @@ var myFunc = function (){
 }
 ```
 
-### Module/Class properties
-Properties are called `attributes` in adhoc. They are defined with the `attribute` keyword, just like how you would declare a `var` or `static`.
-
-Without value: 
-- `attribute myAttribute` - Will be defaulted to `nil`
-
-With value: 
-- `attribute myAttribute = []`
-
 ### Code allowed everywhere
 Top level, in module or class bodies, code is allowed everywhere.
 ```js
@@ -150,6 +167,18 @@ function myFunction()
 }
 ```
 
+### Undefs
+Undefs let you undefine functions or static symbols.
+
+```js
+function myFunction()
+{
+   ...
+}
+
+undef myFunction; // "myFunction" is undefined, now nil if called.
+```
+
 ### Requires
 [TODO]
 
@@ -157,6 +186,7 @@ function myFunction()
 * Anything modern ECMAScript-ish features (arguably not needed).
 * `let`, `const` keywords are not implemented.
 * `for..in` and `for..of` are replaced by the much more convenient `foreach`.
+* `===`, `!==` operators
 
 ### Possibly supported (needs investigation)
 * Async/Await
