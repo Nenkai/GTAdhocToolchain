@@ -171,6 +171,8 @@ namespace GTAdhocCompiler
                     WriteUIntConst(instruction as InsUIntConst); break;
                 case AdhocInstructionType.LONG_CONST:
                     WriteLongConst(instruction as InsLongConst); break;
+                case AdhocInstructionType.U_LONG_CONST:
+                    WriteULongConst(instruction as InsULongConst); break;
                 case AdhocInstructionType.FLOAT_CONST:
                     WriteFloatConst(instruction as InsFloatConst); break;
                 case AdhocInstructionType.SYMBOL_CONST:
@@ -251,6 +253,11 @@ namespace GTAdhocCompiler
         private void WriteLongConst(InsLongConst longConst)
         {
             stream.WriteInt64(longConst.Value);
+        }
+
+        private void WriteULongConst(InsULongConst ulongConst)
+        {
+            stream.WriteUInt64(ulongConst.Value);
         }
 
         private void WriteStaticDefine(InsStaticDefine staticDefine)

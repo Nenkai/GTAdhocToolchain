@@ -1882,8 +1882,10 @@ namespace GTAdhocCompiler
                     InstructionBase ins = literal.NumericTokenType switch
                     {
                         NumericTokenType.Integer => new InsIntConst((int)literal.NumericValue),
+                        NumericTokenType.UnsignedInteger => new InsUIntConst((uint)literal.NumericValue),
                         NumericTokenType.Float => new InsFloatConst((float)literal.NumericValue),
                         NumericTokenType.Long => new InsLongConst((long)literal.NumericValue),
+                        NumericTokenType.UnsignedLong => new InsULongConst((ulong)literal.NumericValue),
                         _ => throw GetCompilationError(literal, "Unknown numeric literal type"),
                     };
                     frame.AddInstruction(ins, literal.Location.Start.Line);
