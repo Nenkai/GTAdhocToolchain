@@ -189,6 +189,8 @@ namespace GTAdhocCompiler
                     WriteSourceFile(instruction as InsSourceFile); break;
                 case AdhocInstructionType.LIST_ASSIGN:
                     WriteListAssign(instruction as InsListAssign); break;
+                case AdhocInstructionType.TRY_CATCH:
+                    WriteTryCatch(instruction as InsTryCatch); break;
                 case AdhocInstructionType.NIL_CONST:
                 case AdhocInstructionType.VOID_CONST:
                 case AdhocInstructionType.ASSIGN_POP:
@@ -201,10 +203,16 @@ namespace GTAdhocCompiler
                 case AdhocInstructionType.EVAL:
                 case AdhocInstructionType.REQUIRE:
                 case AdhocInstructionType.THROW:
+                case AdhocInstructionType.ASSIGN:
                     break;
                 default:
                     throw new NotImplementedException();
             }
+        }
+
+        private void WriteTryCatch(InsTryCatch tryCatch)
+        {
+            stream.WriteInt32(tryCatch.InstructionIndex);
         }
 
         private void WriteListAssign(InsListAssign listAssign)

@@ -140,12 +140,68 @@ namespace GTAdhocCompiler
                 case Nodes.FinalizerStatement:
                     CompileFinalizerStatement(frame, node as FinalizerStatement);
                     break;
+                case Nodes.TryStatement:
+                    CompileTryStatement(frame, node as TryStatement);
+                    break;
                 case Nodes.EmptyStatement:
                     break;
                 default:
                     ThrowCompilationError(node, "Statement not supported");
                     break;
             }
+        }
+
+        public void CompileTryStatement(AdhocCodeFrame frame, TryStatement tryStatement)
+        {
+            InsTryCatch tryCatch = new InsTryCatch();
+            frame.AddInstruction(tryCatch, tryStatement.Location.End.Line);
+
+            if (tryStatement.Block.Type != Nodes.BlockStatement)
+                ThrowCompilationError(tryStatement.Block, "Expected try body to be a block statement.");
+
+            CompileBlockStatement(frame, tryStatement.Block as BlockStatement);
+            frame.AddInstruction(new InsSetState(AdhocRunState.EXIT), 0);
+
+            tryCatch.InstructionIndex = frame.GetLastInstructionIndex();
+
+            if (tryStatement.Handler is not null)
+            {
+                InsJump catchClauseSkipper = new InsJump();
+                frame.AddInstruction(catchClauseSkipper, 0);
+
+                CompileCatchClause(frame, tryStatement.Handler);
+                catchClauseSkipper.JumpInstructionIndex = frame.GetLastInstructionIndex();
+            }
+
+            if (tryStatement.Finalizer != null)
+            {
+                if (tryStatement.Finalizer.Type != Nodes.BlockStatement)
+                    ThrowCompilationError(tryStatement.Block, "Expected catch clause to be a block statement.");
+
+                CompileStatementWithScope(frame, tryStatement.Finalizer);
+            }
+        }
+
+        public void CompileCatchClause(AdhocCodeFrame frame, CatchClause catchClause)
+        {
+            if (catchClause.Param is not null)
+            {
+                if (catchClause.Param.Type != Nodes.Identifier)
+                    ThrowCompilationError(catchClause.Param, "Expected catch clause parameter to be an identifier.");
+
+                // Create temp variable for the exception
+                frame.AddInstruction(new InsIntConst(0), 0);
+                InsertVariablePush(frame, catchClause.Param as Identifier);
+                frame.AddInstruction(InsAssign.Default, 0);
+
+                string tmpCaseVariable = $"catch#{SymbolMap.TempVariableCounter++}";
+                InsertVariablePush(frame, new Identifier(tmpCaseVariable));
+                InsertAssignPop(frame);
+            }
+
+            
+
+            CompileBlockStatement(frame, catchClause.Body);
         }
 
         /// <summary>
@@ -1724,9 +1780,9 @@ namespace GTAdhocCompiler
                 frame.AddInstruction(unaryIns, unaryExp.Location.Start.Line);
 
                 // If we aren't assigning, or not using the return value immediately, pop it
-                // Usages: var i2 = i++;
-                //         while (i++ < 10)
-                // ...etc
+                // Usages: i++;
+                //         for (var i = 0; i < 10; [i++])
+
                 if (popResult)
                     frame.AddInstruction(InsPop.Default, 0);
             }
