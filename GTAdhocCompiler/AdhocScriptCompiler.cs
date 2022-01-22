@@ -500,11 +500,18 @@ namespace GTAdhocCompiler
 
             int loopStartInsIndex = frame.GetLastInstructionIndex();
 
-            if (whileStatement.Test is not null)
-                CompileExpression(frame, whileStatement.Test);
-
             InsJumpIfFalse jumpIfFalse = new InsJumpIfFalse(); // End loop jumper
-            frame.AddInstruction(jumpIfFalse, 0);
+
+            if (whileStatement.Test is not null)
+            {
+                Literal literal = whileStatement.Test as Literal;
+                if (literal is null || literal.TokenType != TokenType.BooleanLiteral || (literal.Value as bool?) == false)
+                {
+                    CompileExpression(frame, whileStatement.Test);
+                    frame.AddInstruction(jumpIfFalse, 0);
+                }
+            }
+                
 
             CompileStatementWithScope(frame, whileStatement.Body);
 
