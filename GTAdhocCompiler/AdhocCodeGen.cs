@@ -129,6 +129,8 @@ namespace GTAdhocCompiler
                     WriteFunctionDefine(instruction as InsFunctionDefine); break;
                 case AdhocInstructionType.FUNCTION_CONST:
                     WriteFunctionConst(instruction as InsFunctionConst); break;
+                case AdhocInstructionType.METHOD_CONST:
+                    WriteMethodConst(instruction as InsMethodConst); break;
                 case AdhocInstructionType.METHOD_DEFINE:
                     WriteMethod(instruction as InsMethodDefine); break;
                 case AdhocInstructionType.VARIABLE_EVAL:
@@ -274,6 +276,11 @@ namespace GTAdhocCompiler
         private void WriteFunctionConst(InsFunctionConst functionConst)
         {
             WriteCodeBlock(functionConst.CodeFrame);
+        }
+
+        private void WriteMethodConst(InsMethodConst methodConst)
+        {
+            WriteCodeBlock(methodConst.CodeFrame);
         }
 
         private void WriteMethod(InsMethodDefine method)

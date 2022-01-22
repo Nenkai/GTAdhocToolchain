@@ -764,14 +764,14 @@ namespace GTAdhocCompiler
                 {
                     var pattern = param as AssignmentPattern;
 
-                    if (pattern.Right is not Literal)
+                    if (pattern.Right.Type != Nodes.Literal && pattern.Right.Type != Nodes.ArrayExpression && pattern.Right.Type != Nodes.MapExpression)
                         ThrowCompilationError(parentNode, "Subroutine parameter assignment must be an identifier to a literal.");
 
                     AdhocSymbol paramSymb = SymbolMap.RegisterSymbol((pattern.Left as Identifier).Name);
                     subroutine.CodeFrame.FunctionParameters.Add(paramSymb);
 
                     // Push default value
-                    CompileLiteral(frame, pattern.Right as Literal);
+                    CompileExpression(frame, pattern.Right);
                 }
                 else
                     ThrowCompilationError(parentNode, "Subroutine definition parameters must all be identifier or assignment to a literal.");
@@ -947,6 +947,9 @@ namespace GTAdhocCompiler
                 case Nodes.FunctionExpression:
                     CompileFunctionExpression(frame, exp as FunctionExpression);
                     break;
+                case Nodes.MethodExpression:
+                    CompileMethodExpression(frame, exp as MethodExpression);
+                    break;
                 case Nodes.CallExpression:
                     CompileCall(frame, exp as CallExpression);
                     break;
@@ -1014,7 +1017,7 @@ namespace GTAdhocCompiler
 
         private void CompileArrowFunctionExpression(AdhocCodeFrame frame, ArrowFunctionExpression arrowFuncExpr)
         {
-            CompileAnonymousFunction(frame, arrowFuncExpr, arrowFuncExpr.Body, arrowFuncExpr.Params);
+            CompileAnonymousSubroutine(frame, arrowFuncExpr, arrowFuncExpr.Body, arrowFuncExpr.Params);
         }
 
         private void CompileYield(AdhocCodeFrame frame, YieldExpression yield)
@@ -1028,12 +1031,12 @@ namespace GTAdhocCompiler
         /// </summary>
         /// <param name="frame"></param>
         /// <param name="arrowFuncExpr"></param>
-        private void CompileAnonymousFunction(AdhocCodeFrame frame, Node parentNode, Node body, NodeList<Expression> funcParams)
+        private void CompileAnonymousSubroutine(AdhocCodeFrame frame, Node parentNode, Node body, NodeList<Expression> funcParams, bool isMethod = false)
         {
-            InsFunctionConst funcConst = new InsFunctionConst();
-            funcConst.CodeFrame.ParentFrame = frame;
-            funcConst.CodeFrame.SourceFilePath = frame.SourceFilePath;
-            funcConst.CodeFrame.CurrentModule = frame.CurrentModule;
+            SubroutineBase subroutine = isMethod ? new InsFunctionConst() : new InsMethodConst();
+            subroutine.CodeFrame.ParentFrame = frame;
+            subroutine.CodeFrame.SourceFilePath = frame.SourceFilePath;
+            subroutine.CodeFrame.CurrentModule = frame.CurrentModule;
 
             /* Unlike JS, adhoc can capture variables from the parent frame
              * Example:
@@ -1043,9 +1046,9 @@ namespace GTAdhocCompiler
              *        map[e.toString()] = e * 100; -> Inserts a new key/value pair into map, which is from the parent frame
              *    });
              */
-            funcConst.CodeFrame.ContextAllowsVariableCaptureFromParentFrame = true;
+            subroutine.CodeFrame.ContextAllowsVariableCaptureFromParentFrame = true;
 
-            EnterScope(funcConst.CodeFrame, parentNode);
+            EnterScope(subroutine.CodeFrame, parentNode);
             foreach (Expression param in funcParams)
             {
                 if (param.Type != Nodes.Identifier)
@@ -1053,33 +1056,33 @@ namespace GTAdhocCompiler
 
                 Identifier paramIdent = param as Identifier;
                 AdhocSymbol paramSymbol = SymbolMap.RegisterSymbol(paramIdent.Name);
-                funcConst.CodeFrame.FunctionParameters.Add(paramSymbol);
-                funcConst.CodeFrame.AddScopeVariable(paramSymbol, isDeclaration: true);
+                subroutine.CodeFrame.FunctionParameters.Add(paramSymbol);
+                subroutine.CodeFrame.AddScopeVariable(paramSymbol, isDeclaration: true);
             }
 
             if (body.Type == Nodes.BlockStatement)
             {
-                CompileStatement(funcConst.CodeFrame, body as BlockStatement);
-                InsertFrameExitIfNeeded(funcConst.CodeFrame, body);
+                CompileStatement(subroutine.CodeFrame, body as BlockStatement);
+                InsertFrameExitIfNeeded(subroutine.CodeFrame, body);
             }
             else
             {
-                CompileExpression(funcConst.CodeFrame, body as Expression);
+                CompileExpression(subroutine.CodeFrame, body as Expression);
 
                 // Add implicit return
-                funcConst.CodeFrame.AddInstruction(new InsSetState(AdhocRunState.RETURN), 0);
+                subroutine.CodeFrame.AddInstruction(new InsSetState(AdhocRunState.RETURN), 0);
             }
 
-            LeaveScope(funcConst.CodeFrame, insertLeaveInstruction: false);
+            LeaveScope(subroutine.CodeFrame, insertLeaveInstruction: false);
 
-            for (int i = 0; i < funcConst.CodeFrame.FunctionParameters.Count; i++)
+            for (int i = 0; i < subroutine.CodeFrame.FunctionParameters.Count; i++)
                 frame.AddInstruction(InsNilConst.Empty, 0);
 
             // "Insert" by evaluating each captured variable
-            foreach (var capturedVariable in funcConst.CodeFrame.CapturedCallbackVariables)
+            foreach (var capturedVariable in subroutine.CodeFrame.CapturedCallbackVariables)
                 InsertVariableEval(frame, new Identifier(capturedVariable.Name));
 
-            frame.AddInstruction(funcConst, parentNode.Location.Start.Line);
+            frame.AddInstruction(subroutine, parentNode.Location.Start.Line);
         }
 
         private void CompileClassExpression(AdhocCodeFrame frame, ClassExpression classExpression)
@@ -1264,8 +1267,14 @@ namespace GTAdhocCompiler
             else
             {
                 // Assume it's an anonymous function, where variables can be captured
-                CompileAnonymousFunction(frame, funcExp, funcExp.Body, funcExp.Params);
+                CompileAnonymousSubroutine(frame, funcExp, funcExp.Body, funcExp.Params);
             }
+        }
+
+        private void CompileMethodExpression(AdhocCodeFrame frame, MethodExpression methodExpression)
+        {
+            // Assume it's an anonymous function, where variables can be captured
+            CompileAnonymousSubroutine(frame, methodExpression, methodExpression.Body, methodExpression.Params, isMethod: true);
         }
 
         // Combination of string literals/templates

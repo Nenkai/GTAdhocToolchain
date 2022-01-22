@@ -140,6 +140,12 @@ namespace GTAdhocCompiler
                     Stack.StackStorageCounter -= funcConst.CodeFrame.CapturedCallbackVariables.Count; // Ver > 7
                     Stack.StackStorageCounter++; // Function itself
                     break;
+                case AdhocInstructionType.METHOD_CONST:
+                    InsMethodConst methodConst = ins as InsMethodConst;
+                    Stack.StackStorageCounter -= methodConst.CodeFrame.FunctionParameters.Count; // Ver > 8
+                    Stack.StackStorageCounter -= methodConst.CodeFrame.CapturedCallbackVariables.Count; // Ver > 7
+                    Stack.StackStorageCounter++; // method itself
+                    break;
                 case AdhocInstructionType.POP:
                 case AdhocInstructionType.POP_OLD:
                 case AdhocInstructionType.ASSIGN:
