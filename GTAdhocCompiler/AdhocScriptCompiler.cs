@@ -229,7 +229,7 @@ namespace GTAdhocCompiler
 
         private void CompileNewClass(AdhocCodeFrame frame, Identifier id, Node superClass, Statement body, bool isModule = false, bool isStaticModule = false)
         {
-            if (id is null || id is not Identifier)
+            if (id is null || id.Type != Nodes.Identifier)
             {
                 ThrowCompilationError(id, "Class or module name must have a valid identifier.");
                 return;
@@ -377,9 +377,6 @@ namespace GTAdhocCompiler
 
             // Condition
             InsJumpIfFalse jumpIfFalse = null; // will only be inserted if the condition exists, else its essentially a while true loop
-            if (((forStatement.Test as BinaryExpression)?.Right as Literal)?.NumericValue as int? == 1)
-                ;
-
             if (forStatement.Test != null)
             {
                 CompileExpression(frame, forStatement.Test);
@@ -399,7 +396,12 @@ namespace GTAdhocCompiler
 
             // Update Counter
             if (forStatement.Update != null)
-                CompileExpression(frame, forStatement.Update);
+            {
+                if (forStatement.Update is UpdateExpression)
+                    CompileUnaryExpression(frame, forStatement.Update as UpdateExpression, popResult: true);
+                else
+                    CompileExpression(frame, forStatement.Update);
+            }
 
             // Insert jump to go back to the beginning of the loop
             InsJump startJump = new InsJump();
@@ -473,16 +475,16 @@ namespace GTAdhocCompiler
             InsJumpIfFalse jumpIfFalse = new InsJumpIfFalse(); // End loop jumper
             frame.AddInstruction(jumpIfFalse, 0);
 
+            InsJump startJmp = new InsJump();
+            startJmp.JumpInstructionIndex = loopStartInsIndex;
+            frame.AddInstruction(startJmp, 0);
+
             // Process break jumps before doing the final exit
             int loopEndIndex = frame.GetLastInstructionIndex();
             foreach (var breakJmp in loopCtx.BreakJumps)
                 breakJmp.JumpInstructionIndex = loopEndIndex;
 
-            InsJump startJmp = new InsJump();
-            startJmp.JumpInstructionIndex = loopStartInsIndex;
-            frame.AddInstruction(startJmp, 0);
-
-            jumpIfFalse.JumpIndex = frame.GetLastInstructionIndex();
+            jumpIfFalse.JumpIndex = loopEndIndex;
 
             LeaveLoop(frame);
         }
@@ -663,8 +665,10 @@ namespace GTAdhocCompiler
 
             foreach (Expression param in subParams)
             {
-                if (param is Identifier paramIdent)
+                if (param.Type == Nodes.Identifier)
                 {
+                    var paramIdent = param as Identifier;
+
                     AdhocSymbol paramSymb = SymbolMap.RegisterSymbol(paramIdent.Name);
                     subroutine.CodeFrame.FunctionParameters.Add(paramSymb);
 
@@ -674,7 +678,7 @@ namespace GTAdhocCompiler
                 }
                 else if (param is AssignmentExpression assignmentExpression)
                 {
-                    if (assignmentExpression.Left is not Identifier || assignmentExpression.Right is not Literal)
+                    if (assignmentExpression.Left.Type != Nodes.Identifier || assignmentExpression.Right.Type != Nodes.Literal)
                         ThrowCompilationError(parentNode, "Subroutine parameter assignment must be an identifier to a literal. (value = 0)");
 
                     AdhocSymbol paramSymb = SymbolMap.RegisterSymbol((assignmentExpression.Left as Identifier).Name);
@@ -683,8 +687,10 @@ namespace GTAdhocCompiler
                     // Push default value
                     CompileLiteral(frame, assignmentExpression.Right as Literal);
                 }
-                else if (param is AssignmentPattern pattern)
+                else if (param.Type == Nodes.AssignmentPattern)
                 {
+                    var pattern = param as AssignmentPattern;
+
                     if (pattern.Right is not Literal)
                         ThrowCompilationError(parentNode, "Subroutine parameter assignment must be an identifier to a literal.");
 
@@ -755,7 +761,13 @@ namespace GTAdhocCompiler
             // We need to add the defined value first
 
             if (initValue != null)
-                CompileExpression(frame, initValue);
+            {
+                if (initValue.Type == Nodes.UpdateExpression)
+                    CompileUnaryExpression(frame, initValue as UpdateExpression, popResult: true);
+                else
+                    CompileExpression(frame, initValue);
+            }
+                
 
             // Now write the id
             if (id is null)
@@ -795,7 +807,7 @@ namespace GTAdhocCompiler
 
             foreach (Expression exp in arrayPattern.Elements)
             {
-                if (exp is not Identifier)
+                if (exp.Type != Nodes.Identifier)
                     ThrowCompilationError(exp, "Expected array element to be identifier.");
 
                 Identifier arrElemIdentifier = exp as Identifier;
@@ -963,7 +975,7 @@ namespace GTAdhocCompiler
             EnterScope(funcConst.CodeFrame, parentNode);
             foreach (Expression param in funcParams)
             {
-                if (param is not Identifier)
+                if (param.Type != Nodes.Identifier)
                     ThrowCompilationError(param, "Expected function parameter to be an identifier.");
 
                 Identifier paramIdent = param as Identifier;
@@ -972,7 +984,7 @@ namespace GTAdhocCompiler
                 funcConst.CodeFrame.AddScopeVariable(paramSymbol, isDeclaration: true);
             }
 
-            if (body is BlockStatement)
+            if (body.Type == Nodes.BlockStatement)
             {
                 CompileStatement(funcConst.CodeFrame, body as BlockStatement);
                 InsertFrameExitIfNeeded(funcConst.CodeFrame, body);
@@ -1004,8 +1016,10 @@ namespace GTAdhocCompiler
 
         private void CompileStaticVariableDefinition(AdhocCodeFrame frame, StaticVariableDefinition staticExpression)
         {
-            if (staticExpression.VarExpression is Identifier ident)
+            if (staticExpression.VarExpression.Type == Nodes.Identifier)
             {
+                var ident = staticExpression.VarExpression as Identifier;
+
                 // static definition with no value
                 var idSymb = SymbolMap.RegisterSymbol(ident.Name);
                 InsStaticDefine staticDefine = new InsStaticDefine(idSymb);
@@ -1026,7 +1040,7 @@ namespace GTAdhocCompiler
             else
             {
                 // static definition with value
-                if (staticExpression.VarExpression is not AssignmentExpression)
+                if (staticExpression.VarExpression.Type != Nodes.AssignmentExpression)
                     ThrowCompilationError(staticExpression, "Expected static keyword to be a variable assignment.");
 
                 AssignmentExpression assignmentExpression = staticExpression.VarExpression as AssignmentExpression;
@@ -1066,8 +1080,10 @@ namespace GTAdhocCompiler
 
         private void CompileAttributeDefinition(AdhocCodeFrame frame, AttributeVariableDefinition attrVariableDefinition)
         {
-            if (attrVariableDefinition.VarExpression is Identifier ident)
+            if (attrVariableDefinition.VarExpression.Type == Nodes.Identifier)
             {
+                var ident = attrVariableDefinition.VarExpression as Identifier;
+
                 // attribute definition with no value
 
                 // defaults to nil
@@ -1143,11 +1159,16 @@ namespace GTAdhocCompiler
 
         private void CompileExpressionStatement(AdhocCodeFrame frame, ExpressionStatement expStatement)
         {
-            if (expStatement.Expression is CallExpression call)
+            if (expStatement.Expression.Type == Nodes.CallExpression)
             {
                 // Call expressions need to be directly popped within an expression statement -> 'getThing()' instead of 'var thing = getThing()'.
                 // Their return values aren't used.
-                CompileCall(frame, call, popReturnValue: true);
+                CompileCall(frame, expStatement.Expression as CallExpression, popReturnValue: true);
+            }
+            else if (expStatement.Expression is UpdateExpression upd) // i++
+            {
+                // We don't care about the result, so we pop it in this context
+                CompileUnaryExpression(frame, upd, popResult: true);
             }
             else
             {
@@ -1659,23 +1680,23 @@ namespace GTAdhocCompiler
         /// </summary>
         /// <param name="frame"></param>
         /// <param name="unaryExp"></param>
-        private void CompileUnaryExpression(AdhocCodeFrame frame, UnaryExpression unaryExp, bool isReference = false)
+        private void CompileUnaryExpression(AdhocCodeFrame frame, UnaryExpression unaryExp, bool popResult = false, bool isReference = false)
         {
             if (unaryExp is UpdateExpression upd)
             {
                 if (!isReference)
                 {
                     // Assigning - we need to push
-                    if (unaryExp.Argument is Identifier leftIdent)
-                        InsertVariablePush(frame, leftIdent);
+                    if (unaryExp.Argument.Type == Nodes.Identifier)
+                        InsertVariablePush(frame, unaryExp.Argument as Identifier);
                     else if (unaryExp.Argument is AttributeMemberExpression attr)
                         InsertAttributeMemberAssignmentPush(frame, attr);
                     else if (unaryExp.Argument is ComputedMemberExpression comp)
                         CompileComputedMemberExpression(frame, comp);
-                    else if (unaryExp.Argument is Literal literal) // -1 -> int const + unary op
-                        CompileLiteral(frame, literal);
-                    else if (unaryExp.Argument is CallExpression call)
-                        CompileCall(frame, call);
+                    else if (unaryExp.Argument.Type == Nodes.Literal) // -1 -> int const + unary op
+                        CompileLiteral(frame, unaryExp.Argument as Literal);
+                    else if (unaryExp.Argument.Type == Nodes.CallExpression)
+                        CompileCall(frame, unaryExp.Argument as CallExpression);
                     else if (unaryExp.Argument is BinaryExpression binaryExp)
                         CompileBinaryExpression(frame, binaryExp);
                     else
@@ -1701,7 +1722,13 @@ namespace GTAdhocCompiler
                 AdhocSymbol symb = SymbolMap.RegisterSymbol(op);
                 InsUnaryAssignOperator unaryIns = new InsUnaryAssignOperator(symb);
                 frame.AddInstruction(unaryIns, unaryExp.Location.Start.Line);
-                frame.AddInstruction(InsPop.Default, 0);
+
+                // If we aren't assigning, or not using the return value immediately, pop it
+                // Usages: var i2 = i++;
+                //         while (i++ < 10)
+                // ...etc
+                if (popResult)
+                    frame.AddInstruction(InsPop.Default, 0);
             }
             else
             {
@@ -1747,6 +1774,10 @@ namespace GTAdhocCompiler
             else if (unaryExp.Argument is UpdateExpression upd)
             {
                 CompileUnaryExpression(frame, upd, isReference: true);
+            }
+            else if (unaryExp.Argument is Identifier identifier)
+            {
+                InsertVariablePush(frame, identifier);
             }
             else
             {
