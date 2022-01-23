@@ -1040,7 +1040,7 @@ namespace GTAdhocCompiler
         /// <param name="arrowFuncExpr"></param>
         private void CompileAnonymousSubroutine(AdhocCodeFrame frame, Node parentNode, Node body, NodeList<Expression> funcParams, bool isMethod = false)
         {
-            SubroutineBase subroutine = isMethod ? new InsFunctionConst() : new InsMethodConst();
+            SubroutineBase subroutine = isMethod ? new InsMethodConst() : new InsFunctionConst();
             subroutine.CodeFrame.ParentFrame = frame;
             subroutine.CodeFrame.SourceFilePath = frame.SourceFilePath;
             subroutine.CodeFrame.CurrentModule = frame.CurrentModule;
@@ -1551,16 +1551,20 @@ namespace GTAdhocCompiler
         /// </summary>
         /// <param name="frame"></param>
         /// <param name="staticExp"></param>
-        /// <param name="compileProperty">Whether to compile the property - used whenever we're compiling the eval call or not</param>
-        private void CompileAttributeMemberExpression(AdhocCodeFrame frame, AttributeMemberExpression staticExp, bool compileProperty = true)
+        private void CompileAttributeMemberExpression(AdhocCodeFrame frame, AttributeMemberExpression staticExp)
         {
             CompileExpression(frame, staticExp.Object); // ORG
 
-            if (staticExp.Property is not Identifier)
-                ThrowCompilationError(staticExp, "Expected attribute member to be identifier.");
-
-            if (compileProperty)
+            if (staticExp.Property.Type == Nodes.Identifier)
+            {
                 CompileIdentifier(frame, staticExp.Property as Identifier, attribute: true); // inSession
+            }
+            else if (staticExp.Property is StaticMemberExpression)
+            {
+                CompileStaticMemberExpressionAttributeEval(frame, staticExp.Property as StaticMemberExpression);
+            }
+            else
+                ThrowCompilationError(staticExp, "Expected attribute member to be identifier or static member expression.");
         }
 
         /// <summary>
@@ -1584,7 +1588,6 @@ namespace GTAdhocCompiler
             string fullPath = string.Join("::", pathParts);
             AdhocSymbol fullPathSymb = SymbolMap.RegisterSymbol(fullPath);
             eval.VariableSymbols.Add(fullPathSymb);
-            fullPathSymb.IsStatic = true;
 
             int idx = frame.AddScopeVariable(fullPathSymb, isDeclaration: false, isStatic: true);
             eval.VariableStorageIndex = idx;
@@ -1613,12 +1616,35 @@ namespace GTAdhocCompiler
             string fullPath = string.Join("::", pathParts);
             AdhocSymbol fullPathSymb = SymbolMap.RegisterSymbol(fullPath);
             push.VariableSymbols.Add(fullPathSymb);
-            fullPathSymb.IsStatic = true;
 
             int idx = frame.AddScopeVariable(fullPathSymb, isDeclaration: false, isStatic: true);
             push.VariableStorageIndex = idx;
 
             frame.AddInstruction(push, staticExp.Location.Start.Line);
+        }
+
+        /// <summary>
+        /// Compiles a static member path as an attribute evaluation.
+        /// </summary>
+        /// <param name="frame"></param>
+        /// <param name="staticExp"></param>
+        private void CompileStaticMemberExpressionAttributeEval(AdhocCodeFrame frame, StaticMemberExpression staticExp)
+        {
+            // Recursively build the namespace path
+            List<string> pathParts = new(4);
+            BuildStaticPath(staticExp, ref pathParts);
+
+            InsAttributeEvaluation attrEval = new InsAttributeEvaluation();
+            foreach (string part in pathParts)
+            {
+                AdhocSymbol symb = SymbolMap.RegisterSymbol(part);
+                attrEval.AttributeSymbols.Add(symb);
+            }
+
+            string fullPath = string.Join("::", pathParts);
+            AdhocSymbol fullPathSymb = SymbolMap.RegisterSymbol(fullPath);
+            attrEval.AttributeSymbols.Add(fullPathSymb);
+            frame.AddInstruction(attrEval, staticExp.Location.Start.Line);
         }
 
         /// <summary>
