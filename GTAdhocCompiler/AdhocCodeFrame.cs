@@ -284,7 +284,9 @@ namespace GTAdhocCompiler
                 // Undeclared variable accesses
 
                 // Captured variable from parent function?
-                if (ContextAllowsVariableCaptureFromParentFrame && ParentFrame is not null && ParentFrame.Stack.HasLocalVariable(symbol))
+                if (ContextAllowsVariableCaptureFromParentFrame && ParentFrame is not null 
+                    && ParentFrame.Stack.HasLocalVariable(symbol) 
+                    && !FunctionParameters.Contains(symbol)) // Make sure not mistreat a variable as captured if its used as a function parameter (i.e "context")
                 {
                     if (!CapturedCallbackVariables.Contains(symbol))
                     {
