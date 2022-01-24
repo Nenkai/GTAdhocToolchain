@@ -1372,7 +1372,7 @@ namespace GTAdhocCompiler
             else
             {
                 /* Adhoc expects all literals and interpolated values to be all in a row, one per string push */
-            List<Node> literalNodes = new List<Node>();
+                List<Node> literalNodes = new List<Node>();
                 literalNodes.AddRange(templateLiteral.Quasis);
                 literalNodes.AddRange(templateLiteral.Expressions);
 
@@ -1460,7 +1460,7 @@ namespace GTAdhocCompiler
             }
             else if (expression is UnaryExpression unaryExp && unaryExp.Operator == UnaryOperator.Indirection)
             {
-                if (unaryExp.Argument is AttributeMemberExpression)
+                if (unaryExp.Argument.Type == Nodes.Identifier || unaryExp.Argument is AttributeMemberExpression)
                     CompileExpression(frame, unaryExp.Argument);
                 else
                     ThrowCompilationError(expression, "TODO: Ref stuff");
@@ -1654,6 +1654,24 @@ namespace GTAdhocCompiler
         /// <param name="call"></param>
         private void CompileCall(AdhocCodeFrame frame, CallExpression call, bool popReturnValue = false)
         {
+            // HACK
+            if (call.Callee is Identifier ident)
+            {
+                if (ident.Name == "object_selector")
+                {
+                    if (call.Arguments.Count != 2)
+                        ThrowCompilationError(call, "Expected object selector call to have 2 argument.");
+
+                    // Hack to handle object selectors
+                    CompileExpression(frame, call.Arguments[0]);
+                    CompileExpression(frame, call.Arguments[1]);
+
+                    frame.AddInstruction(InsObjectSelector.Default, 0);
+                    frame.AddInstruction(InsEval.Default, 0);
+                    return;
+                }
+            }
+
             CompileExpression(frame, call.Callee);
 
             for (int i = 0; i < call.Arguments.Count; i++)

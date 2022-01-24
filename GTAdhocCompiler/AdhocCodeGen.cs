@@ -210,6 +210,7 @@ namespace GTAdhocCompiler
                 case AdhocInstructionType.REQUIRE:
                 case AdhocInstructionType.THROW:
                 case AdhocInstructionType.ASSIGN:
+                case AdhocInstructionType.OBJECT_SELECTOR:
                     break;
                 default:
                     throw new NotImplementedException();
