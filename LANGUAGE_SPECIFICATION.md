@@ -179,6 +179,28 @@ function myFunction()
 undef myFunction; // "myFunction" is undefined, now nil if called.
 ```
 
+### Operator Overloading
+Adhoc supports fully overloading operators.
+```java
+class OperatorOverloadClassTest extends System::Object
+{
+    attribute value = "";
+    
+    method __init__(val)
+    {
+        self.value = val;
+    }
+
+    method __add__(val) // Needs to be the internal label for a designated operator, in this case, __add__ = +
+    {
+       return OperatorOverloadClassTest(value + val);
+    }
+}
+var obj = MyOperatorOverloadingClass();
+obj += "hello world!";
+// obj.value is now "hello world!"
+```
+
 ### Requires
 [TODO]
 
