@@ -267,7 +267,7 @@ namespace GTAdhocCompiler
                 else
                 {
                     // May also be a reassignment to a static
-                    if (Stack.HasStaticVariable(symbol))
+                    if (Stack.HasStaticVariable(symbol) || CurrentModule.IsDefinedStaticMember(symbol))
                     {
                         added = Stack.TryAddStaticVariable(symbol, out newVariable);
                     }
@@ -285,9 +285,8 @@ namespace GTAdhocCompiler
 
                 // Captured variable from parent function?
                 if (ContextAllowsVariableCaptureFromParentFrame && ParentFrame is not null
-                    && !Stack.HasLocalVariable(symbol) // Do not conflict with locals
-                    && !FunctionParameters.Contains(symbol) // Do not conflict with function parameters (i.e "context")
-                    && ParentFrame.Stack.HasLocalVariable(symbol)) // Symbol exists in parent? If so, we are actually capturing
+                    && ParentFrame.Stack.HasLocalVariable(symbol) // Symbol exists in parent? If so, we are actually capturing
+                    && (!Stack.HasLocalVariable(symbol)&& !FunctionParameters.Contains(symbol) || CapturedCallbackVariables.Contains(symbol))) // Do not conflict with locals/params
                 {
                     if (!CapturedCallbackVariables.Contains(symbol))
                     {
@@ -337,7 +336,12 @@ namespace GTAdhocCompiler
             if (Stack.HasLocalVariable(symb))
                 return false; // Priorize local variables
 
-            return CurrentModule.IsDefinedStaticMember(symb) || CurrentModule.IsDefinedAttributeMember(symb) || !symb.Name.Equals("self");
+            return IsMember(symb) || !symb.Name.Equals("self");
+        }
+
+        private bool IsMember(AdhocSymbol symb)
+        {
+            return CurrentModule.IsDefinedStaticMember(symb) || CurrentModule.IsDefinedAttributeMember(symb);
         }
 
         public ScopeContext GetLastBreakControlledScope()

@@ -239,6 +239,9 @@ namespace GTAdhocCompiler
 
         public void CompileIncludeStatement(AdhocCodeFrame frame, IncludeStatement include)
         {
+            if (string.IsNullOrEmpty(ProjectDirectory))
+                ProjectDirectory = Path.GetDirectoryName(frame.SourceFilePath.Name);
+
             string pathToIncludeFile = Path.Combine(ProjectDirectory, include.Path);
             if (!File.Exists(pathToIncludeFile))
                 ThrowCompilationError(include, $"Include file does not exist: {pathToIncludeFile}.");
@@ -1111,7 +1114,9 @@ namespace GTAdhocCompiler
                 if (!frame.CurrentModule.DefineStatic(idSymb))
                     ThrowCompilationError(staticExpression, $"Static member {idSymb.Name} was already declared in this module.");
 
+                CurrentModule.DefineStatic(idSymb);
                 frame.AddAttributeOrStaticMemberVariable(idSymb);
+                
             }
             else if (staticExpression.VarExpression is ClassExpression classExp) // Static Modules/Absolute
             {
@@ -1137,6 +1142,7 @@ namespace GTAdhocCompiler
                 frame.AddInstruction(staticDefine, staticExpression.Location.End.Line);
 
                 frame.AddAttributeOrStaticMemberVariable(idSymb);
+                CurrentModule.DefineStatic(idSymb);
 
                 if (assignmentExpression.Operator == AssignmentOperator.Assign)
                 {
