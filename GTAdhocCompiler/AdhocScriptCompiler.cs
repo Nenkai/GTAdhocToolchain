@@ -1114,9 +1114,6 @@ namespace GTAdhocCompiler
                 if (!frame.CurrentModule.DefineStatic(idSymb))
                     ThrowCompilationError(staticExpression, $"Static member {idSymb.Name} was already declared in this module.");
 
-                if (!CurrentModule.DefineStatic(idSymb))
-                    ThrowCompilationError(staticExpression, "Static member is already defined.");
-
                 frame.AddAttributeOrStaticMemberVariable(idSymb);
                 
             }
@@ -1143,8 +1140,9 @@ namespace GTAdhocCompiler
                 InsStaticDefine staticDefine = new InsStaticDefine(idSymb);
                 frame.AddInstruction(staticDefine, staticExpression.Location.End.Line);
 
-                if (!CurrentModule.DefineStatic(idSymb))
-                    ThrowCompilationError(staticExpression, "Static member is already defined.");
+                if (!frame.CurrentModule.DefineStatic(idSymb))
+                    ThrowCompilationError(staticExpression, $"Static member {idSymb.Name} was already declared in this module.");
+
                 frame.AddAttributeOrStaticMemberVariable(idSymb);
 
                 if (assignmentExpression.Operator == AssignmentOperator.Assign)
