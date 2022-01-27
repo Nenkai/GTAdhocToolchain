@@ -1114,7 +1114,9 @@ namespace GTAdhocCompiler
                 if (!frame.CurrentModule.DefineStatic(idSymb))
                     ThrowCompilationError(staticExpression, $"Static member {idSymb.Name} was already declared in this module.");
 
-                CurrentModule.DefineStatic(idSymb);
+                if (!CurrentModule.DefineStatic(idSymb))
+                    ThrowCompilationError(staticExpression, "Static member is already defined.");
+
                 frame.AddAttributeOrStaticMemberVariable(idSymb);
                 
             }
@@ -1141,8 +1143,9 @@ namespace GTAdhocCompiler
                 InsStaticDefine staticDefine = new InsStaticDefine(idSymb);
                 frame.AddInstruction(staticDefine, staticExpression.Location.End.Line);
 
+                if (!CurrentModule.DefineStatic(idSymb))
+                    ThrowCompilationError(staticExpression, "Static member is already defined.");
                 frame.AddAttributeOrStaticMemberVariable(idSymb);
-                CurrentModule.DefineStatic(idSymb);
 
                 if (assignmentExpression.Operator == AssignmentOperator.Assign)
                 {
@@ -1182,7 +1185,9 @@ namespace GTAdhocCompiler
                 InsAttributeDefine staticDefine = new InsAttributeDefine(idSymb);
                 frame.AddInstruction(staticDefine, attrVariableDefinition.Location.End.Line);
 
-                frame.CurrentModule.DefineAttribute(idSymb);
+                if (!frame.CurrentModule.DefineAttribute(idSymb))
+                    ThrowCompilationError(attrVariableDefinition, "Attribute is already defined.");
+
                 frame.AddAttributeOrStaticMemberVariable(idSymb);
             }
             else
@@ -1204,7 +1209,9 @@ namespace GTAdhocCompiler
                 InsAttributeDefine attrDefine = new InsAttributeDefine(idSymb);
                 frame.AddInstruction(attrDefine, identifier.Location.Start.Line);
 
-                frame.CurrentModule.DefineAttribute(idSymb);
+                if (!frame.CurrentModule.DefineAttribute(idSymb))
+                    ThrowCompilationError(attrVariableDefinition, "Attribute is already defined.");
+
                 frame.AddAttributeOrStaticMemberVariable(idSymb);
             }
         }
