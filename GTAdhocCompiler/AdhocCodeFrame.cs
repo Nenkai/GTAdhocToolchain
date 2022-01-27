@@ -267,7 +267,7 @@ namespace GTAdhocCompiler
                 else
                 {
                     // May also be a reassignment to a static
-                    if (Stack.HasStaticVariable(symbol) || CurrentModule.IsDefinedStaticMember(symbol))
+                    if (Stack.HasStaticVariable(symbol) || CurrentModule.IsDefinedStaticMember(symbol) || CurrentModule.IsDefinedAttributeMember(symbol))
                     {
                         added = Stack.TryAddStaticVariable(symbol, out newVariable);
                     }
