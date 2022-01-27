@@ -210,11 +210,11 @@ namespace GTAdhocCompiler
 
                 // Create temp variable for the exception
                 frame.AddInstruction(new InsIntConst(0), 0);
-                InsertVariablePush(frame, catchClause.Param as Identifier);
+                InsertVariablePush(frame, catchClause.Param as Identifier, true);
                 frame.AddInstruction(InsAssign.Default, 0);
 
                 string tmpCaseVariable = $"catch#{SymbolMap.TempVariableCounter++}";
-                InsertVariablePush(frame, new Identifier(tmpCaseVariable));
+                InsertVariablePush(frame, new Identifier(tmpCaseVariable), true);
                 InsertAssignPop(frame);
             }
 
@@ -590,7 +590,7 @@ namespace GTAdhocCompiler
                 Location = foreachStatement.Right.Location,
             };
 
-            InsertVariablePush(frame, itorIdentifier);
+            InsertVariablePush(frame, itorIdentifier, true);
             InsertAssignPop(frame);
 
             // Test - fetch_next returns whether the iterator is done or not
@@ -642,7 +642,7 @@ namespace GTAdhocCompiler
 
             // Create a label for the temporary switch variable
             string tmpCaseVariable = $"case#{SymbolMap.TempVariableCounter++}";
-            AdhocSymbol labelSymb = InsertVariablePush(frame, new Identifier(tmpCaseVariable));
+            AdhocSymbol labelSymb = InsertVariablePush(frame, new Identifier(tmpCaseVariable), true);
             InsertAssignPop(frame);
 
             LocalVariable caseVariable = frame.Stack.GetLocalVariableBySymbol(labelSymb);
@@ -794,7 +794,7 @@ namespace GTAdhocCompiler
             {
                 EnterScope(subroutine.CodeFrame, parentNode);
                 foreach (var param in subroutine.CodeFrame.FunctionParameters)
-                    subroutine.CodeFrame.AddScopeVariable(param, isDeclaration: true);
+                    subroutine.CodeFrame.AddScopeVariable(param, isAssignment: true, isLocalDeclaration: true);
                 
                 CompileBlockStatement(subroutine.CodeFrame, blockStatement, openScope: false, insertLeaveInstruction: false);
             }
@@ -861,7 +861,7 @@ namespace GTAdhocCompiler
                 if (initValue != null || pushWhenNoInit)
                 {
                     // Variable is being defined with a value.
-                    InsertVariablePush(frame, idIdentifier);
+                    InsertVariablePush(frame, idIdentifier, true);
 
                     // Perform assignment
                     InsertAssignPop(frame);
@@ -870,7 +870,7 @@ namespace GTAdhocCompiler
                 {
                     // Variable is declared but not assigned to anything yet. Do not add any variable push.
                     AdhocSymbol varSymb = SymbolMap.RegisterSymbol(idIdentifier.Name);
-                    frame.AddScopeVariable(varSymb, isDeclaration: true);
+                    frame.AddScopeVariable(varSymb, isAssignment: true, isLocalDeclaration: true);
                 }
             }
             else if (id is ArrayPattern arrayPattern) // var [hello, world] = helloworld; - deconstruct array
@@ -894,7 +894,7 @@ namespace GTAdhocCompiler
                     ThrowCompilationError(exp, "Expected array element to be identifier.");
 
                 Identifier arrElemIdentifier = exp as Identifier;
-                InsertVariablePush(frame, arrElemIdentifier);
+                InsertVariablePush(frame, arrElemIdentifier, true);
             }
 
             InsListAssign listAssign = new InsListAssign(arrayPattern.Elements.Count);
@@ -1067,7 +1067,7 @@ namespace GTAdhocCompiler
                 Identifier paramIdent = param as Identifier;
                 AdhocSymbol paramSymbol = SymbolMap.RegisterSymbol(paramIdent.Name);
                 subroutine.CodeFrame.FunctionParameters.Add(paramSymbol);
-                subroutine.CodeFrame.AddScopeVariable(paramSymbol, isDeclaration: true);
+                subroutine.CodeFrame.AddScopeVariable(paramSymbol, isAssignment: true, isLocalDeclaration: true);
             }
 
             if (body.Type == Nodes.BlockStatement)
@@ -1153,7 +1153,7 @@ namespace GTAdhocCompiler
                 else if (IsAdhocAssignWithOperandOperator(assignmentExpression.Operator))
                 {
                     // Assigning to self (+=)
-                    InsertVariablePush(frame, assignmentExpression.Left as Identifier); // Push current value first
+                    InsertVariablePush(frame, assignmentExpression.Left as Identifier, false); // Push current value first
                     CompileExpression(frame, assignmentExpression.Right);
 
                     InsertBinaryAssignOperator(frame, assignmentExpression, assignmentExpression.Operator, assignmentExpression.Location.Start.Line);
@@ -1421,7 +1421,7 @@ namespace GTAdhocCompiler
                 if (assignExpression.Left is Identifier)
                 {
                     // Pushing to variable
-                    InsertVariablePush(frame, assignExpression.Left as Identifier); // Push current value first
+                    InsertVariablePush(frame, assignExpression.Left as Identifier, false); // Push current value first
                 }
                 else if (assignExpression.Left is AttributeMemberExpression attr)
                 {
@@ -1454,7 +1454,7 @@ namespace GTAdhocCompiler
         {
             if (expression is Identifier ident) // hello = world
             {
-                InsertVariablePush(frame, ident);
+                InsertVariablePush(frame, ident, false);
             }
             else if (expression is AttributeMemberExpression attrMember) // Pushing into an object i.e hello.world = "!"
             {
@@ -1595,7 +1595,7 @@ namespace GTAdhocCompiler
             AdhocSymbol fullPathSymb = SymbolMap.RegisterSymbol(fullPath);
             eval.VariableSymbols.Add(fullPathSymb);
 
-            int idx = frame.AddScopeVariable(fullPathSymb, isDeclaration: false, isStatic: true);
+            int idx = frame.AddScopeVariable(fullPathSymb, isAssignment: false, isStatic: true);
             eval.VariableStorageIndex = idx;
 
             frame.AddInstruction(eval, staticExp.Location.Start.Line);
@@ -1623,7 +1623,7 @@ namespace GTAdhocCompiler
             AdhocSymbol fullPathSymb = SymbolMap.RegisterSymbol(fullPath);
             push.VariableSymbols.Add(fullPathSymb);
 
-            int idx = frame.AddScopeVariable(fullPathSymb, isDeclaration: false, isStatic: true);
+            int idx = frame.AddScopeVariable(fullPathSymb, isAssignment: false, isStatic: true);
             push.VariableStorageIndex = idx;
 
             frame.AddInstruction(push, staticExp.Location.Start.Line);
@@ -1806,7 +1806,7 @@ namespace GTAdhocCompiler
             CompileExpression(frame, finalizerStatement.Body);
 
             // add temp value & set finally
-            InsertVariablePush(frame, new Identifier($"fin#{SymbolMap.TempVariableCounter++}") { Location = finalizerStatement.Body.Location });
+            InsertVariablePush(frame, new Identifier($"fin#{SymbolMap.TempVariableCounter++}") { Location = finalizerStatement.Body.Location }, true);
 
             InsAttributePush push = new InsAttributePush();
             push.AttributeSymbols.Add(SymbolMap.RegisterSymbol("finally"));
@@ -1827,7 +1827,7 @@ namespace GTAdhocCompiler
                 {
                     // Assigning - we need to push
                     if (unaryExp.Argument.Type == Nodes.Identifier)
-                        InsertVariablePush(frame, unaryExp.Argument as Identifier);
+                        InsertVariablePush(frame, unaryExp.Argument as Identifier, false);
                     else if (unaryExp.Argument is AttributeMemberExpression attr)
                         InsertAttributeMemberAssignmentPush(frame, attr);
                     else if (unaryExp.Argument is ComputedMemberExpression comp)
@@ -1916,7 +1916,7 @@ namespace GTAdhocCompiler
             }
             else if (unaryExp.Argument is Identifier identifier)
             {
-                InsertVariablePush(frame, identifier);
+                InsertVariablePush(frame, identifier, false);
             }
             else
             {
@@ -1995,7 +1995,7 @@ namespace GTAdhocCompiler
                 return;
 
             AdhocSymbol symb = SymbolMap.RegisterSymbol(identifier.Name);
-            int idx = identifier.Name != "self" ? frame.AddScopeVariable(symb, false) : 0;
+            int idx = identifier.Name != "self" ? frame.AddScopeVariable(symb, isAssignment: false) : 0;
             var varEval = new InsVariableEvaluation(idx);
             varEval.VariableSymbols.Add(symb); // Only one
             frame.AddInstruction(varEval, identifier.Location.Start.Line);
@@ -2029,10 +2029,10 @@ namespace GTAdhocCompiler
         /// <param name="frame"></param>
         /// <param name="identifier"></param>
         /// <returns></returns>
-        private AdhocSymbol InsertVariablePush(AdhocCodeFrame frame, Identifier identifier)
+        private AdhocSymbol InsertVariablePush(AdhocCodeFrame frame, Identifier identifier, bool isVariableDeclaration)
         {
             AdhocSymbol varSymb = SymbolMap.RegisterSymbol(identifier.Name);
-            int idx = frame.AddScopeVariable(varSymb, isDeclaration: true);
+            int idx = frame.AddScopeVariable(varSymb, isAssignment: true, isLocalDeclaration: isVariableDeclaration);
 
             var varPush = new InsVariablePush();
             varPush.VariableSymbols.Add(varSymb);

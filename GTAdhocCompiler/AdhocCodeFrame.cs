@@ -252,13 +252,16 @@ namespace GTAdhocCompiler
             Stack.FreeLocalVariable(localVarToRemove);
         }
 
-        public int AddScopeVariable(AdhocSymbol symbol, bool isDeclaration = false, bool isStatic = false)
+        public int AddScopeVariable(AdhocSymbol symbol, bool isAssignment = false, bool isStatic = false, bool isLocalDeclaration = false)
         {
+            if (symbol.Name == "watcher")
+                ;
+
             bool added;
             Variable newVariable;
             var lastScope = CurrentScope;
 
-            if (isDeclaration)
+            if (isAssignment)
             {
                 if (isStatic)
                 {
@@ -267,7 +270,10 @@ namespace GTAdhocCompiler
                 else
                 {
                     // May also be a reassignment to a static
-                    if (Stack.HasStaticVariable(symbol) || CurrentModule.IsDefinedStaticMember(symbol) || CurrentModule.IsDefinedAttributeMember(symbol))
+                    if (!isLocalDeclaration && 
+                        (Stack.HasStaticVariable(symbol) 
+                        || CurrentModule.IsDefinedStaticMember(symbol) 
+                        || CurrentModule.IsDefinedAttributeMember(symbol)))
                     {
                         added = Stack.TryAddStaticVariable(symbol, out newVariable);
                     }
