@@ -890,11 +890,17 @@ namespace GTAdhocCompiler
 
             foreach (Expression exp in arrayPattern.Elements)
             {
-                if (exp.Type != Nodes.Identifier)
-                    ThrowCompilationError(exp, "Expected array element to be identifier.");
-
-                Identifier arrElemIdentifier = exp as Identifier;
-                InsertVariablePush(frame, arrElemIdentifier, true);
+                if (exp.Type == Nodes.Identifier)
+                {
+                    Identifier arrElemIdentifier = exp as Identifier;
+                    InsertVariablePush(frame, arrElemIdentifier, true);
+                }
+                else if (exp is AttributeMemberExpression)
+                {
+                    InsertAttributeMemberAssignmentPush(frame, exp as AttributeMemberExpression);
+                }
+                else
+                    ThrowCompilationError(exp, "Expected array pattern element to be an identifier or attribute member expression.");
             }
 
             InsListAssign listAssign = new InsListAssign(arrayPattern.Elements.Count);
@@ -915,33 +921,26 @@ namespace GTAdhocCompiler
             }
 
             string fullImportNamespace = "";
-            string target = "";
 
             InsImport importIns = new InsImport();
 
             for (int i = 0; i < import.Specifiers.Count; i++)
             {
                 ImportDeclarationSpecifier specifier = import.Specifiers[i];
-                if (i == import.Specifiers.Count - 1)
-                {
-                    target = specifier.Local.Name;
-                    break;
-                }
-
                 AdhocSymbol part = SymbolMap.RegisterSymbol(specifier.Local.Name);
                 importIns.ImportNamespaceParts.Add(part);
                 fullImportNamespace += specifier.Local.Name;
 
-                if (i < import.Specifiers.Count - 1 && import.Specifiers[i + 1].Local.Name != "*")
+                if (i < import.Specifiers.Count - 1)
                     fullImportNamespace += "::";
             }
 
             AdhocSymbol namespaceSymbol = SymbolMap.RegisterSymbol(fullImportNamespace);
-            AdhocSymbol targetNamespace = SymbolMap.RegisterSymbol(target);
+            AdhocSymbol value = SymbolMap.RegisterSymbol(import.Target.Name);
             AdhocSymbol nilSymbol = SymbolMap.RegisterSymbol("nil");
 
             importIns.ImportNamespaceParts.Add(namespaceSymbol);
-            importIns.Target = targetNamespace;
+            importIns.ModuleValue = value;
 
             frame.AddInstruction(importIns, import.Location.Start.Line);
         }

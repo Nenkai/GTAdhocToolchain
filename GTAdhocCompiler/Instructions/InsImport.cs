@@ -13,7 +13,7 @@ namespace GTAdhocCompiler.Instructions
         public override string InstructionName => "IMPORT";
 
         public List<AdhocSymbol> ImportNamespaceParts { get; set; } = new();
-        public AdhocSymbol Target { get; set; }
+        public AdhocSymbol ModuleValue { get; set; }
 
         public InsImport()
         {

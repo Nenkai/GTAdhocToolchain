@@ -417,7 +417,7 @@ namespace GTAdhocCompiler
         private void WriteImport(InsImport import)
         {
             stream.WriteSymbols(import.ImportNamespaceParts);
-            stream.WriteSymbol(import.Target);
+            stream.WriteSymbol(import.ModuleValue);
             stream.WriteSymbol(SymbolMap.Symbols["nil"]);
         }
 
