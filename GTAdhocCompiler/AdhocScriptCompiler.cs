@@ -1250,23 +1250,15 @@ namespace GTAdhocCompiler
             }
         }
 
+        /// <summary>
+        /// Compiles expression statements without returns, where the result is popped
+        /// </summary>
+        /// <param name="frame"></param>
+        /// <param name="expStatement"></param>
         private void CompileExpressionStatement(AdhocCodeFrame frame, ExpressionStatement expStatement)
         {
-            if (expStatement.Expression.Type == Nodes.CallExpression)
-            {
-                // Call expressions need to be directly popped within an expression statement -> 'getThing()' instead of 'var thing = getThing()'.
-                // Their return values aren't used.
-                CompileCall(frame, expStatement.Expression as CallExpression, popReturnValue: true);
-            }
-            else if (expStatement.Expression is UpdateExpression upd) // i++
-            {
-                // We don't care about the result, so we pop it in this context
-                CompileUnaryExpression(frame, upd, popResult: true);
-            }
-            else
-            {
-                CompileExpression(frame, expStatement.Expression);
-            }
+            CompileExpression(frame, expStatement.Expression);
+            frame.AddInstruction(InsPop.Default, 0); // Discard result
         }
 
         private void CompileMethodDeclaration(AdhocCodeFrame frame, MethodDeclaration methodDefinition)
@@ -1865,13 +1857,6 @@ namespace GTAdhocCompiler
                 AdhocSymbol symb = SymbolMap.RegisterSymbol(op);
                 InsUnaryAssignOperator unaryIns = new InsUnaryAssignOperator(symb);
                 frame.AddInstruction(unaryIns, unaryExp.Location.Start.Line);
-
-                // If we aren't assigning, or not using the return value immediately, pop it
-                // Usages: i++;
-                //         for (var i = 0; i < 10; [i++])
-
-                if (popResult)
-                    frame.AddInstruction(InsPop.Default, 0);
             }
             else
             {
@@ -1901,6 +1886,13 @@ namespace GTAdhocCompiler
                     frame.AddInstruction(unaryIns, unaryExp.Location.Start.Line);
                 }
             }
+
+            // If we aren't assigning, or not using the return value immediately, pop it
+            // Usages: i++;
+            //         for (var i = 0; i < 10; [i++])
+
+            if (popResult)
+                frame.AddInstruction(InsPop.Default, 0);
         }
 
         private void CompileReferenceOfUnaryExpression(AdhocCodeFrame frame, UnaryExpression unaryExp)
