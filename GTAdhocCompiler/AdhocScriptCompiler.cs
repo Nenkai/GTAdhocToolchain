@@ -1251,14 +1251,16 @@ namespace GTAdhocCompiler
         }
 
         /// <summary>
-        /// Compiles expression statements without returns, where the result is popped
+        /// Compiles expression statements
         /// </summary>
         /// <param name="frame"></param>
         /// <param name="expStatement"></param>
         private void CompileExpressionStatement(AdhocCodeFrame frame, ExpressionStatement expStatement)
         {
             CompileExpression(frame, expStatement.Expression);
-            frame.AddInstruction(InsPop.Default, 0); // Discard result
+
+            if (expStatement.Expression.Type != Nodes.AssignmentExpression)
+                frame.AddInstruction(InsPop.Default, 0); // Discard any result
         }
 
         private void CompileMethodDeclaration(AdhocCodeFrame frame, MethodDeclaration methodDefinition)
