@@ -875,7 +875,7 @@ namespace GTAdhocCompiler
             }
             else if (id is ArrayPattern arrayPattern) // var [hello, world] = helloworld; - deconstruct array
             {
-                CompileArrayPatternPush(frame, arrayPattern);
+                CompileArrayPatternPush(frame, arrayPattern, isDeclaration: true);
             }
             else
             {
@@ -883,7 +883,7 @@ namespace GTAdhocCompiler
             }
         }
 
-        private void CompileArrayPatternPush(AdhocCodeFrame frame, ArrayPattern arrayPattern)
+        private void CompileArrayPatternPush(AdhocCodeFrame frame, ArrayPattern arrayPattern, bool isDeclaration = false)
         {
             if (arrayPattern.Elements.Count == 0)
                 ThrowCompilationError(arrayPattern, "Array pattern has no elements.");
@@ -893,7 +893,7 @@ namespace GTAdhocCompiler
                 if (exp.Type == Nodes.Identifier)
                 {
                     Identifier arrElemIdentifier = exp as Identifier;
-                    InsertVariablePush(frame, arrElemIdentifier, true);
+                    InsertVariablePush(frame, arrElemIdentifier, isDeclaration);
                 }
                 else if (exp is AttributeMemberExpression)
                 {
@@ -1477,7 +1477,7 @@ namespace GTAdhocCompiler
             }
             else if (expression is ArrayPattern pattern) // var [hi, hello] = variable
             {
-                CompileArrayPatternPush(frame, pattern);
+                CompileArrayPatternPush(frame, pattern, isDeclaration: false);
                 return; // No need for assign pop
             }
             else
