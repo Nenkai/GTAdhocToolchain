@@ -1259,7 +1259,9 @@ namespace GTAdhocCompiler
         {
             CompileExpression(frame, expStatement.Expression);
 
-            if (expStatement.Expression.Type != Nodes.AssignmentExpression)
+            if (expStatement.Expression.Type != Nodes.AssignmentExpression
+                && expStatement.Expression.Type != Nodes.StaticDeclaration
+                && expStatement.Expression.Type != Nodes.AttributeDeclaration)
                 frame.AddInstruction(InsPop.Default, 0); // Discard any result
         }
 
