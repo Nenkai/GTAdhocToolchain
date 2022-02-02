@@ -155,14 +155,9 @@ namespace GTAdhocCompiler
                     Stack.StackStorageCounter -= 2;
                     break;
                 case AdhocInstructionType.ATTRIBUTE_PUSH:
-                case AdhocInstructionType.LOGICAL_AND_OLD:
-                case AdhocInstructionType.LOGICAL_OR_OLD:
                 // Verify these two later
                 case AdhocInstructionType.LOGICAL_AND:
                 case AdhocInstructionType.LOGICAL_OR:
-                    Stack.StackStorageCounter--;
-                    Stack.StackStorageCounter++;
-                    break;
                 case AdhocInstructionType.UNARY_ASSIGN_OPERATOR:
                 case AdhocInstructionType.UNARY_OPERATOR:
                     Stack.StackStorageCounter--;

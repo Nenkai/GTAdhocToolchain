@@ -738,9 +738,6 @@ namespace GTAdhocCompiler
             if (id is null)
                 ThrowCompilationError(parentNode, "Expected subroutine to have an identifier.");
 
-            if (id.Name == "boot_sequence_common")
-                ;
-
             Logger.Debug($"L{parentNode.Location.Start.Line} - Compiling subroutine '{id.Name}'");
 
             SubroutineBase subroutine = isMethod ? new InsMethodDefine() : new InsFunctionDefine();
