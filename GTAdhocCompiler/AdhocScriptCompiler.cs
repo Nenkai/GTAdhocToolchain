@@ -370,7 +370,8 @@ namespace GTAdhocCompiler
                 frame.AddInstruction(@class, id.Location.Start.Line);
             }
 
-            CompileStatementWithScope(frame, body);
+            // Compile statements directly, we don't need a regular leave.
+            CompileStatements(frame, body as BlockStatement);
 
             LeaveModuleOrClass(frame);
 
@@ -2239,7 +2240,7 @@ namespace GTAdhocCompiler
                 if (isModuleLeave)
                 {
                     leave.VariableStorageRewindIndex = 1;
-                    leave.ModuleOrClassDepth = Modules.Count - 1;
+                    leave.ModuleOrClassDepthRewindIndex = Modules.Count - 1;
                 }
                 else
                 {

@@ -388,7 +388,7 @@ namespace GTAdhocCompiler
 
         private void WriteLeave(InsLeaveScope leave)
         {
-            stream.WriteInt32(leave.ModuleOrClassDepth); // Unused by the engine, TODO
+            stream.WriteInt32(leave.ModuleOrClassDepthRewindIndex); // Unused by GT6 and above
             stream.WriteInt32(leave.VariableStorageRewindIndex);
         }
 

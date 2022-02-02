@@ -15,8 +15,16 @@ namespace GTAdhocCompiler.Instructions
 
         public override string InstructionName => "LEAVE";
 
-        public int ModuleOrClassDepth { get; set; }
+        /// <summary>
+        /// Rewinds the depth to a certain point.
+        /// NOT USED AFTER GT5
+        /// </summary>
+        public int ModuleOrClassDepthRewindIndex { get; set; }
 
+        /// <summary>
+        /// Rewinds the variable storage to a certain point (sets all to nil).
+        /// When set to 1 and depth value is set, this is ignored.
+        /// </summary>
         public int VariableStorageRewindIndex { get; set; }
     }
 }
