@@ -23,11 +23,6 @@ namespace GTAdhocCompiler
         /// </summary>
         public List<StaticVariable> StaticVariableStorage { get; set; } = new();
 
-        public List<Variable> GlobalVariableStorage { get; set; } = new()
-        {
-            null
-        };
-
         public int LocalVariableStorageSize { get; set; } = 1;
 
         public int StaticVariableStorageSize { get; set; } = 0;
@@ -51,20 +46,6 @@ namespace GTAdhocCompiler
         /// </summary>
         public int StackSize { get; set; }
 
-        public int GetLastVariableStorageIndex()
-        {
-            int highestTakenIndex = GlobalVariableStorage.Count;
-            for (int i = GlobalVariableStorage.Count - 1; i >= 1; i --)
-            {
-                if (GlobalVariableStorage[i] == null) // Free'd up space
-                    highestTakenIndex = i;
-                else
-                    return highestTakenIndex;
-            }
-
-            return GlobalVariableStorage.Count;
-        }
-
         public bool TryAddStaticVariable(AdhocSymbol symbol, out Variable variable)
         {
             variable = StaticVariableStorage.Find(e => e.Symbol == symbol);
@@ -82,7 +63,7 @@ namespace GTAdhocCompiler
 
         public bool TryAddLocalVariable(AdhocSymbol symbol, out Variable variable)
         {
-            variable = LocalVariableStorage.Find(e => e?.Symbol == symbol);
+            variable = GetLocalVariableBySymbol(symbol);
             if (variable is null)
             {
                 var newVar = new LocalVariable() { Symbol = symbol };
@@ -95,34 +76,19 @@ namespace GTAdhocCompiler
             return false;
         }
 
-        public int AddVariableToGlobalSpace(Variable variable)
+        public void AddLocalVariable(LocalVariable variable)
         {
-            if (variable is StaticVariable)
+            int freeIdx = LocalVariableStorage.IndexOf(null, 1);
+            if (freeIdx == -1) // No free space? If so grow storage
             {
-                GlobalVariableStorage.Add(variable);
-                return GlobalVariableStorage.Count - 1;
+                LocalVariableStorage.Add(variable); // Expand
+                if (LocalVariableStorage.Count > LocalVariableStorageSize)
+                    LocalVariableStorageSize = LocalVariableStorage.Count;
             }
             else
             {
-                int freeIdx = GlobalVariableStorage.IndexOf(null, 1);
-                if (freeIdx == -1) // No free space? If so grow storage
-                {
-                    GlobalVariableStorage.Add(variable);
-                    return GlobalVariableStorage.Count - 1;
-                }
-                else
-                {
-                    GlobalVariableStorage[freeIdx] = variable;
-                    return freeIdx;
-                }
+                LocalVariableStorage[freeIdx] = variable;
             }
-        }
-
-        public void AddLocalVariable(LocalVariable variable)
-        {
-            LocalVariableStorage.Add(variable); // Expand
-            if (LocalVariableStorage.Count > LocalVariableStorageSize)
-                LocalVariableStorageSize = LocalVariableStorage.Count;
         }
 
         public void AddStaticVariable(StaticVariable variable)
@@ -130,12 +96,6 @@ namespace GTAdhocCompiler
             StaticVariableStorage.Add(variable); // Expand
             if (StaticVariableStorage.Count > StaticVariableStorageSize)
                 StaticVariableStorageSize = StaticVariableStorage.Count;
-        }
-
-        public int GetGlobalVariableIndex(Variable variable)
-        {
-            return GlobalVariableStorage.IndexOf(variable, 1);
-            
         }
 
         public bool HasStaticVariable(AdhocSymbol symbol)
@@ -153,13 +113,35 @@ namespace GTAdhocCompiler
             return LocalVariableStorage.Find(e => e?.Symbol == symbol);
         }
 
+        public int GetLocalVariableIndex(LocalVariable local)
+        {
+            return LocalVariableStorage.IndexOf(local);
+        }
+
+        public int GetStaticVariableIndex(StaticVariable local)
+        {
+            return StaticVariableStorage.IndexOf(local);
+        }
+
+        public int GetLastLocalVariableIndex()
+        {
+            int highestTakenIndex = LocalVariableStorage.Count;
+            for (int i = LocalVariableStorage.Count - 1; i >= 1; i--)
+            {
+                if (LocalVariableStorage[i] == null) // Free'd up space
+                    highestTakenIndex = i;
+                else
+                    return highestTakenIndex;
+            }
+
+            return LocalVariableStorage.Count;
+        }
+
         public void FreeLocalVariable(LocalVariable var)
         {
-            LocalVariableStorage.Remove(var);
-
-            // Free up slot from global space
-            int idx = GlobalVariableStorage.IndexOf(var);
-            GlobalVariableStorage[idx] = null;
+            var idx = GetLocalVariableIndex(var);
+            if (idx != -1)
+                LocalVariableStorage[idx] = null;
         }
     }
 }
