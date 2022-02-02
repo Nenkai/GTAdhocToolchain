@@ -101,8 +101,8 @@ namespace GTAdhocCompiler
                 stream.WriteInt32(block.Stack.StackSize);
 
                 /* These two are combined to make the size of the storage for variables */
-                stream.WriteInt32(block.Stack.LocalVariableStorageSize + block.Stack.StaticVariableStorageSize);
-                stream.WriteInt32(0);
+                stream.WriteInt32(block.Stack.LocalVariableStorageSize);
+                stream.WriteInt32(block.Stack.StaticVariableStorageSize);
             }
 
             stream.WriteInt32(block.Instructions.Count);

@@ -254,7 +254,6 @@ namespace GTAdhocCompiler
 
         public int AddScopeVariable(AdhocSymbol symbol, bool isAssignment = false, bool isStatic = false, bool isLocalDeclaration = false)
         {
-            bool added;
             Variable newVariable;
             var lastScope = CurrentScope;
 
@@ -262,7 +261,7 @@ namespace GTAdhocCompiler
             {
                 if (isStatic)
                 {
-                    added = Stack.TryAddStaticVariable(symbol, out newVariable);
+                    Stack.TryAddStaticVariable(symbol, out newVariable);
                 }
                 else
                 {
@@ -271,11 +270,11 @@ namespace GTAdhocCompiler
                         !Stack.HasLocalVariable(symbol) &&
                         (Stack.HasStaticVariable(symbol) || CurrentModule.IsDefinedStaticMember(symbol) || CurrentModule.IsDefinedAttributeMember(symbol)))
                     {
-                        added = Stack.TryAddStaticVariable(symbol, out newVariable);
+                        Stack.TryAddStaticVariable(symbol, out newVariable);
                     }
                     else
                     {
-                        added = Stack.TryAddLocalVariable(symbol, out newVariable);
+                        bool added = Stack.TryAddLocalVariable(symbol, out newVariable);
                         if (added)
                             lastScope.ScopeVariables.Add(symbol.Name, symbol);
                     }
@@ -296,7 +295,6 @@ namespace GTAdhocCompiler
 
                         // Add captured variable to current frame
                         Stack.TryAddLocalVariable(symbol, out newVariable);
-                        Stack.AddVariableToGlobalSpace(newVariable);
                     }
 
                     // Captured variables have backward indices
@@ -305,32 +303,37 @@ namespace GTAdhocCompiler
 
                 if (isStatic || !Stack.HasLocalVariable(symbol))
                 {
-                    added = Stack.TryAddStaticVariable(symbol, out newVariable);
+                    Stack.TryAddStaticVariable(symbol, out newVariable);
                 }
                 else
                 {
-                    added = Stack.TryAddLocalVariable(symbol, out newVariable);
+                    Stack.TryAddLocalVariable(symbol, out newVariable);
                 }
             }
 
-            if (added)
+            if (newVariable is LocalVariable local)
             {
-                return Stack.AddVariableToGlobalSpace(newVariable);
+                var idx = Stack.GetLocalVariableIndex(local);
+                if (idx == -1)
+                    throw new Exception($"Could not find local variable index for {local}");
+
+                return idx;
+            }
+            else if (newVariable is StaticVariable staticVar)
+            {
+                var idx = Stack.GetStaticVariableIndex(staticVar);
+                if (idx == -1)
+                    throw new Exception($"Could not find static variable index for {staticVar}");
+                return idx;
             }
             else
-            {
-                // Was already declared and registered
-                return Stack.GetGlobalVariableIndex(newVariable);
-            }
-
-            throw new Exception("wat?");
+                throw new Exception("Variable is not a local or static variable..?");
         }
 
         public void AddAttributeOrStaticMemberVariable(AdhocSymbol symbol)
         {
             var newVar = new StaticVariable() { Symbol = symbol };
             Stack.AddStaticVariable(newVar);
-            Stack.AddVariableToGlobalSpace(newVar);
         }
 
         public bool IsStaticVariable(AdhocSymbol symb)

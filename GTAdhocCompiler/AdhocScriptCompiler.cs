@@ -647,7 +647,7 @@ namespace GTAdhocCompiler
             InsertAssignPop(frame);
 
             LocalVariable caseVariable = frame.Stack.GetLocalVariableBySymbol(labelSymb);
-            int caseVariableStoreIdx = frame.Stack.GetGlobalVariableIndex(caseVariable);
+            int caseVariableStoreIdx = frame.Stack.GetLocalVariableIndex(caseVariable);
 
             Dictionary<SwitchCase, InsJumpIfTrue> caseBodyJumps = new();
             InsJump defaultJump = null;
@@ -1262,7 +1262,8 @@ namespace GTAdhocCompiler
 
             if (expStatement.Expression.Type != Nodes.AssignmentExpression
                 && expStatement.Expression.Type != Nodes.StaticDeclaration
-                && expStatement.Expression.Type != Nodes.AttributeDeclaration)
+                && expStatement.Expression.Type != Nodes.AttributeDeclaration
+                && expStatement.Expression.Type != Nodes.YieldExpression)
                 frame.AddInstruction(InsPop.Default, 0); // Discard any result
         }
 
@@ -2244,7 +2245,7 @@ namespace GTAdhocCompiler
                 }
                 else
                 {
-                    leave.VariableStorageRewindIndex = frame.Stack.GetLastVariableStorageIndex();
+                    leave.VariableStorageRewindIndex = frame.Stack.GetLastLocalVariableIndex();
                 }
 
                 frame.AddInstruction(leave, 0);
