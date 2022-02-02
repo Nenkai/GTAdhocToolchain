@@ -1,11 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-using Esprima.Ast;
-using GTAdhocCompiler.Instructions;
+﻿using GTAdhocCompiler.Instructions;
 using GTAdhocCompiler.Variables;
 
 namespace GTAdhocCompiler
@@ -164,13 +157,16 @@ namespace GTAdhocCompiler
                 case AdhocInstructionType.ATTRIBUTE_PUSH:
                 case AdhocInstructionType.LOGICAL_AND_OLD:
                 case AdhocInstructionType.LOGICAL_OR_OLD:
-                    // Verify these two later
+                // Verify these two later
                 case AdhocInstructionType.LOGICAL_AND:
                 case AdhocInstructionType.LOGICAL_OR:
+                    Stack.StackStorageCounter--;
+                    Stack.StackStorageCounter++;
+                    break;
                 case AdhocInstructionType.UNARY_ASSIGN_OPERATOR:
                 case AdhocInstructionType.UNARY_OPERATOR:
-                    Stack.StackStorageCounter++;
                     Stack.StackStorageCounter--;
+                    Stack.StackStorageCounter++;
                     break;
                 case AdhocInstructionType.ASSIGN_OLD:
                 case AdhocInstructionType.BINARY_ASSIGN_OPERATOR:
@@ -213,6 +209,12 @@ namespace GTAdhocCompiler
                     Stack.StackStorageCounter--; // Array
                     Stack.StackStorageCounter++;
                     break;
+
+                case AdhocInstructionType.SET_STATE:
+                    InsSetState state = ins as InsSetState;
+                    if (state.State <= AdhocRunState.RUN)
+                        Stack.StackStorageCounter--;
+                    break;
                 // These have no effect on stack
                 case AdhocInstructionType.CLASS_DEFINE:
                 case AdhocInstructionType.EVAL:
@@ -228,16 +230,15 @@ namespace GTAdhocCompiler
                 case AdhocInstructionType.ATTRIBUTE_EVAL:
                 case AdhocInstructionType.SOURCE_FILE:
                 case AdhocInstructionType.CODE_EVAL:
-                case AdhocInstructionType.SET_STATE: // FIX ME LATER
                 case AdhocInstructionType.LEAVE: // FIX ME LATER
                     break;
                 default:
                     throw new Exception("Not implemented");
             }
 
+
             // CALL_OLD
             // LEAVE
-            // SET_STATE
             // VA_CALL
         }
 
@@ -267,7 +268,7 @@ namespace GTAdhocCompiler
                 else
                 {
                     // May also be a reassignment to a static
-                    if (!isLocalDeclaration && 
+                    if (!isLocalDeclaration &&
                         !Stack.HasLocalVariable(symbol) &&
                         (Stack.HasStaticVariable(symbol) || CurrentModule.IsDefinedStaticMember(symbol) || CurrentModule.IsDefinedAttributeMember(symbol)))
                     {
@@ -288,7 +289,7 @@ namespace GTAdhocCompiler
                 // Captured variable from parent function?
                 if (ContextAllowsVariableCaptureFromParentFrame && ParentFrame is not null
                     && ParentFrame.Stack.HasLocalVariable(symbol) // Symbol exists in parent? If so, we are actually capturing
-                    && (!Stack.HasLocalVariable(symbol)&& !FunctionParameters.Contains(symbol) || CapturedCallbackVariables.Contains(symbol))) // Do not conflict with locals/params
+                    && (!Stack.HasLocalVariable(symbol) && !FunctionParameters.Contains(symbol) || CapturedCallbackVariables.Contains(symbol))) // Do not conflict with locals/params
                 {
                     if (!CapturedCallbackVariables.Contains(symbol))
                     {
