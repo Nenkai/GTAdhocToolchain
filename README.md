@@ -1,5 +1,5 @@
-# GTAdhocCompiler
-A compiler for the Gran Turismo scripting language, Adhoc, from C#. 
+# GTAdhocToolchain
+A toolchain for the Gran Turismo scripting language, Adhoc, from C#. 
 
 Most of this project is still mostly work in progress, the compiler produces valid custom game code for Adhoc Version 12 (GT PSP -> GT Sport) and certain projects can be fully recompiled from source.
 
