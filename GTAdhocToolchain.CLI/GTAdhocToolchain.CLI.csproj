@@ -13,11 +13,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\GTAdhocTolchain.Menu\GTAdhocToolchain.Menu.csproj" />
+    <ProjectReference Include="..\GTAdhocToolchain.Menu\GTAdhocToolchain.Menu.csproj" />
     <ProjectReference Include="..\GTAdhocToolchain.Compiler\GTAdhocToolchain.Compiler.csproj" />
     <ProjectReference Include="..\GTAdhocToolchain.CodeGen\GTAdhocToolchain.CodeGen.csproj" />
     <ProjectReference Include="..\GTAdhocToolchain.Disasm\GTAdhocToolchain.Disasm.csproj" />
+    <ProjectReference Include="..\GTAdhocToolchain.Packaging\GTAdhocToolchain.Packaging.csproj" />
     <ProjectReference Include="..\GTAdhocToolchain.Project\GTAdhocToolchain.Project.csproj" />
+    <ProjectReference Include="..\MenuResources\GTAdhocToolchain.Menu.Resources.csproj" />
   </ItemGroup>
 
   <ItemGroup>

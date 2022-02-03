@@ -8,8 +8,6 @@ using System.Diagnostics;
 
 using GTAdhocToolchain.Core;
 
-using GTAdhocToolchain.Core;
-
 namespace GTAdhocToolchain.Menu.Fields
 {
     [DebuggerDisplay("mString: {Name} ({String})")]

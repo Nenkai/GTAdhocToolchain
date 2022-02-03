@@ -1,0 +1,5 @@
+﻿// For field names that collide with others but aren't the same type
+add_override|IconBox|h_spacing|Short
+add_override|IconBox|v_spacing|Short
+add_override|ListBox|spacing|Float
+add_override|IntAttribute|value|Int
