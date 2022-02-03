@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "GTAdhocToolchain": {
+      "commandName": "Project",
+      "commandLineArgs": "build -i C:\\Users\\nenkai\\source\\repos\\GTAdhocScripts\\project_files\\gt5_arcade.yaml"
+    }
+  }
+}

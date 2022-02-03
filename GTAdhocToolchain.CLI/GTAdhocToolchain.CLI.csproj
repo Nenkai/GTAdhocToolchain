@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommandLineParser" Version="2.8.0" />
+    <PackageReference Include="NLog" Version="4.7.13" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\GTAdhocToolchain.Compiler\GTAdhocToolchain.Compiler.csproj" />
+    <ProjectReference Include="..\GTAdhocToolchain.CodeGen\GTAdhocToolchain.CodeGen.csproj" />
+    <ProjectReference Include="..\GTAdhocToolchain.Project\GTAdhocToolchain.Project.csproj" />
+  </ItemGroup>
+
+</Project>
