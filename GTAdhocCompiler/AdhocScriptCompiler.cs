@@ -2230,8 +2230,13 @@ namespace GTAdhocCompiler
             if (!isModuleLeave) // Module leaves don't actually reset the max.
             {
                 // Clear up/rewind
-                foreach (var variable in lastScope.ScopeVariables)
-                    frame.FreeVariable(variable.Value);
+                foreach (var variable in lastScope.LocalScopeVariables)
+                    frame.FreeLocalVariable(variable.Value);
+            }
+            else
+            {
+                foreach (var variable in lastScope.StaticScopeVariables)
+                    frame.FreeStaticVariable(variable.Value);
             }
 
             if (insertLeaveInstruction)

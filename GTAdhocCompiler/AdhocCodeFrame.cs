@@ -242,10 +242,16 @@ namespace GTAdhocCompiler
             return Instructions.Count;
         }
 
-        public void FreeVariable(AdhocSymbol symbol)
+        public void FreeLocalVariable(AdhocSymbol symbol)
         {
             var localVarToRemove = Stack.GetLocalVariableBySymbol(symbol);
             Stack.FreeLocalVariable(localVarToRemove);
+        }
+
+        public void FreeStaticVariable(AdhocSymbol symbol)
+        {
+            var staticVarToRemove = Stack.GetStaticVariableBySymbol(symbol);
+            Stack.FreeStaticVariable(staticVarToRemove);
         }
 
         public int AddScopeVariable(AdhocSymbol symbol, bool isAssignment = false, bool isStatic = false, bool isLocalDeclaration = false)
@@ -257,7 +263,9 @@ namespace GTAdhocCompiler
             {
                 if (isStatic)
                 {
-                    Stack.TryAddStaticVariable(symbol, out newVariable);
+                    bool added = Stack.TryAddStaticVariable(symbol, out newVariable);
+                    if (added)
+                        lastScope.StaticScopeVariables.Add(symbol.Name, symbol);
                 }
                 else
                 {
@@ -266,13 +274,15 @@ namespace GTAdhocCompiler
                         !Stack.HasLocalVariable(symbol) &&
                         (Stack.HasStaticVariable(symbol) || CurrentModule.IsDefinedStaticMember(symbol) || CurrentModule.IsDefinedAttributeMember(symbol)))
                     {
-                        Stack.TryAddStaticVariable(symbol, out newVariable);
+                        bool added = Stack.TryAddStaticVariable(symbol, out newVariable);
+                        if (added)
+                            lastScope.StaticScopeVariables.Add(symbol.Name, symbol);
                     }
                     else
                     {
                         bool added = Stack.TryAddLocalVariable(symbol, out newVariable);
                         if (added)
-                            lastScope.ScopeVariables.Add(symbol.Name, symbol);
+                            lastScope.LocalScopeVariables.Add(symbol.Name, symbol);
                     }
                 }
             }
@@ -299,14 +309,18 @@ namespace GTAdhocCompiler
 
                 if (isStatic || !Stack.HasLocalVariable(symbol))
                 {
-                    Stack.TryAddStaticVariable(symbol, out newVariable);
+                    bool added = Stack.TryAddStaticVariable(symbol, out newVariable);
+                    if (added)
+                        lastScope.StaticScopeVariables.Add(symbol.Name, symbol);
                 }
                 else
                 {
+                    // Variable already exists, just get the index
                     Stack.TryAddLocalVariable(symbol, out newVariable);
                 }
             }
 
+            // Grab our variable index, whether it's been added or not
             if (newVariable is LocalVariable local)
             {
                 var idx = Stack.GetLocalVariableIndex(local);

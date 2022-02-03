@@ -48,7 +48,7 @@ namespace GTAdhocCompiler
 
         public bool TryAddStaticVariable(AdhocSymbol symbol, out Variable variable)
         {
-            variable = StaticVariableStorage.Find(e => e.Symbol == symbol);
+            variable = StaticVariableStorage.Find(e => e?.Symbol == symbol);
             if (variable is null)
             {
                 var newVar = new StaticVariable() { Symbol = symbol };
@@ -113,6 +113,11 @@ namespace GTAdhocCompiler
             return LocalVariableStorage.Find(e => e?.Symbol == symbol);
         }
 
+        public StaticVariable GetStaticVariableBySymbol(AdhocSymbol symbol)
+        {
+            return StaticVariableStorage.Find(e => e?.Symbol == symbol);
+        }
+
         public int GetLocalVariableIndex(LocalVariable local)
         {
             return LocalVariableStorage.IndexOf(local);
@@ -142,6 +147,13 @@ namespace GTAdhocCompiler
             var idx = GetLocalVariableIndex(var);
             if (idx != -1)
                 LocalVariableStorage[idx] = null;
+        }
+
+        public void FreeStaticVariable(StaticVariable var)
+        {
+            var idx = GetStaticVariableIndex(var);
+            if (idx != -1)
+                StaticVariableStorage[idx] = null;
         }
     }
 }
