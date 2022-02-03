@@ -19,7 +19,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GTAdhocToolchain.Disasm", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GTAdhocToolchain.Menu", "GTAdhocToolchain.Menu\GTAdhocToolchain.Menu.csproj", "{0C920070-F880-41C5-93EB-29AFC08085F4}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GTAdhocToolchain.Menu.Resources", "MenuResources\GTAdhocToolchain.Menu.Resources.csproj", "{1E68BE7F-6AC0-4E2E-B872-101B9E79AADF}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GTAdhocToolchain.Menu.Resources", "GTAdhocToolchain.MenuResources\GTAdhocToolchain.Menu.Resources.csproj", "{1E68BE7F-6AC0-4E2E-B872-101B9E79AADF}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GTAdhocToolchain.Packaging", "GTAdhocToolchain.Packaging\GTAdhocToolchain.Packaging.csproj", "{93ABE462-D381-4E19-BB86-CCDC20D77664}"
 EndProject

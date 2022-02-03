@@ -19,7 +19,7 @@
     <ProjectReference Include="..\GTAdhocToolchain.Disasm\GTAdhocToolchain.Disasm.csproj" />
     <ProjectReference Include="..\GTAdhocToolchain.Packaging\GTAdhocToolchain.Packaging.csproj" />
     <ProjectReference Include="..\GTAdhocToolchain.Project\GTAdhocToolchain.Project.csproj" />
-    <ProjectReference Include="..\MenuResources\GTAdhocToolchain.Menu.Resources.csproj" />
+    <ProjectReference Include="..\GTAdhocToolchain.MenuResources\GTAdhocToolchain.Menu.Resources.csproj" />
   </ItemGroup>
 
   <ItemGroup>
