@@ -13,6 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\GTAdhocTolchain.Menu\GTAdhocToolchain.Menu.csproj" />
     <ProjectReference Include="..\GTAdhocToolchain.Compiler\GTAdhocToolchain.Compiler.csproj" />
     <ProjectReference Include="..\GTAdhocToolchain.CodeGen\GTAdhocToolchain.CodeGen.csproj" />
     <ProjectReference Include="..\GTAdhocToolchain.Disasm\GTAdhocToolchain.Disasm.csproj" />

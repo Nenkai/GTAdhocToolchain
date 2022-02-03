@@ -11,6 +11,7 @@ using GTAdhocToolchain.Compiler;
 using GTAdhocToolchain.CodeGen;
 using GTAdhocToolchain.Project;
 using GTAdhocToolchain.Disasm;
+using GTAdhocToolchain.Menu;
 
 namespace GTAdhocToolchain.CLI
 {
@@ -46,8 +47,10 @@ namespace GTAdhocToolchain.CLI
                 }
             }
 
-            Parser.Default.ParseArguments<BuildVerbs>(args)
+            Parser.Default.ParseArguments<BuildVerbs, MProjectToBinVerbs, MProjectToTextVerbs>(args)
             .WithParsed<BuildVerbs>(Build)
+            .WithParsed<MProjectToBinVerbs>(MProjectToBin)
+            .WithParsed<MProjectToTextVerbs>(MProjectToText)
             .WithNotParsed(HandleNotParsedArgs);
         }
 
@@ -163,6 +166,65 @@ namespace GTAdhocToolchain.CLI
 
             Logger.Error("Script build failed.");
         }
+
+        public static void MProjectToBin(MProjectToBinVerbs verbs)
+        {
+            if (verbs.Version == 0)
+            {
+                Console.WriteLine("Version 0 is not currently supported.");
+                return;
+            }
+            else if (verbs.Version > 1 || verbs.Version < 0)
+            {
+                Console.WriteLine("Version must be 0 or 1. (0 not current supported).");
+                return;
+            }
+
+            var mbin = new MBinaryIO(verbs.InputPath);
+            mNode rootNode = mbin.Read();
+
+            if (rootNode is null)
+            {
+                var mtext = new MTextIO(verbs.InputPath);
+                rootNode = mtext.Read();
+
+                if (rootNode is null)
+                {
+                    Console.WriteLine("Could not read mproject.");
+                    return;
+                }
+            }
+
+            MBinaryWriter writer = new MBinaryWriter(verbs.OutputPath);
+            writer.Version = verbs.Version;
+            writer.WriteNode(rootNode);
+
+            Console.WriteLine($"Done. Exported to '{verbs.OutputPath}'.");
+        }
+
+        public static void MProjectToText(MProjectToTextVerbs verbs)
+        {
+            var mbin = new MBinaryIO(verbs.InputPath);
+            mNode rootNode = mbin.Read();
+
+            if (rootNode is null)
+            {
+                var mtext = new MTextIO(verbs.InputPath);
+                rootNode = mtext.Read();
+
+                if (rootNode is null)
+                {
+                    Console.WriteLine("Could not read mproject.");
+                    return;
+                }
+            }
+
+            using MTextWriter writer = new MTextWriter(verbs.OutputPath);
+            writer.Debug = verbs.Debug;
+            writer.WriteNode(rootNode);
+
+            Console.WriteLine($"Done. Exported to '{verbs.OutputPath}'.");
+        }
     }
 
     [Verb("build", HelpText = "Builds a project.")]
@@ -173,5 +235,31 @@ namespace GTAdhocToolchain.CLI
 
         [Option('o', "output", Required = false, HelpText = "Output compiled scripts when compiling standalone scripts (not projects).")]
         public string OutputPath { get; set; }
+    }
+
+    [Verb("mproject-to-bin", HelpText = "Read mwidget/mproject and outputs it to a binary version of it.")]
+    public class MProjectToBinVerbs
+    {
+        [Option('i', "input", Required = true, HelpText = "Input folder.")]
+        public string InputPath { get; set; }
+
+        [Option('o', "output", Required = true, HelpText = "Output folder.")]
+        public string OutputPath { get; set; }
+
+        [Option('v', "version", Default = 1, HelpText = "Version of the binary file. Default is 1. (0 is currently unsupported, used for GT5 and under. 1 is GT6 and above.")]
+        public int Version { get; set; }
+    }
+
+    [Verb("mproject-to-text", HelpText = "Read mwidget/mproject and outputs it to a text version of it.")]
+    public class MProjectToTextVerbs
+    {
+        [Option('i', "input", Required = true, HelpText = "Input folder.")]
+        public string InputPath { get; set; }
+
+        [Option('o', "output", Required = true, HelpText = "Output folder.")]
+        public string OutputPath { get; set; }
+
+        [Option('d', "debug", HelpText = "Write debug info to the output text file. Note: This will produce a non-working text mproject file.")]
+        public bool Debug { get; set; }
     }
 }

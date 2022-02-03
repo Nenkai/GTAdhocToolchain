@@ -1,8 +1,7 @@
 {
   "profiles": {
     "GTAdhocToolchain.CLI": {
-      "commandName": "Project",
-      "commandLineArgs": "build -i C:\\Users\\nenkai\\source\\repos\\GTAdhocScripts\\project_files\\dev_runviewer.yaml"
+      "commandName": "Project"
     }
   }
 }

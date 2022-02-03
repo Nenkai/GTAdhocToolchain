@@ -15,7 +15,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GTAdhocToolchain.Project", 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GTAdhocToolchain.CLI", "GTAdhocToolchain.CLI\GTAdhocToolchain.CLI.csproj", "{F6839C1C-EE51-4CF3-BFEE-30E66F83594A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GTAdhocToolchain.Disasm", "GTAdhocToolchain.Disasm\GTAdhocToolchain.Disasm.csproj", "{68C2AC46-A202-44C6-A407-47BB2C8A1C3E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GTAdhocToolchain.Disasm", "GTAdhocToolchain.Disasm\GTAdhocToolchain.Disasm.csproj", "{68C2AC46-A202-44C6-A407-47BB2C8A1C3E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GTAdhocToolchain.Menu", "GTAdhocTolchain.Menu\GTAdhocToolchain.Menu.csproj", "{0C920070-F880-41C5-93EB-29AFC08085F4}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -51,6 +53,10 @@ Global
 		{68C2AC46-A202-44C6-A407-47BB2C8A1C3E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{68C2AC46-A202-44C6-A407-47BB2C8A1C3E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{68C2AC46-A202-44C6-A407-47BB2C8A1C3E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0C920070-F880-41C5-93EB-29AFC08085F4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0C920070-F880-41C5-93EB-29AFC08085F4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0C920070-F880-41C5-93EB-29AFC08085F4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0C920070-F880-41C5-93EB-29AFC08085F4}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
