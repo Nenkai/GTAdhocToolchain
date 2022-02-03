@@ -26,5 +26,14 @@ namespace GTAdhocToolchain.Core.Instructions
         /// When set to 1 and depth value is set, this is ignored.
         /// </summary>
         public int VariableStorageRewindIndex { get; set; }
+
+        public override void Deserialize(AdhocStream stream)
+        {
+            ModuleOrClassDepthRewindIndex = stream.ReadInt32();
+            VariableStorageRewindIndex = stream.ReadInt32();
+        }
+
+        public override string ToString()
+           => $"{InstructionType}: Depth:{ModuleOrClassDepthRewindIndex}, SetHeapSize:{VariableStorageRewindIndex}";
     }
 }

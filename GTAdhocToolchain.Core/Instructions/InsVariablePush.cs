@@ -18,5 +18,15 @@ namespace GTAdhocToolchain.Core.Instructions
         public List<AdhocSymbol> VariableSymbols { get; set; } = new();
 
         public int VariableStorageIndex { get; set; }
+
+        public override void Deserialize(AdhocStream stream)
+        {
+            VariableSymbols = stream.ReadSymbols();
+            VariableStorageIndex = stream.ReadInt32();
+        }
+
+        public override string ToString()
+            => $"{InstructionType}: {string.Join(',', VariableSymbols.Select(e => e.Name))}, PushAt:{VariableStorageIndex}";
+
     }
 }

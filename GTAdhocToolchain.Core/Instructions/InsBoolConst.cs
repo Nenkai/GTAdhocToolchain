@@ -20,5 +20,19 @@ namespace GTAdhocToolchain.Core.Instructions
         {
             Value = value;
         }
+
+        public InsBoolConst()
+        {
+
+        }
+
+        public override void Deserialize(AdhocStream stream)
+        {
+            Value = stream.ReadBoolean();
+        }
+
+        public override string ToString()
+            => $"{InstructionType}: {Value}";
+
     }
 }

@@ -21,5 +21,18 @@ namespace GTAdhocToolchain.Core.Instructions
         {
             StringCount = stringCount;
         }
+
+        public InsStringPush()
+        {
+
+        }
+
+        public override void Deserialize(AdhocStream stream)
+        {
+            StringCount = stream.ReadInt32();
+        }
+
+        public override string ToString()
+            => $"{InstructionType}: StringIndex={StringCount}";
     }
 }

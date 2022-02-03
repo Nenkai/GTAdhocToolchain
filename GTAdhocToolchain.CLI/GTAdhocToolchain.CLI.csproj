@@ -15,7 +15,12 @@
   <ItemGroup>
     <ProjectReference Include="..\GTAdhocToolchain.Compiler\GTAdhocToolchain.Compiler.csproj" />
     <ProjectReference Include="..\GTAdhocToolchain.CodeGen\GTAdhocToolchain.CodeGen.csproj" />
+    <ProjectReference Include="..\GTAdhocToolchain.Disasm\GTAdhocToolchain.Disasm.csproj" />
     <ProjectReference Include="..\GTAdhocToolchain.Project\GTAdhocToolchain.Project.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Properties\" />
   </ItemGroup>
 
 </Project>

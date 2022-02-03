@@ -18,5 +18,19 @@ namespace GTAdhocToolchain.Core.Instructions
         {
             Value = value;
         }
+
+        public InsFloatConst()
+        {
+
+        }
+
+        public override void Deserialize(AdhocStream stream)
+        {
+            Value = stream.ReadSingle();
+        }
+
+
+        public override string ToString()
+            => $"{InstructionType}: {Value}";
     }
 }

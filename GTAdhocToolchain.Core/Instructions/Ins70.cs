@@ -6,11 +6,11 @@ using System.Threading.Tasks;
 
 namespace GTAdhocToolchain.Core.Instructions
 {
-    public class InsTryCatch : InstructionBase
+    public class Ins70 : InstructionBase
     {
-        public override AdhocInstructionType InstructionType => AdhocInstructionType.TRY_CATCH;
+        public override AdhocInstructionType InstructionType => AdhocInstructionType.UNK_70;
 
-        public override string InstructionName => "TRY_CATCH";
+        public override string InstructionName => "UNK_70";
 
         public int InstructionIndex { get; set; }
 
@@ -20,6 +20,6 @@ namespace GTAdhocToolchain.Core.Instructions
         }
 
         public override string ToString()
-           => $"{InstructionType}: {InstructionIndex}";
+            => $"{InstructionType}: Jump To {InstructionIndex}";
     }
 }

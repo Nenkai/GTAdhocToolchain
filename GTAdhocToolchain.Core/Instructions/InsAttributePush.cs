@@ -16,5 +16,20 @@ namespace GTAdhocToolchain.Core.Instructions
         public override string InstructionName => "ATTRIBUTE_PUSH";
 
         public List<AdhocSymbol> AttributeSymbols { get; set; } = new();
+
+        public override void Deserialize(AdhocStream stream)
+        {
+            if (stream.Version <= 5)
+            {
+                AdhocSymbol attrName = stream.ReadSymbol();
+                AttributeSymbols = new List<AdhocSymbol>(1);
+                AttributeSymbols.Add(attrName);
+            }
+            else
+                AttributeSymbols = stream.ReadSymbols();
+        }
+
+        public override string ToString()
+            => $"{InstructionType}: {string.Join(',', AttributeSymbols.Select(e => e.Name))}";
     }
 }

@@ -21,5 +21,19 @@ namespace GTAdhocToolchain.Core.Instructions
         {
             Operator = opSymbol;
         }
+
+        public InsUnaryAssignOperator()
+        {
+
+        }
+
+        public override void Deserialize(AdhocStream stream)
+        {
+            Operator = stream.ReadSymbol();
+        }
+
+        public override string ToString()
+            => $"{InstructionType}: {Utils.OperatorNameToPunctuator(Operator.Name)} ({Operator.Name})";
+
     }
 }

@@ -10,6 +10,7 @@ using NLog;
 using GTAdhocToolchain.Compiler;
 using GTAdhocToolchain.CodeGen;
 using GTAdhocToolchain.Project;
+using GTAdhocToolchain.Disasm;
 
 namespace GTAdhocToolchain.CLI
 {
@@ -21,9 +22,33 @@ namespace GTAdhocToolchain.CLI
         {
             Console.WriteLine("[-- GTAdhocToolchain by Nenkai#9075 -- ]");
 
+            if (args.Length == 1)
+            {
+                if (args[0].ToLower().EndsWith(".adc"))
+                {
+                    AdhocFile adc = null;
+                    bool withOffset = true;
+                    try
+                    {
+                        adc = AdhocFile.ReadFromFile(args[0]);
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine($"Errored while reading: {e.Message}");
+                    }
+
+                    adc.Disassemble(Path.ChangeExtension(args[0], ".ad.diss"), withOffset);
+
+                    if (adc.Version == 12)
+                        adc.PrintStrings(Path.ChangeExtension(args[0], ".strings"));
+
+                    return;
+                }
+            }
+
             Parser.Default.ParseArguments<BuildVerbs>(args)
-                .WithParsed<BuildVerbs>(Build)
-                .WithNotParsed(HandleNotParsedArgs);
+            .WithParsed<BuildVerbs>(Build)
+            .WithNotParsed(HandleNotParsedArgs);
         }
 
         public static void WatchAndCompile(string projectDir, string input, string output)

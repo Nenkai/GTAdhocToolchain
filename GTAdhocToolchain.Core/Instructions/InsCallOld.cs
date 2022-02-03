@@ -9,20 +9,20 @@ namespace GTAdhocToolchain.Core.Instructions
     /// <summary>
     /// Represents a function or method call. Will pop the amount of provided arguments from the stack, plus the function object itself. (Arg Count + 1).
     /// </summary>
-    public class InsCall : InstructionBase
+    public class InsCallOld : InstructionBase
     {
-        public override AdhocInstructionType InstructionType => AdhocInstructionType.CALL;
+        public override AdhocInstructionType InstructionType => AdhocInstructionType.CALL_OLD;
 
-        public override string InstructionName => "CALL";
+        public override string InstructionName => "CALL_OLD";
 
         public int ArgumentCount { get; set; }
 
-        public InsCall(int argumentCount)
+        public InsCallOld(int argumentCount)
         {
             ArgumentCount = argumentCount;
         }
 
-        public InsCall()
+        public InsCallOld()
         {
 
         }
@@ -31,7 +31,6 @@ namespace GTAdhocToolchain.Core.Instructions
         {
             ArgumentCount = stream.ReadInt32();
         }
-
 
         public override string ToString()
             => $"{InstructionType}: ArgCount={ArgumentCount}";

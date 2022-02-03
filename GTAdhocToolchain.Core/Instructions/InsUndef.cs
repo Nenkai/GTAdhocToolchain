@@ -16,5 +16,13 @@ namespace GTAdhocToolchain.Core.Instructions
         public override string InstructionName => "UNDEF";
 
         public List<AdhocSymbol> Symbols { get; set; } = new();
+
+        public override void Deserialize(AdhocStream stream)
+        {
+            Symbols = stream.ReadSymbols();
+        }
+
+        public override string ToString()
+            => $"{InstructionType}: {string.Join(",", Symbols.Select(e => e.Name))}";
     }
 }

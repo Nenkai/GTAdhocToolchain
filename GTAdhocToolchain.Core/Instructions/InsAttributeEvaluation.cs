@@ -16,5 +16,13 @@ namespace GTAdhocToolchain.Core.Instructions
         public override string InstructionName => "ATTRIBUTE_EVAL";
 
         public List<AdhocSymbol> AttributeSymbols { get; set; } = new();
+
+        public override void Deserialize(AdhocStream stream)
+        {
+            AttributeSymbols = stream.ReadSymbols();
+        }
+
+        public override string ToString()
+            => $"{InstructionType}: {string.Join(',', AttributeSymbols.Select(e => e.Name))}";
     }
 }

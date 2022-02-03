@@ -17,5 +17,18 @@ namespace GTAdhocToolchain.Core.Instructions
         {
             Name = name;
         }
+
+        public InsStaticDefine()
+        {
+
+        }
+
+        public override void Deserialize(AdhocStream stream)
+        {
+            Name = stream.ReadSymbol();
+        }
+
+        public override string ToString()
+            => $"{InstructionType}: {Name.Name}";
     }
 }

@@ -4,6 +4,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
+using Syroot.BinaryData;
+
 namespace GTAdhocToolchain.Core.Instructions
 {
     /// <summary>
@@ -16,5 +18,13 @@ namespace GTAdhocToolchain.Core.Instructions
         public override AdhocInstructionType InstructionType => AdhocInstructionType.ASSIGN;
 
         public override string InstructionName => "ASSIGN";
+
+        public override void Deserialize(AdhocStream strema)
+        {
+
+        }
+
+        public override string ToString()
+            => $"{InstructionType}";
     }
 }

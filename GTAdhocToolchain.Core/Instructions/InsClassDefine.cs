@@ -20,5 +20,14 @@ namespace GTAdhocToolchain.Core.Instructions
         {
             
         }
+
+        public override void Deserialize(AdhocStream stream)
+        {
+            Name = stream.ReadSymbol();
+            ExtendsFrom = stream.ReadSymbols();
+        }
+
+        public override string ToString()
+            => $"{InstructionType}: {Name.Name} extends {string.Join(",", ExtendsFrom.Select(e => e.Name))}";
     }
 }

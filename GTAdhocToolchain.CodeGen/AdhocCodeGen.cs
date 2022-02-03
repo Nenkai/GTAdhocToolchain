@@ -115,7 +115,7 @@ namespace GTAdhocToolchain.CodeGen
 
         private void WriteInstruction(InstructionBase instruction)
         {
-            stream.WriteInt32(instruction.LineNumber);
+            stream.WriteInt32((int)instruction.LineNumber);
             stream.WriteByte((byte)instruction.InstructionType);
 
             switch (instruction.InstructionType)

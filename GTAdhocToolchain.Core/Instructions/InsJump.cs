@@ -16,5 +16,13 @@ namespace GTAdhocToolchain.Core.Instructions
         public override string InstructionName => "JUMP";
 
         public int JumpInstructionIndex { get; set; }
+
+        public override void Deserialize(AdhocStream stream)
+        {
+            JumpInstructionIndex = stream.ReadInt32();
+        }
+
+        public override string ToString()
+           => $"{InstructionType}: JumpTo={JumpInstructionIndex}";
     }
 }

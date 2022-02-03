@@ -20,5 +20,18 @@ namespace GTAdhocToolchain.Core.Instructions
         {
             FileName = fileName;
         }
+
+        public InsSourceFile()
+        {
+
+        }
+
+        public override void Deserialize(AdhocStream stream)
+        {
+            FileName = stream.ReadSymbol();
+        }
+
+        public override string ToString()
+            => $"{InstructionType}: {FileName.Name}";
     }
 }

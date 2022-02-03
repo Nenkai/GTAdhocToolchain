@@ -16,5 +16,14 @@ namespace GTAdhocToolchain.Core.Instructions
         public override AdhocInstructionType InstructionType => AdhocInstructionType.POP;
 
         public override string InstructionName => "POP";
+
+        public override void Deserialize(AdhocStream stream)
+        {
+            
+        }
+
+        public override string ToString()
+            => $"{InstructionType}";
+
     }
 }

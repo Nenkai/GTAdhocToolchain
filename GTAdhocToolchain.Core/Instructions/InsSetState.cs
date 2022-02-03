@@ -20,5 +20,18 @@ namespace GTAdhocToolchain.Core.Instructions
         {
             State = state;
         }
+
+        public InsSetState()
+        {
+
+        }
+
+        public override void Deserialize(AdhocStream stream)
+        {
+            State = (AdhocRunState)stream.ReadByte();
+        }
+
+        public override string ToString()
+            => $"{InstructionType}: State={State} ({(byte)State})";
     }
 }

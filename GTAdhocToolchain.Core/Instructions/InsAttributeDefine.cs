@@ -21,5 +21,18 @@ namespace GTAdhocToolchain.Core.Instructions
         {
             AttributeName = attrSymbol;
         }
+
+        public InsAttributeDefine()
+        {
+
+        }
+
+        public override void Deserialize(AdhocStream stream)
+        {
+            AttributeName = stream.ReadSymbol();
+        }
+
+        public override string ToString()
+            => $"{InstructionType}: {AttributeName.Name}";
     }
 }

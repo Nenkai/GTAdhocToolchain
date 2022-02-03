@@ -1,6 +1,8 @@
 ﻿using GTAdhocToolchain.Core.Instructions;
 using GTAdhocToolchain.Core.Variables;
 
+using System.Text;
+
 namespace GTAdhocToolchain.Core
 {
     /// <summary>
@@ -83,6 +85,9 @@ namespace GTAdhocToolchain.Core
         /// <returns></returns>
         public LoopContext GetLastLoop() => CurrentLoops.Peek();
 
+        public uint InstructionCountOffset { get; set; }
+        public bool HasDebuggingInformation { get; set; }
+
         public void SetSourcePath(AdhocSymbolMap symbolMap, string path)
         {
             SourceFilePath = symbolMap.RegisterSymbol(path);
@@ -96,7 +101,7 @@ namespace GTAdhocToolchain.Core
         /// <exception cref="Exception"></exception>
         public void AddInstruction(InstructionBase ins, int lineNumber)
         {
-            ins.LineNumber = lineNumber;
+            ins.LineNumber = (uint)lineNumber;
             Instructions.Add(ins);
 
             switch (ins.InstructionType)
@@ -368,6 +373,143 @@ namespace GTAdhocToolchain.Core
             }
 
             return null;
+        }
+
+        public void Read(AdhocStream stream)
+        {
+            if (Version < 8)
+            {
+                HasDebuggingInformation = true; // Not in code paths, but its forced to read
+                SourceFilePath = stream.ReadSymbol();
+
+                if (Version > 3)
+                {
+                    uint argCount = stream.ReadUInt32();
+                    for (int i = 0; i < argCount; i++)
+                        CapturedCallbackVariables.Add(stream.ReadSymbol());
+                }
+            }
+            else
+            {
+                HasDebuggingInformation = stream.ReadBoolean();
+                Version = stream.ReadByte();
+
+                if (Version != 8) // Why PDI? Changed your mind after 8?
+                {
+                    if (HasDebuggingInformation)
+                        SourceFilePath = stream.ReadSymbol();
+                }
+
+
+                if (Version >= 12)
+                {
+                    byte unk = stream.Read1Byte();
+                }
+
+                uint argCount = stream.ReadUInt32();
+
+                if (argCount > 0)
+                {
+                    for (int i = 0; i < argCount; i++)
+                    {
+                        var symbol = stream.ReadSymbol();
+                        symbol.Id = stream.ReadInt32();
+                        FunctionParameters.Add(symbol);
+                    }
+                }
+
+                uint funcArgs = stream.ReadUInt32();
+                if (funcArgs > 0)
+                {
+                    for (int i = 0; i < funcArgs; i++)
+                    {
+                        var symbol = stream.ReadSymbol();
+                        symbol.Id = stream.ReadInt32();
+                        CapturedCallbackVariables.Add(symbol);
+                        
+                    }
+                }
+
+                uint unkVarHeapIndex = stream.ReadUInt32();
+            }
+
+            if (Version <= 10)
+            {
+                Stack.LocalVariableStorageSize = stream.ReadInt32();
+                Stack.StackSize = stream.ReadInt32();
+                Stack.StaticVariableStorageSize = Stack.LocalVariableStorageSize;
+            }
+            else
+            {
+
+                Stack.StackSize = stream.ReadInt32();
+                Stack.LocalVariableStorageSize = stream.ReadInt32();
+                Stack.StaticVariableStorageSize = stream.ReadInt32();
+            }
+
+            InstructionCountOffset = (uint)stream.Position;
+            uint instructionCount = stream.ReadUInt32();
+            if (instructionCount < 0x40000000)
+            {
+                for (int i = 0; i < instructionCount; i++)
+                {
+                    uint originalLineNumber = 0;
+                    if (HasDebuggingInformation)
+                        originalLineNumber = stream.ReadUInt32();
+
+                    AdhocInstructionType type = (AdhocInstructionType)stream.ReadByte();
+
+                    ReadInstruction(stream, originalLineNumber, type);
+                }
+            }
+        }
+
+        public void ReadInstruction(AdhocStream stream, uint lineNumber, AdhocInstructionType type)
+        {
+            InstructionBase ins = InstructionBase.GetByType(type);
+            if (ins != null)
+            {
+                ins.InstructionOffset = (uint)stream.Position + 4;
+                ins.LineNumber = lineNumber;
+                ins.Deserialize(stream);
+                Instructions.Add(ins);
+            }
+        }
+
+        public string Dissasemble()
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.Append("(");
+            if (FunctionParameters.Count != 0)
+            {
+                for (int i = 0; i < FunctionParameters.Count; i++)
+                {
+                    sb.Append(FunctionParameters[i].Name).Append($"[{FunctionParameters[i].Id}]");
+                    if (i != FunctionParameters.Count - 1)
+                        sb.Append(", ");
+                }
+            }
+
+            sb.Append(")");
+
+            if (CapturedCallbackVariables.Count != 0)
+            {
+                sb.Append("[");
+                for (int i = 0; i < CapturedCallbackVariables.Count; i++)
+                {
+                    sb.Append(CapturedCallbackVariables[i].Name).Append($"[{CapturedCallbackVariables[i].Id}]");
+                    if (i != CapturedCallbackVariables.Count - 1)
+                        sb.Append(", ");
+                }
+                sb.Append("]");
+            }
+
+            sb.AppendLine();
+
+            sb.Append("  > Instruction Count: ").Append(Instructions.Count).Append(" (").Append(InstructionCountOffset.ToString("X2")).Append(')').AppendLine();
+            sb.Append($"  > Stack Size: {Stack.StackSize} - Variable Heap Size: {Stack.LocalVariableStorageSize} - Variable Heap Size Static: {(Version < 10 ? "=Variable Heap Size" : $"{Stack.StaticVariableStorageSize}")}");
+
+            return sb.ToString();
         }
     }
 }

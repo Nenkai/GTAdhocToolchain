@@ -9,25 +9,27 @@ namespace GTAdhocToolchain.Core.Instructions
     /// <summary>
     /// Pushes a map/dictionary/kv collection const into the variable storage.
     /// </summary>
-    public class InsMapConst : InstructionBase
+    public class InsMapConstOld : InstructionBase
     {
         public readonly static InsMapConst Default = new();
 
-        public override AdhocInstructionType InstructionType => AdhocInstructionType.MAP_CONST;
+        public override AdhocInstructionType InstructionType => AdhocInstructionType.MAP_CONST_OLD;
 
-        public override string InstructionName => "MAP_CONST";
+        public override string InstructionName => "MAP_CONST_OLD";
 
-        public InsMapConst()
+        public int Value { get; set; }
+
+        public InsMapConstOld()
         {
             
         }
 
         public override void Deserialize(AdhocStream stream)
         {
-            
+            Value = stream.ReadInt32();
         }
 
         public override string ToString()
-           => InstructionName.ToString();
+           => $"{InstructionType}: {Value}";
     }
 }

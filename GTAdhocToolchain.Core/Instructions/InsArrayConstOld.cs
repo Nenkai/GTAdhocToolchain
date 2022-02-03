@@ -11,20 +11,20 @@ namespace GTAdhocToolchain.Core.Instructions
     /// <summary>
     /// Pushes an array const into the variable storage.
     /// </summary>
-    public class InsArrayConst : InstructionBase
+    public class InsArrayConstOld : InstructionBase
     {
-        public override AdhocInstructionType InstructionType => AdhocInstructionType.ARRAY_CONST;
+        public override AdhocInstructionType InstructionType => AdhocInstructionType.ARRAY_CONST_OLD;
 
-        public override string InstructionName => "ARRAY_CONST";
+        public override string InstructionName => "ARRAY_CONST_OLD";
 
         public uint ArraySize { get; set; }
 
-        public InsArrayConst(uint size)
+        public InsArrayConstOld(uint size)
         {
             ArraySize = size;
         }
 
-        public InsArrayConst()
+        public InsArrayConstOld()
         {
 
         }

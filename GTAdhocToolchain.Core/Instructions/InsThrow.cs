@@ -16,5 +16,13 @@ namespace GTAdhocToolchain.Core.Instructions
         public override AdhocInstructionType InstructionType => AdhocInstructionType.THROW;
 
         public override string InstructionName => "THROW";
+
+        public override void Deserialize(AdhocStream stream)
+        {
+            
+        }
+
+        public override string ToString()
+            => $"{InstructionType}";
     }
 }

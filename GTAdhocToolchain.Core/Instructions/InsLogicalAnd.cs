@@ -19,5 +19,13 @@ namespace GTAdhocToolchain.Core.Instructions
         /// Index to jump to if the first operand before the comparison matches.
         /// </summary>
         public int InstructionJumpIndex { get; set; }
+
+        public override void Deserialize(AdhocStream stream)
+        {
+            InstructionJumpIndex = stream.ReadInt32();
+        }
+
+        public override string ToString()
+           => $"{InstructionType}: Jump={InstructionJumpIndex}";
     }
 }

@@ -16,5 +16,14 @@ namespace GTAdhocToolchain.Core.Instructions
         public override AdhocInstructionType InstructionType => AdhocInstructionType.EVAL;
 
         public override string InstructionName => "EVAL";
+
+        public override void Deserialize(AdhocStream stream)
+        {
+            
+        }
+
+        public override string ToString()
+            => $"{InstructionType}";
+
     }
 }

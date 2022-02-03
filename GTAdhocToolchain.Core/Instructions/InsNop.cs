@@ -6,16 +6,13 @@ using System.Threading.Tasks;
 
 namespace GTAdhocToolchain.Core.Instructions
 {
-    /// <summary>
-    /// Pops 1 pointer off the stack.
-    /// </summary>
-    public class InsPopOld : InstructionBase
+    public class InsNop : InstructionBase
     {
-        public readonly static InsPopOld Default = new();
+        public static readonly InsNop Empty = new();
 
-        public override AdhocInstructionType InstructionType => AdhocInstructionType.POP_OLD;
+        public override AdhocInstructionType InstructionType => AdhocInstructionType.NOP;
 
-        public override string InstructionName => "POP_OLD";
+        public override string InstructionName => "NOP";
 
         public override void Deserialize(AdhocStream stream)
         {

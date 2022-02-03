@@ -14,5 +14,19 @@ namespace GTAdhocToolchain.Core.Instructions
         public override AdhocInstructionType InstructionType => AdhocInstructionType.METHOD_CONST;
 
         public override string InstructionName => "METHOD_CONST";
+
+        public override void Deserialize(AdhocStream stream)
+        {
+            CodeFrame.Read(stream);
+        }
+
+        public override string ToString()
+        {
+            var sb = new StringBuilder();
+            sb.Append(InstructionType.ToString()).Append(" - ");
+            sb.Append(CodeFrame.Dissasemble());
+            return sb.ToString();
+        }
+
     }
 }

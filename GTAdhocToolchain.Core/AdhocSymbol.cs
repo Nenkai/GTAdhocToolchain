@@ -17,6 +17,11 @@ namespace GTAdhocToolchain.Core
             Name = name;
         }
 
+        public AdhocSymbol(string name)
+        {
+            Name = name;
+        }
+
         public override string ToString()
         {
             return $"({Id}) {Name}";

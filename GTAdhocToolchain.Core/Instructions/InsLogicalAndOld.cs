@@ -7,13 +7,13 @@ using System.Threading.Tasks;
 namespace GTAdhocToolchain.Core.Instructions
 {
     /// <summary>
-    /// Logical or instruction.
+    /// Logical and instruction.
     /// </summary>
-    public class InsLogicalOr : InstructionBase
+    public class InsLogicalAndOld : InstructionBase
     {
-        public override AdhocInstructionType InstructionType => AdhocInstructionType.LOGICAL_OR;
+        public override AdhocInstructionType InstructionType => AdhocInstructionType.LOGICAL_AND_OLD;
 
-        public override string InstructionName => "LOGICAL_OR";
+        public override string InstructionName => "LOGICAL_AND_OLD";
 
         /// <summary>
         /// Index to jump to if the first operand before the comparison matches.
