@@ -207,7 +207,7 @@ namespace GTAdhocCompiler
 
                 case AdhocInstructionType.SET_STATE:
                     InsSetState state = ins as InsSetState;
-                    if (state.State <= AdhocRunState.RUN)
+                    if (state.State == AdhocRunState.RETURN || state.State == AdhocRunState.YIELD)
                         Stack.StackStorageCounter--;
                     break;
                 // These have no effect on stack
