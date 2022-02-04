@@ -416,8 +416,7 @@ namespace GTAdhocToolchain.Core
                     for (int i = 0; i < argCount; i++)
                     {
                         var symbol = stream.ReadSymbol();
-                        symbol.Id = stream.ReadInt32();
-                        FunctionParameters.Add(symbol);
+                        FunctionParameters.Add(new AdhocSymbol(stream.ReadInt32(), symbol.Name));
                     }
                 }
 
@@ -427,8 +426,7 @@ namespace GTAdhocToolchain.Core
                     for (int i = 0; i < funcArgs; i++)
                     {
                         var symbol = stream.ReadSymbol();
-                        symbol.Id = stream.ReadInt32();
-                        CapturedCallbackVariables.Add(symbol);
+                        CapturedCallbackVariables.Add(new AdhocSymbol(stream.ReadInt32(), symbol.Name));
                         
                     }
                 }

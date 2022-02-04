@@ -70,7 +70,10 @@ namespace GTAdhocToolchain.Core
         public AdhocSymbol ReadSymbol()
         {
             if (Version <= 8)
-                return new AdhocSymbol(this.ReadString(StringCoding.Int16CharCount));
+            {
+                var symbStr = this.ReadString(StringCoding.Int16CharCount);
+                return new AdhocSymbol(symbStr);
+            }
             else
             {
                 uint symbolTableIdx = (uint)DecodeBitsAndAdvance();

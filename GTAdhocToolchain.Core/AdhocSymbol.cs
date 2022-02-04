@@ -15,6 +15,7 @@ namespace GTAdhocToolchain.Core
         {
             Id = id;
             Name = name;
+
         }
 
         public AdhocSymbol(string name)

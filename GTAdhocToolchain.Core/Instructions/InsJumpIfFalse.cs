@@ -23,6 +23,6 @@ namespace GTAdhocToolchain.Core.Instructions
         }
 
         public override string ToString()
-            => $"{InstructionType}: JumpTo={JumpIndex}";
+            => $"{InstructionType}: Jump To Func Ins {JumpIndex}";
     }
 }

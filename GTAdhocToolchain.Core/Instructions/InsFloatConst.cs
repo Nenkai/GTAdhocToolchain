@@ -31,6 +31,6 @@ namespace GTAdhocToolchain.Core.Instructions
 
 
         public override string ToString()
-            => $"{InstructionType}: {Value}";
+            => $"{InstructionType}: Value={Value}";
     }
 }
