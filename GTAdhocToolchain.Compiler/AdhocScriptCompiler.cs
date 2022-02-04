@@ -15,7 +15,8 @@ namespace GTAdhocToolchain.Compiler
     {
         public AdhocSymbolMap SymbolMap { get; set; } = new();
 
-        public Stack<AdhocModule> Modules { get; set; } = new();
+        public Stack<AdhocModule> ModuleStack { get; set; } = new();
+        public Dictionary<string, AdhocModule> DefinedModules { get; set; } = new();
 
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
@@ -24,7 +25,7 @@ namespace GTAdhocToolchain.Compiler
         public AdhocScriptCompiler()
         {
             var topLevelModule = new AdhocModule();
-            Modules.Push(topLevelModule); // Top Level Module
+            ModuleStack.Push(topLevelModule); // Top Level Module
             this.CurrentModule = topLevelModule;
         }
 
@@ -313,6 +314,7 @@ namespace GTAdhocToolchain.Compiler
 
             Logger.Debug($"L{id.Location.Start.Line} - Compiling {(isModule ? "module" : "class")} '{id.Name}'");
             AdhocModule moduleOrClass = EnterModuleOrClass(frame, body);
+            DefinedModules.TryAdd(id.Name, moduleOrClass);
 
             if (isModule)
             {
@@ -747,6 +749,12 @@ namespace GTAdhocToolchain.Compiler
             subroutine.CodeFrame.ParentFrame = this;
             subroutine.CodeFrame.CurrentModule = frame.CurrentModule;
 
+            if (isMethod)
+            {
+                if (!frame.CurrentModule.DefineMethod(subroutine.Name))
+                    ThrowCompilationError(id, "Method name already defined in this scope.");
+            }
+
             foreach (Expression param in subParams)
             {
                 if (param.Type == Nodes.Identifier)
@@ -942,6 +950,25 @@ namespace GTAdhocToolchain.Compiler
 
             importIns.ImportNamespaceParts.Add(namespaceSymbol);
             importIns.ModuleValue = value;
+
+            /* Imports actually copies the static members from the target */
+            if (import.Target.Name == "*")
+            {
+                if (DefinedModules.TryGetValue(fullImportNamespace, out AdhocModule mod))
+                {
+                    foreach (var memberSymbol in mod.GetAllMembers())
+                        frame.Stack.AddStaticVariable(new StaticVariable() { Symbol = memberSymbol });
+                }
+                else
+                {
+                    // TODO
+                    frame.Stack.AddStaticVariable(null);
+                }
+            }
+            else
+            {
+                frame.Stack.AddStaticVariable(new StaticVariable() { Symbol = value });
+            }
 
             frame.AddInstruction(importIns, import.Location.Start.Line);
         }
@@ -2201,7 +2228,7 @@ namespace GTAdhocToolchain.Compiler
             frame.CurrentScopes.Push(scope);
 
             AdhocModule newModule = new AdhocModule();
-            Modules.Push(newModule);
+            ModuleStack.Push(newModule);
             frame.CurrentModule = newModule;
 
             return newModule;
@@ -2246,7 +2273,7 @@ namespace GTAdhocToolchain.Compiler
                 if (isModuleLeave)
                 {
                     leave.VariableStorageRewindIndex = 1;
-                    leave.ModuleOrClassDepthRewindIndex = Modules.Count - 1;
+                    leave.ModuleOrClassDepthRewindIndex = ModuleStack.Count - 1;
                 }
                 else
                 {
@@ -2260,8 +2287,8 @@ namespace GTAdhocToolchain.Compiler
         private void LeaveModuleOrClass(AdhocCodeFrame frame)
         {
             LeaveScope(frame, isModuleLeave: true);
-            Modules.Pop();
-            frame.CurrentModule = Modules.Peek();
+            ModuleStack.Pop();
+            frame.CurrentModule = ModuleStack.Peek();
         }
 
         /// <summary>

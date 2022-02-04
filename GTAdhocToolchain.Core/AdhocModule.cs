@@ -14,12 +14,23 @@ namespace GTAdhocToolchain.Core
 
         public List<AdhocSymbol> DefinedAttributeMembers { get; set; } = new();
 
+        public List<AdhocSymbol> DefinedMethods { get; set; } = new();
+
         public bool DefineStatic(AdhocSymbol symbol)
         {
             if (DefinedStaticVariables.Contains(symbol))
                 return false;
 
             DefinedStaticVariables.Add(symbol);
+            return true;
+        }
+
+        public bool DefineMethod(AdhocSymbol symbol)
+        {
+            if (DefinedMethods.Contains(symbol))
+                return false;
+
+            DefinedMethods.Add(symbol);
             return true;
         }
 
@@ -30,6 +41,11 @@ namespace GTAdhocToolchain.Core
 
             DefinedAttributeMembers.Add(symbol);
             return true;
+        }
+
+        public IEnumerable<AdhocSymbol> GetAllMembers()
+        {
+            return DefinedMethods.Concat(DefinedAttributeMembers);
         }
 
         public bool IsDefinedStaticMember(AdhocSymbol symbol)
