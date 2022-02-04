@@ -7,6 +7,9 @@ using System.Threading.Tasks;
 using System.IO;
 using System.IO.Compression;
 using Syroot.BinaryData;
+using ICSharpCode.SharpZipLib.Zip.Compression;
+
+using ICSharpCodeDeflater = ICSharpCode.SharpZipLib.Zip.Compression.Deflater;
 
 namespace GTAdhocToolchain.Packaging
 {
@@ -50,19 +53,18 @@ namespace GTAdhocToolchain.Packaging
                 Directory.CreateDirectory(outDir + Path.GetDirectoryName(file.ProjectFileName));
 
                 stream.Position = (int)file.CompressedDataOffset;
+                byte[] compressed = new byte[(int)file.CompressedDataSize];
+                stream.Read(compressed, 0, (int)compressed.Length);
 
-                int uncompressedSize;
+                Inflater inflater = new Inflater(noHeader: true);
+                inflater.SetInput(compressed, 0, (int)file.CompressedDataSize);
+                int uncompressedSize = inflater.Inflate(buffer);
 
-                using (var ds = new DeflateStream(stream, CompressionMode.Decompress, leaveOpen: true))
-                {
-                    uncompressedSize = ds.Read(buffer, 0, buffer.Length);
-
-                    using (var output = new FileStream(outDir + file.ProjectFileName, FileMode.Create))
-                        output.Write(buffer, 0, uncompressedSize);
-                }
+                using (var output = new FileStream(outDir + file.ProjectFileName, FileMode.Create))
+                    output.Write(buffer, 0, uncompressedSize);
 
                 Console.WriteLine($"Extracted: {file.RawFileName}");
-                Array.Clear(buffer, 0, uncompressedSize);
+                Array.Clear(buffer, 0, buffer.Length);
             }
         }
 
