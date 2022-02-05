@@ -20,7 +20,7 @@ namespace GTAdhocToolchain.Compiler
 
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
-        public int Version { get; set; }
+        public HashSet<string> PostCompilationWarnings = new();
 
         public AdhocScriptCompiler()
         {
@@ -52,7 +52,10 @@ namespace GTAdhocToolchain.Compiler
             // Script done.
             this.AddInstruction(new InsSetState(AdhocRunState.EXIT), 0);
 
+            PrintPostCompilationWarnings();
+
             Logger.Info($"Script successfully compiled.");
+
         }
 
         /// <summary>
@@ -587,18 +590,11 @@ namespace GTAdhocToolchain.Compiler
             frame.AddInstruction(attrIns, foreachStatement.Right.Location.Start.Line);
 
             // Assign it to a temporary value for the iteration
-            string itorVariable = $"in#{SymbolMap.TempVariableCounter++}";
-            Identifier itorIdentifier = new Identifier(itorVariable)
-            {
-                Location = foreachStatement.Right.Location,
-            };
-
-            InsertVariablePush(frame, itorIdentifier, true);
-            InsertAssignPop(frame);
+            AdhocSymbol itorIdentifier = InsertNewLocalVariable(frame, $"in#{SymbolMap.TempVariableCounter++}", foreachStatement.Right.Location);
 
             // Test - fetch_next returns whether the iterator is done or not
             int testInsIndex = frame.GetLastInstructionIndex();
-            InsertVariableEval(frame, itorIdentifier);
+            InsertVariableEvalFromSymbol(frame, itorIdentifier);
             InsAttributeEvaluation fetchNextIns = new InsAttributeEvaluation();
             fetchNextIns.AttributeSymbols.Add(SymbolMap.RegisterSymbol("fetch_next"));
             frame.AddInstruction(fetchNextIns, foreachStatement.Right.Location.Start.Line);
@@ -607,7 +603,7 @@ namespace GTAdhocToolchain.Compiler
             frame.AddInstruction(exitJump, 0);
 
             // Entering body, but we need to get the iterator's value into our declared variable, equivalent to *iterator
-            InsertVariableEval(frame, itorIdentifier);
+            InsertVariableEvalFromSymbol(frame, itorIdentifier);
             frame.AddInstruction(InsEval.Default, 0);
 
             if (foreachStatement.Left is not VariableDeclaration)
@@ -644,12 +640,7 @@ namespace GTAdhocToolchain.Compiler
             SwitchContext switchCtx = EnterSwitch(frame, switchStatement);
 
             // Create a label for the temporary switch variable
-            string tmpCaseVariable = $"case#{SymbolMap.TempVariableCounter++}";
-            AdhocSymbol labelSymb = InsertVariablePush(frame, new Identifier(tmpCaseVariable), true);
-            InsertAssignPop(frame);
-
-            LocalVariable caseVariable = frame.Stack.GetLocalVariableBySymbol(labelSymb);
-            int caseVariableStoreIdx = frame.Stack.GetLocalVariableIndex(caseVariable);
+            AdhocSymbol caseSymb = InsertNewLocalVariable(frame, $"case#{SymbolMap.TempVariableCounter++}");
 
             Dictionary<SwitchCase, InsJumpIfTrue> caseBodyJumps = new();
             InsJump defaultJump = null;
@@ -662,10 +653,7 @@ namespace GTAdhocToolchain.Compiler
                 if (swCase.Test != null) // Actual case
                 {
                     // Get temp variable
-                    InsVariableEvaluation tempVar = new InsVariableEvaluation();
-                    tempVar.VariableSymbols.Add(labelSymb);
-                    tempVar.VariableStorageIndex = caseVariableStoreIdx;
-                    frame.AddInstruction(tempVar, swCase.Location.Start.Line);
+                    InsertVariableEvalFromSymbol(frame, caseSymb);
 
                     // Write what we are comparing to 
                     CompileExpression(frame, swCase.Test);
@@ -735,7 +723,7 @@ namespace GTAdhocToolchain.Compiler
                 CompileSubroutine(frame, funcDecl, funcDecl.Body, funcDecl.Id, funcDecl.Params, isMethod: false);
         }
 
-        public void CompileSubroutine(AdhocCodeFrame frame, Node parentNode, Node body, Identifier id, NodeList<Expression> subParams, bool isMethod)
+        public void CompileSubroutine(AdhocCodeFrame frame, Node parentNode, Node body, Identifier id, NodeList<Expression> subParams, bool isMethod = false, bool isAsync = false)
         {
             if (id is null)
                 ThrowCompilationError(parentNode, "Expected subroutine to have an identifier.");
@@ -1046,6 +1034,9 @@ namespace GTAdhocToolchain.Compiler
                 case Nodes.YieldExpression:
                     CompileYield(frame, exp as YieldExpression);
                     break;
+                case Nodes.AwaitExpression:
+                    CompileAwait(frame, exp as AwaitExpression);
+                    break;
                 default:
                     ThrowCompilationError(exp, $"Expression {exp.Type} not supported");
                     break;
@@ -1063,12 +1054,35 @@ namespace GTAdhocToolchain.Compiler
             frame.AddInstruction(new InsSetState(AdhocRunState.YIELD), 0);
         }
 
+        private void CompileAwait(AdhocCodeFrame frame, AwaitExpression awaitExpr)
+        {
+            var awaitStart = new StaticMemberExpression(new Identifier("System"), new Identifier("AwaitTaskStart"), false);
+            CompileExpression(frame, awaitStart);
+
+            // Function body
+            CompileExpression(frame, awaitExpr.Argument);
+
+            // Get task - <task> = System::AwaitTaskStart(<func>);
+            frame.AddInstruction(new InsCall(1), 0);
+            string tmpTaskVariable = $"task#{SymbolMap.TempVariableCounter++}";
+            AdhocSymbol taskSymb = InsertVariablePush(frame, new Identifier(tmpTaskVariable), true);
+            frame.AddInstruction(InsAssignPop.Default, 0);
+
+            // Get result of task - <result> = System::AwaitTaskResult(<task>);
+            var awaitResult = new StaticMemberExpression(new Identifier("System"), new Identifier("AwaitTaskResult"), false);
+            CompileExpression(frame, awaitResult);
+            InsertVariableEvalFromSymbol(frame, taskSymb);
+            frame.AddInstruction(new InsCall(1), 0);
+
+            AddPostCompilationWarning(CompilationMessages.Warning_UsingAwait_Code);
+        }
+
         /// <summary>
         /// Compiles: .doThing(e => <statement>)
         /// </summary>
         /// <param name="frame"></param>
         /// <param name="arrowFuncExpr"></param>
-        private void CompileAnonymousSubroutine(AdhocCodeFrame frame, Node parentNode, Node body, NodeList<Expression> funcParams, bool isMethod = false)
+        private void CompileAnonymousSubroutine(AdhocCodeFrame frame, Node parentNode, Node body, NodeList<Expression> funcParams, bool isMethod = false, bool isAsync = false)
         {
             SubroutineBase subroutine = isMethod ? new InsMethodConst() : new InsFunctionConst();
             subroutine.CodeFrame.ParentFrame = frame;
@@ -2350,6 +2364,52 @@ namespace GTAdhocToolchain.Compiler
                 frame.AddInstruction(InsAssignOld.Default, 0);
                 frame.AddInstruction(InsPopOld.Default, 0);
             }
+        }
+
+        /// <summary>
+        /// Inserts a new variable eval from a symbol.
+        /// </summary>
+        /// <param name="frame"></param>
+        /// <param name="symbol"></param>
+        /// <returns></returns>
+        // Mostly used for temp variables produced by the compiler
+        private void InsertVariableEvalFromSymbol(AdhocCodeFrame frame, AdhocSymbol symbol)
+        {
+            LocalVariable taskVariable = frame.Stack.GetLocalVariableBySymbol(symbol);
+            int taskVariableStoreIdx = frame.Stack.GetLocalVariableIndex(taskVariable);
+
+            var insVarEval = new InsVariableEvaluation();
+            insVarEval.VariableSymbols.Add(symbol);
+            insVarEval.VariableStorageIndex = taskVariableStoreIdx;
+            frame.AddInstruction(insVarEval, 0);
+        }
+
+        /// <summary>
+        /// Inserts a new variable.
+        /// </summary>
+        /// <param name="frame"></param>
+        /// <param name="variable"></param>
+        /// <param name="location"></param>
+        /// <returns></returns>
+        // Mostly used for temp variables produced by the compiler
+        private AdhocSymbol InsertNewLocalVariable(AdhocCodeFrame frame, string variable, Location location = default)
+        {
+            AdhocSymbol symb = InsertVariablePush(frame, new Identifier(variable) {  Location = location }, true);
+            InsertAssignPop(frame);
+
+            return symb;
+        }
+
+        private void PrintPostCompilationWarnings()
+        {
+            foreach (var warn in PostCompilationWarnings)
+                Logger.Warn(CompilationMessages.Warnings[warn]);
+        }
+
+        private void AddPostCompilationWarning(string warningCode)
+        {
+            if (!PostCompilationWarnings.Contains(warningCode))
+                PostCompilationWarnings.Add(warningCode);
         }
     }
 }
