@@ -490,7 +490,6 @@ namespace GTAdhocToolchain.Core
                         sb.Append(", ");
                 }
             }
-
             sb.Append(")");
 
             if (CapturedCallbackVariables.Count != 0)

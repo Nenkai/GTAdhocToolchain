@@ -92,8 +92,8 @@ namespace GTAdhocToolchain.Core.Instructions
                 /*
                 AdhocInstructionType.PRINT => new OpPrint(),
                 AdhocInstructionType.MODULE_CONSTRUCTOR => new OpModuleCtor(),
-                AdhocInstructionType.VA_CALL => new OpVaCall(),
                 */
+                AdhocInstructionType.VA_CALL => new InsVaCall(),
                 AdhocInstructionType.NOP => new InsNop(),
                 AdhocInstructionType.DOUBLE_CONST => new InsDoubleConst(),
                 AdhocInstructionType.UNK_69 => new Ins69(),
