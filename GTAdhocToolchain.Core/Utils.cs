@@ -189,5 +189,23 @@ namespace GTAdhocToolchain.Core
             for (long i = basePos; i < newPos; i++)
                 bs.WriteByte(value);
         }
+
+        public static int AlphaNumericStringSorter(string v1, string v2)
+        {
+            int min = v1.Length > v2.Length ? v2.Length : v1.Length;
+            for (int i = 0; i < min; i++)
+            {
+                if (v1[i] < v2[i])
+                    return -1;
+                else if (v1[i] > v2[i])
+                    return 1;
+            }
+            if (v1.Length < v2.Length)
+                return -1;
+            else if (v1.Length > v2.Length)
+                return 1;
+
+            return 0;
+        }
     }
 }

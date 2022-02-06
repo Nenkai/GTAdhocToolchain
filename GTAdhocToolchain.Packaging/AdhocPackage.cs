@@ -6,10 +6,11 @@ using System.Threading.Tasks;
 
 using System.IO;
 using System.IO.Compression;
+
 using Syroot.BinaryData;
 using ICSharpCode.SharpZipLib.Zip.Compression;
 
-using ICSharpCodeDeflater = ICSharpCode.SharpZipLib.Zip.Compression.Deflater;
+using GTAdhocToolchain.Core;
 
 namespace GTAdhocToolchain.Packaging
 {
@@ -75,9 +76,8 @@ namespace GTAdhocToolchain.Packaging
 
             Console.WriteLine("[:] Packing MPackage..");
 
-            var files = Directory.GetFiles(inputFolder, "*", SearchOption.AllDirectories)
-                .OrderBy(e => e, StringComparer.Ordinal)
-                       .ToArray();
+            List<string> files = Directory.GetFiles(inputFolder, "*", SearchOption.AllDirectories).ToList();
+            files.Sort(Utils.AlphaNumericStringSorter); // For BSearch
 
             if (outFile is null)
                 outFile = $"{Path.GetFileName(inputFolder)}.mpackage";
@@ -87,14 +87,14 @@ namespace GTAdhocToolchain.Packaging
 
             bs.WriteString(Magic, StringCoding.Raw);
             bs.WriteInt32(0); // Relocation Ptr
-            bs.WriteInt32(files.Length);
+            bs.WriteInt32(files.Count);
 
             // Skip toc offset for now
             bs.Position = 0x10;
 
             var folderNameStart = inputFolder.Length;
 
-            List<(int stringOffset, int dataOffset, int compressedSize)> toc = new(files.Length);
+            List<(int stringOffset, int dataOffset, int compressedSize)> toc = new(files.Count);
             foreach (var file in files)
             {
                 int stringOffset = (int)bs.Position;

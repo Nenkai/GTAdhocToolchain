@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-using System.IO;
 using Syroot.BinaryData;
 
+using GTAdhocToolchain.Core;
 
 namespace GTAdhocToolchain.Menu.Resources
 {
@@ -56,7 +56,9 @@ namespace GTAdhocToolchain.Menu.Resources
 
         public void AddFilesFromFolder(string folderName)
         {
-            string[] files = Directory.GetFiles(folderName, "*", SearchOption.AllDirectories);
+            List<string> files = Directory.GetFiles(folderName, "*", SearchOption.AllDirectories).ToList();
+            files.Sort(Utils.AlphaNumericStringSorter);
+
             foreach (var file in files)
             {
                 var pair = new GpbPair();
@@ -70,6 +72,11 @@ namespace GTAdhocToolchain.Menu.Resources
                 pair.FileData = File.ReadAllBytes(file);
                 Files.Add(pair);
             }
+        }
+
+        public static int PairSorter(GpbPair a, GpbPair b)
+        {
+            return Utils.AlphaNumericStringSorter(a.FileName, b.FileName);
         }
     }
 }

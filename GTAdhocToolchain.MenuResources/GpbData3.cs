@@ -78,7 +78,7 @@ namespace GTAdhocToolchain.Menu.Resources
             int currentFileNameOffset = baseFileNameOffset;
 
             // Game uses bsearch, important
-            Files = Files.OrderBy(e => e.FileName).ToList();
+            Files.Sort(GpbBase.PairSorter);
 
             for (int i = 0; i < Files.Count; i++)
             {
