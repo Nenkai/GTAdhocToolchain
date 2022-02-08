@@ -93,6 +93,7 @@ namespace GTAdhocToolchain.Menu.Fields
                         FieldType.ScopeStart => new mNode(),
                         FieldType.ScopeEnd => null,
                         FieldType.SByte => new mSByte(),
+                        FieldType.ExternalRef => new mExternalRef(),
                         _ => throw new Exception($"Type: {type} not supported"),
                     };
 

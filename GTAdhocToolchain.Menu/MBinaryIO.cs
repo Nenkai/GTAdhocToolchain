@@ -103,6 +103,7 @@ namespace GTAdhocToolchain.Menu
                 FieldType.ScopeStart => new mNode(),
                 FieldType.ScopeEnd => null,
                 FieldType.SByte => new mSByte(),
+                FieldType.ExternalRef => new mExternalRef(),
                 _ => throw new Exception($"Type: {typeNew} not supported"),
             };
 
@@ -129,6 +130,7 @@ namespace GTAdhocToolchain.Menu
         ArrayMaybe = 13,
         ScopeStart = 14,
         ScopeEnd = 15,
+        ExternalRef = 16,
     }
 
     public enum FieldTypeOld
