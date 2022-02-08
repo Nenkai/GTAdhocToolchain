@@ -2062,6 +2062,12 @@ namespace GTAdhocToolchain.Compiler
                 frame.AddInstruction(new InsStringConst(frame.SourceFilePath), identifier.Location.Start.Line);
                 return true;
             }
+            else if (AdhocConstants.CompilerProvidedConstants.ContainsKey(identifier.Name))
+            {
+                var define = AdhocConstants.CompilerProvidedConstants[identifier.Name];
+                frame.AddInstruction(define, identifier.Location.Start.Line);
+                return true;
+            }
 
             return false;
         }
