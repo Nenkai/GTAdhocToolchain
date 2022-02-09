@@ -32,8 +32,10 @@ namespace GTAdhocToolchain.Compiler
 
             { "CELL_PAD_CTRL_L1", new InsIntConst(0xFFD7) },
             { "CELL_PAD_CTRL_L2", new InsIntConst(0xFFD8) },
+            { "CELL_PAD_CTRL_L3", new InsIntConst(0xFFD9) },
             { "CELL_PAD_CTRL_R1", new InsIntConst(0xFFDC) },
             { "CELL_PAD_CTRL_R2", new InsIntConst(0xFFDD) },
+            { "CELL_PAD_CTRL_R3", new InsIntConst(0xFFDD) },
         };
     }
 }
