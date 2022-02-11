@@ -11,6 +11,8 @@ namespace GTAdhocToolchain.Core.Instructions
     /// </summary>
     public class InsElementPush : InstructionBase
     {
+        public readonly static InsElementPush Default = new();
+
         public override AdhocInstructionType InstructionType => AdhocInstructionType.ELEMENT_PUSH;
 
         public override string InstructionName => "ELEMENT_PUSH";

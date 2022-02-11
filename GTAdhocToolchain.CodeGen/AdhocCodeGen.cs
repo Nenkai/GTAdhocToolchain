@@ -198,6 +198,8 @@ namespace GTAdhocToolchain.CodeGen
                     WriteTryCatch(instruction as InsTryCatch); break;
                 case AdhocInstructionType.UNDEF:
                     WriteUndef(instruction as InsUndef); break;
+                case AdhocInstructionType.VA_CALL:
+                    WriteVariableCall(instruction as InsVaCall); break;
                 case AdhocInstructionType.NIL_CONST:
                 case AdhocInstructionType.VOID_CONST:
                 case AdhocInstructionType.ASSIGN_POP:
@@ -216,6 +218,11 @@ namespace GTAdhocToolchain.CodeGen
                 default:
                     throw new NotImplementedException();
             }
+        }
+
+        private void WriteVariableCall(InsVaCall vaCall)
+        {
+            stream.WriteUInt32(vaCall.PopObjectCount);
         }
 
         private void WriteUndef(InsUndef undef)

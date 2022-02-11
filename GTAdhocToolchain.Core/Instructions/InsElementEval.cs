@@ -11,6 +11,8 @@ namespace GTAdhocToolchain.Core.Instructions
     /// </summary>
     public class InsElementEval : InstructionBase
     {
+        public readonly static InsElementEval Default = new();
+
         public override AdhocInstructionType InstructionType => AdhocInstructionType.ELEMENT_EVAL;
 
         public override string InstructionName => "ELEMENT_EVAL";
