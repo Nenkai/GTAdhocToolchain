@@ -16,7 +16,7 @@ namespace GTAdhocToolchain.Compiler
         public AdhocSymbolMap SymbolMap { get; set; } = new();
 
         public Stack<AdhocModule> ModuleStack { get; set; } = new();
-        public Dictionary<string, AdhocModule> DefinedModules { get; set; } = new();
+        public Dictionary<string, AdhocModule> TopLevelModules { get; set; } = new();
 
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
@@ -317,7 +317,7 @@ namespace GTAdhocToolchain.Compiler
 
             Logger.Debug($"L{id.Location.Start.Line} - Compiling {(isModule ? "module" : "class")} '{id.Name}'");
             AdhocModule moduleOrClass = EnterModuleOrClass(frame, body);
-            DefinedModules.TryAdd(id.Name, moduleOrClass);
+            TopLevelModules.TryAdd(id.Name, moduleOrClass);
 
             if (isModule)
             {
@@ -372,6 +372,14 @@ namespace GTAdhocToolchain.Compiler
                     fullSuperClassName = fullSuperClassName.Remove(fullSuperClassName.Length - 2);
                     @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol(fullSuperClassName));
                 }
+                else
+                {
+                    // Not provided, inherits from base object (System::Object)
+                    @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol("System"));
+                    @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol("Object"));
+                    @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol("System::Object"));
+                }
+
                 frame.AddInstruction(@class, id.Location.Start.Line);
             }
 
@@ -784,6 +792,9 @@ namespace GTAdhocToolchain.Compiler
                     ThrowCompilationError(parentNode, "Subroutine definition parameters must all be identifier or assignment to a literal.");
             }
 
+            if (frame.CurrentScope.StaticScopeVariables.ContainsKey(subroutine.Name.Name))
+                ThrowCompilationError(parentNode, $"Static subroutine name {subroutine.Name} is already defined in this scope.");
+
             frame.AddAttributeOrStaticMemberVariable(subroutine.Name);
             frame.AddInstruction(subroutine, parentNode.Location.Start.Line);
 
@@ -942,7 +953,7 @@ namespace GTAdhocToolchain.Compiler
             /* Imports actually copies the static members from the target */
             if (import.Target.Name == "*")
             {
-                if (DefinedModules.TryGetValue(fullImportNamespace, out AdhocModule mod))
+                if (TopLevelModules.TryGetValue(fullImportNamespace, out AdhocModule mod))
                 {
                     foreach (var memberSymbol in mod.GetAllMembers())
                         frame.Stack.AddStaticVariable(new StaticVariable() { Symbol = memberSymbol });
@@ -1004,6 +1015,9 @@ namespace GTAdhocToolchain.Compiler
                 case Nodes.MemberExpression when exp is AttributeMemberExpression:
                     CompileAttributeMemberExpression(frame, exp as AttributeMemberExpression);
                     break;
+                case Nodes.MemberExpression when exp is ObjectSelectorMemberExpression:
+                    CompileObjectSelectorExpression(frame, exp as ObjectSelectorMemberExpression);
+                    break;
                 case Nodes.AssignmentExpression:
                     CompileAssignmentExpression(frame, exp as AssignmentExpression);
                     break;
@@ -1037,10 +1051,23 @@ namespace GTAdhocToolchain.Compiler
                 case Nodes.AwaitExpression:
                     CompileAwait(frame, exp as AwaitExpression);
                     break;
+                case Nodes.SpreadElement:
+                    CompileSpreadElement(frame, exp as SpreadElement);
+                    break;
                 default:
                     ThrowCompilationError(exp, $"Expression {exp.Type} not supported");
                     break;
             }
+        }
+
+        /// <summary>
+        /// Compiles <function>.(...args)
+        /// </summary>
+        /// <param name="frame"></param>
+        /// <param name="spreadElement"></param>
+        private void CompileSpreadElement(AdhocCodeFrame frame, SpreadElement spreadElement)
+        {
+            CompileExpression(frame, spreadElement.Argument);
         }
 
         private void CompileArrowFunctionExpression(AdhocCodeFrame frame, ArrowFunctionExpression arrowFuncExpr)
@@ -1474,6 +1501,10 @@ namespace GTAdhocToolchain.Compiler
                 {
                     CompileComputedMemberExpressionAssignment(frame, compExpression);
                 }
+                else if (assignExpression.Left is ObjectSelectorMemberExpression objectSelector)
+                {
+                    throw new NotImplementedException("Implement object selector assignment expression");
+                }
                 else
                     ThrowCompilationError(assignExpression, "Unimplemented");
 
@@ -1506,6 +1537,10 @@ namespace GTAdhocToolchain.Compiler
             else if (expression is ComputedMemberExpression compExpression)
             {
                 CompileComputedMemberExpressionAssignment(frame, compExpression);
+            }
+            else if (expression is ObjectSelectorMemberExpression objSelectExpression)
+            {
+                CompileObjectSelectorExpressionAssignment(frame, objSelectExpression);
             }
             else if (expression is UnaryExpression unaryExp && unaryExp.Operator == UnaryOperator.Indirection)
             {
@@ -1579,8 +1614,7 @@ namespace GTAdhocToolchain.Compiler
             CompileExpression(frame, computedMember.Object);
             CompileExpression(frame, computedMember.Property);
 
-            InsElementEval eval = new InsElementEval();
-            frame.AddInstruction(eval, 0);
+            frame.AddInstruction(InsElementEval.Default, 0);
         }
 
         /// <summary>
@@ -1591,8 +1625,15 @@ namespace GTAdhocToolchain.Compiler
             CompileExpression(frame, computedMember.Object);
             CompileExpression(frame, computedMember.Property);
 
-            InsElementPush push = new InsElementPush();
-            frame.AddInstruction(push, 0);
+            frame.AddInstruction(InsElementPush.Default, 0);
+        }
+
+        private void CompileObjectSelectorExpressionAssignment(AdhocCodeFrame frame, ObjectSelectorMemberExpression objSelector)
+        {
+            CompileExpression(frame, objSelector.Object);
+            CompileExpression(frame, objSelector.Property);
+
+            frame.AddInstruction(InsObjectSelector.Default, 0);
         }
 
         /// <summary>
@@ -1614,6 +1655,13 @@ namespace GTAdhocToolchain.Compiler
             }
             else
                 ThrowCompilationError(staticExp, "Expected attribute member to be identifier or static member expression.");
+        }
+
+        private void CompileObjectSelectorExpression(AdhocCodeFrame frame, ObjectSelectorMemberExpression objSelectExpr)
+        {
+            CompileExpression(frame, objSelectExpr.Object);
+            CompileExpression(frame, objSelectExpr.Property);
+            frame.AddInstruction(InsObjectSelector.Default, 0);
         }
 
         /// <summary>
@@ -1703,33 +1751,36 @@ namespace GTAdhocToolchain.Compiler
         /// <param name="call"></param>
         private void CompileCall(AdhocCodeFrame frame, CallExpression call, bool popReturnValue = false)
         {
-            // HACK
-            if (call.Callee is Identifier ident)
+            CompileExpression(frame, call.Callee);
+
+            bool isVaCall = false;
+            if (call.Arguments.Count == 1 && call.Arguments[0].Type == Nodes.SpreadElement)
             {
-                if (ident.Name == "object_selector")
+                CompileExpression(frame, call.Arguments[0]);
+                isVaCall = true;
+            }
+            else
+            {
+                for (int i = 0; i < call.Arguments.Count; i++)
                 {
-                    if (call.Arguments.Count != 2)
-                        ThrowCompilationError(call, "Expected object selector call to have 2 argument.");
+                    if (call.Arguments[i].Type == Nodes.SpreadElement) // Has more than 1
+                        ThrowCompilationError(call.Arguments[i], "Only a spread element as an argument is allowed in a Variable function call (VA_CALL). There must not be more than one argument.");
 
-                    // Hack to handle object selectors
-                    CompileExpression(frame, call.Arguments[0]);
-                    CompileExpression(frame, call.Arguments[1]);
-
-                    frame.AddInstruction(InsObjectSelector.Default, 0);
-                    frame.AddInstruction(InsEval.Default, 0);
-                    return;
+                    CompileExpression(frame, call.Arguments[i]);
                 }
             }
 
-            CompileExpression(frame, call.Callee);
-
-            for (int i = 0; i < call.Arguments.Count; i++)
+            if (isVaCall)
             {
-                CompileExpression(frame, call.Arguments[i]);
+                var vaCallIns = new InsVaCall() { PopObjectCount = 2 };
+                frame.AddInstruction(vaCallIns, call.Location.Start.Line);
+                AddPostCompilationWarning(CompilationMessages.Warning_UsingVaCall_Code);
             }
-            
-            var callIns = new InsCall(call.Arguments.Count);
-            frame.AddInstruction(callIns, call.Location.Start.Line);
+            else
+            {
+                var callIns = new InsCall(call.Arguments.Count);
+                frame.AddInstruction(callIns, call.Location.Start.Line);
+            }
 
             // When calling and not caring about returns
             if (popReturnValue)
@@ -1953,13 +2004,17 @@ namespace GTAdhocToolchain.Compiler
             {
                 CompileStaticMemberExpressionAssignment(frame, staticExpr);
             }
+            else if (unaryExp.Argument is ComputedMemberExpression computedMemberExpr)
+            {
+                CompileComputedMemberExpressionAssignment(frame, computedMemberExpr);
+            }
             else if (unaryExp.Argument is UpdateExpression upd)
             {
                 CompileUnaryExpression(frame, upd, isReference: true);
             }
             else if (unaryExp.Argument is Identifier identifier)
             {
-                InsertVariablePush(frame, identifier, false);
+                InsertVariablePush(frame, identifier, true);
             }
             else
             {
@@ -2171,17 +2226,6 @@ namespace GTAdhocToolchain.Compiler
             };
         }
 
-        private static string UnaryOperatorToString(UnaryOperator op, bool postIncrement)
-        {
-            return op switch
-            {
-                UnaryOperator.Increment when postIncrement => "@++",
-                UnaryOperator.Increment when !postIncrement => "++@",
-                UnaryOperator.Decrement when postIncrement => "@--",
-                UnaryOperator.Decrement when !postIncrement => "--@",
-                _ => null,
-            };
-        }
 
         private static bool IsAdhocAssignWithOperandOperator(AssignmentOperator op)
         {
@@ -2249,8 +2293,10 @@ namespace GTAdhocToolchain.Compiler
 
             AdhocModule newModule = new AdhocModule();
             ModuleStack.Push(newModule);
-            frame.CurrentModule = newModule;
 
+            newModule.ParentModule = frame.CurrentModule;
+            frame.CurrentModule = newModule;
+            
             return newModule;
         }
 
@@ -2409,7 +2455,7 @@ namespace GTAdhocToolchain.Compiler
         private void PrintPostCompilationWarnings()
         {
             foreach (var warn in PostCompilationWarnings)
-                Logger.Warn(CompilationMessages.Warnings[warn]);
+                Logger.Warn($"Feature Warning: {CompilationMessages.Warnings[warn]}. This may crash older game builds.");
         }
 
         private void AddPostCompilationWarning(string warningCode)

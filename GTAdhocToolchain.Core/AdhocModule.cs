@@ -16,6 +16,8 @@ namespace GTAdhocToolchain.Core
 
         public List<AdhocSymbol> DefinedMethods { get; set; } = new();
 
+        public AdhocModule ParentModule { get; set; }
+
         public bool DefineStatic(AdhocSymbol symbol)
         {
             if (DefinedStaticVariables.Contains(symbol))

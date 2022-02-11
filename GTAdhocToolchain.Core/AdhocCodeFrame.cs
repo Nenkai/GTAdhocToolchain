@@ -174,6 +174,7 @@ namespace GTAdhocToolchain.Core
                 case AdhocInstructionType.OBJECT_SELECTOR:
                 case AdhocInstructionType.ELEMENT_PUSH:
                 case AdhocInstructionType.ELEMENT_EVAL:
+                case AdhocInstructionType.VA_CALL:
                     Stack.StackStorageCounter -= 2;
                     Stack.StackStorageCounter++;
                     break;
@@ -239,7 +240,6 @@ namespace GTAdhocToolchain.Core
 
             // CALL_OLD
             // LEAVE
-            // VA_CALL
         }
 
         public int GetLastInstructionIndex()
@@ -272,12 +272,9 @@ namespace GTAdhocToolchain.Core
                     if (added)
                         lastScope.StaticScopeVariables.Add(symbol.Name, symbol);
                 }
-                else
+                else if (!isLocalDeclaration) // Reassignment to a static?
                 {
-                    // May also be a reassignment to a static
-                    if (!isLocalDeclaration &&
-                        !Stack.HasLocalVariable(symbol) &&
-                        (Stack.HasStaticVariable(symbol) || CurrentModule.IsDefinedStaticMember(symbol) || CurrentModule.IsDefinedAttributeMember(symbol)))
+                    if (Stack.HasStaticVariable(symbol) || IsStaticModuleAttribute(symbol) || !Stack.HasLocalVariable(symbol))
                     {
                         bool added = Stack.TryAddStaticVariable(symbol, out newVariable);
                         if (added)
@@ -289,6 +286,12 @@ namespace GTAdhocToolchain.Core
                         if (added)
                             lastScope.LocalScopeVariables.Add(symbol.Name, symbol);
                     }
+                }
+                else // Actually declaring a new (?) local 
+                {
+                    bool added = Stack.TryAddLocalVariable(symbol, out newVariable);
+                    if (added)
+                        lastScope.LocalScopeVariables.Add(symbol.Name, symbol);
                 }
             }
             else
@@ -345,6 +348,22 @@ namespace GTAdhocToolchain.Core
                 throw new Exception("Variable is not a local or static variable..?");
         }
 
+        public bool IsStaticModuleAttribute(AdhocSymbol symbol)
+        {
+            // Recursively check all modules
+            bool HasStatic(AdhocSymbol symbol, AdhocModule module)
+            {
+                if (module.IsDefinedStaticMember(symbol) || module.IsDefinedAttributeMember(symbol))
+                    return true;
+                else if (module.ParentModule is not null)
+                    return HasStatic(symbol, module.ParentModule);
+                else
+                    return false;
+            }
+
+            return HasStatic(symbol, CurrentModule);
+        }
+
         public void AddAttributeOrStaticMemberVariable(AdhocSymbol symbol)
         {
             var newVar = new StaticVariable() { Symbol = symbol };
@@ -356,15 +375,16 @@ namespace GTAdhocToolchain.Core
 
         public bool IsStaticVariable(AdhocSymbol symb)
         {
+            if (symb.Name == "self")
+                return false;
+
             if (Stack.HasLocalVariable(symb))
                 return false; // Priorize local variables
 
-            return IsMember(symb) || !symb.Name.Equals("self");
-        }
+            if (IsStaticModuleAttribute(symb))
+                return true;
 
-        private bool IsMember(AdhocSymbol symb)
-        {
-            return CurrentModule.IsDefinedStaticMember(symb) || CurrentModule.IsDefinedAttributeMember(symb);
+            return true;
         }
 
         public ScopeContext GetLastBreakControlledScope()
@@ -485,7 +505,7 @@ namespace GTAdhocToolchain.Core
             {
                 for (int i = 0; i < FunctionParameters.Count; i++)
                 {
-                    sb.Append(FunctionParameters[i].Name).Append($"[{FunctionParameters[i].Id}]");
+                    sb.Append(FunctionParameters[i].Name);//.Append($"[{FunctionParameters[i].Id}]");
                     if (i != FunctionParameters.Count - 1)
                         sb.Append(", ");
                 }
@@ -497,7 +517,7 @@ namespace GTAdhocToolchain.Core
                 sb.Append("[");
                 for (int i = 0; i < CapturedCallbackVariables.Count; i++)
                 {
-                    sb.Append(CapturedCallbackVariables[i].Name).Append($"[{CapturedCallbackVariables[i].Id}]");
+                    sb.Append(CapturedCallbackVariables[i].Name);//.Append($"[{CapturedCallbackVariables[i].Id}]");
                     if (i != CapturedCallbackVariables.Count - 1)
                         sb.Append(", ");
                 }
