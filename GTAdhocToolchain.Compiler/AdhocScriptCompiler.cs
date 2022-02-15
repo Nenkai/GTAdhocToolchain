@@ -1477,15 +1477,26 @@ namespace GTAdhocToolchain.Compiler
             }
         }
 
-        private void CompileAssignmentExpression(AdhocCodeFrame frame, AssignmentExpression assignExpression)
+        private void CompileAssignmentExpression(AdhocCodeFrame frame, AssignmentExpression assignExpression, bool popResult = true)
         {
+            // Assigning to a variable or literal directly?
             if (assignExpression.Operator == AssignmentOperator.Assign)
             {
-                // Assigning to something new
-                CompileExpression(frame, assignExpression.Right);
-                CompileVariableAssignment(frame, assignExpression.Left);
+                // a = b = c?
+                if (assignExpression.Right.Type == Nodes.AssignmentExpression)
+                {
+                    // We are reusing the result (b in this case) - we do not pop it.
+                    CompileAssignmentExpression(frame, assignExpression.Right as AssignmentExpression, popResult: false);
+                }
+                else
+                {
+                    // Regular assignment
+                    CompileExpression(frame, assignExpression.Right);
+                }
+
+                CompileVariableAssignment(frame, assignExpression.Left, popResult);
             }
-            else if (IsAdhocAssignWithOperandOperator(assignExpression.Operator))
+            else if (IsAdhocAssignWithOperandOperator(assignExpression.Operator)) // += -= /= etc..
             {
                 // Assigning to self (+=)
                 if (assignExpression.Left is Identifier)
@@ -1508,10 +1519,18 @@ namespace GTAdhocToolchain.Compiler
                 else
                     ThrowCompilationError(assignExpression, "Unimplemented");
 
-                CompileExpression(frame, assignExpression.Right);
+                // a += b += c?
+                if (assignExpression.Right.Type == Nodes.AssignmentExpression)
+                {
+                    // Do not discard result
+                    CompileAssignmentExpression(frame, assignExpression.Right as AssignmentExpression, popResult: false);
+                }
+                else
+                    CompileExpression(frame, assignExpression.Right);
 
                 InsertBinaryAssignOperator(frame, assignExpression, assignExpression.Operator, assignExpression.Location.Start.Line);
-                frame.AddInstruction(InsPop.Default, 0);
+                if (popResult)
+                    frame.AddInstruction(InsPop.Default, 0);
             }
             else
             {
@@ -1524,7 +1543,7 @@ namespace GTAdhocToolchain.Compiler
         /// </summary>
         /// <param name="frame"></param>
         /// <param name="expression"></param>
-        public void CompileVariableAssignment(AdhocCodeFrame frame, Expression expression)
+        public void CompileVariableAssignment(AdhocCodeFrame frame, Expression expression, bool popValue = true)
         {
             if (expression is Identifier ident) // hello = world
             {
@@ -1561,7 +1580,10 @@ namespace GTAdhocToolchain.Compiler
             else
                 ThrowCompilationError(expression, "Unimplemented");
 
-            InsertAssignPop(frame);
+            if (popValue)
+                InsertAssignPop(frame);
+            else
+                frame.AddInstruction(InsAssign.Default, 0);
         }
 
         /// <summary>
