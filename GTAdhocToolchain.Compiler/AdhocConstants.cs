@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 using GTAdhocToolchain.Core.Instructions;
+using GTAdhocToolchain.Core;
 
 namespace GTAdhocToolchain.Compiler
 {
@@ -36,6 +37,14 @@ namespace GTAdhocToolchain.Compiler
             { "CELL_PAD_CTRL_R1", new InsIntConst(0xFFDC) },
             { "CELL_PAD_CTRL_R2", new InsIntConst(0xFFDD) },
             { "CELL_PAD_CTRL_R3", new InsIntConst(0xFFDE) },
+
+            { "COLOR_WHITE", new InsStringConst(new AdhocSymbol(((char)0x11).ToString())) },
+            { "COLOR_RED", new InsStringConst(new AdhocSymbol( ((char)0x12).ToString()))},
+            { "COLOR_GREEN", new InsStringConst(new AdhocSymbol(((char)0x13).ToString())) },
+            { "COLOR_BLUE", new InsStringConst(new AdhocSymbol(((char)0x14).ToString())) },
+            { "COLOR_YELLOW", new InsStringConst(new AdhocSymbol(((char)0x15).ToString())) },
+            { "COLOR_CYAN", new InsStringConst(new AdhocSymbol(((char)0x16).ToString())) },
+            { "COLOR_BLACK", new InsStringConst(new AdhocSymbol(((char)0x17).ToString())) },
         };
     }
 }

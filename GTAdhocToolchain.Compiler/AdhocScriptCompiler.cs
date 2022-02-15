@@ -2236,6 +2236,9 @@ namespace GTAdhocToolchain.Compiler
             else if (AdhocConstants.CompilerProvidedConstants.ContainsKey(identifier.Name))
             {
                 var define = AdhocConstants.CompilerProvidedConstants[identifier.Name];
+                if (define is InsStringConst str)
+                    str.String = SymbolMap.RegisterSymbol(str.String.Name);
+
                 frame.AddInstruction(define, identifier.Location.Start.Line);
                 return true;
             }
