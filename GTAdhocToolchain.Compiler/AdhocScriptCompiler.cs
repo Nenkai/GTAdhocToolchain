@@ -859,6 +859,8 @@ namespace GTAdhocToolchain.Compiler
                 {
                     if (initValue.Type == Nodes.UpdateExpression)
                         CompileUnaryExpression(frame, initValue as UpdateExpression, popResult: true);
+                    else if (initValue.Type == Nodes.AssignmentExpression)
+                        CompileAssignmentExpression(frame, initValue as AssignmentExpression, popResult: false); // var a = b = c; // Do not discard b
                     else
                         CompileExpression(frame, initValue);
                 }
@@ -1522,10 +1524,11 @@ namespace GTAdhocToolchain.Compiler
                     throw new NotImplementedException("Implement object selector assignment expression");
                 }
                 else
+                {
                     ThrowCompilationError(assignExpression, "Unimplemented");
-
-                // a += b += c?
-                if (assignExpression.Right.Type == Nodes.AssignmentExpression)
+                }
+                    
+                if (assignExpression.Right.Type == Nodes.AssignmentExpression) // a += b += c?
                 {
                     // Do not discard result
                     CompileAssignmentExpression(frame, assignExpression.Right as AssignmentExpression, popResult: false);
@@ -1583,7 +1586,10 @@ namespace GTAdhocToolchain.Compiler
                 return; // No need for assign pop
             }
             else
+            {
+                // Error
                 ThrowCompilationError(expression, "Unimplemented");
+            }
 
             if (popValue)
                 InsertAssignPop(frame);
@@ -2288,7 +2294,7 @@ namespace GTAdhocToolchain.Compiler
         /// <returns></returns>
         private AdhocCompilationException GetCompilationError(Node node, string message)
         {
-            return new AdhocCompilationException($"{message}. Line {node.Location.Start.Line}:{node.Location.Start.Column}");
+            return new AdhocCompilationException($"{message} Line {node.Location.Start.Line}:{node.Location.Start.Column}");
         }
 
         private LoopContext EnterLoop(AdhocCodeFrame frame, Statement loopStatement)
