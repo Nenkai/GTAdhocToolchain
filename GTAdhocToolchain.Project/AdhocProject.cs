@@ -85,7 +85,7 @@ namespace GTAdhocToolchain.Project
 
             var compiler = new AdhocScriptCompiler();
             compiler.SetProjectDirectory(Path.GetFullPath(Path.Combine(ProjectFilePath, BaseIncludeFolder)));
-            compiler.SetSourcePath(compiler.SymbolMap, Path.Combine(ProjectFolder, tmpFileName));
+            compiler.SetSourcePath(compiler.SymbolMap, ProjectFolder + "/" + tmpFileName);
             compiler.CompileScript(program);
 
             AdhocCodeGen codeGen = new AdhocCodeGen(compiler, compiler.SymbolMap);

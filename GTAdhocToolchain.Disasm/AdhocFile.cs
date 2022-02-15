@@ -40,6 +40,8 @@ namespace GTAdhocToolchain.Disasm
             byte version = (byte)int.Parse(magic.AsSpan(4, 3));
             var adhoc = new AdhocFile(version);
 
+            stream.Version = version;
+
             if (adhoc.Version >= 9)
                 stream.ReadSymbolTable();
             adhoc.SymbolTable = stream.Symbols;
@@ -162,7 +164,6 @@ namespace GTAdhocToolchain.Disasm
             {
                 InstructionBase inst = subroutine.CodeFrame.Instructions[i];
                 sw.Write(curDepthStr);
-
                 if (ifdepth > 0)
                     sw.Write(new string(' ', 2 * ifdepth));
 
