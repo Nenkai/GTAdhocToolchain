@@ -115,6 +115,8 @@ namespace GTAdhocToolchain.Disasm
                     modOrClass.Push((inst as InsModuleDefine).Names[^1].Name);
                 else if (inst.InstructionType == AdhocInstructionType.CLASS_DEFINE)
                     modOrClass.Push((inst as InsClassDefine).Name.Name);
+                else if (inst.InstructionType == AdhocInstructionType.TRY_CATCH)
+                    modOrClass.Push("TryCatch");
                 else if (inst is InsSetState state && state.State == AdhocRunState.EXIT)
                     sw.Write($"  [EXIT {modOrClass.Pop()}]");
 
@@ -180,6 +182,8 @@ namespace GTAdhocToolchain.Disasm
                     modOrClass.Push((inst as InsModuleDefine).Names[^1].Name);
                 else if (inst.InstructionType == AdhocInstructionType.CLASS_DEFINE)
                     modOrClass.Push((inst as InsClassDefine).Name.Name);
+                else if (inst.InstructionType == AdhocInstructionType.TRY_CATCH)
+                    modOrClass.Push("TryCatch");
                 else if (inst is InsSetState state && state.State == AdhocRunState.EXIT)
                     sw.Write($"  [EXIT {modOrClass.Pop()}]");
 
