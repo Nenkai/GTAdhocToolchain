@@ -841,53 +841,58 @@ namespace GTAdhocToolchain.Compiler
                 frame.HasTopLevelReturnValue = true;
         }
 
+        /// <summary>
+        /// Compiles "var a = 0, [b = 1] ...;"
+        /// </summary>
+        /// <param name="frame"></param>
+        /// <param name="varDeclaration"></param>
+        /// <param name="pushWhenNoInit"></param>
         public void CompileVariableDeclaration(AdhocCodeFrame frame, VariableDeclaration varDeclaration, bool pushWhenNoInit = false)
         {
-            NodeList<VariableDeclarator> declarators = varDeclaration.Declarations;
-            VariableDeclarator declarator = declarators[0];
-
-            Expression? initValue = declarator.Init;
-            Expression? id = declarator.Id;
-
-            // We need to add the defined value first
-
-            if (initValue != null)
+            foreach (VariableDeclarator declarator in varDeclaration.Declarations)
             {
-                if (initValue.Type == Nodes.UpdateExpression)
-                    CompileUnaryExpression(frame, initValue as UpdateExpression, popResult: true);
-                else
-                    CompileExpression(frame, initValue);
-            }
-                
+                Expression? initValue = declarator.Init;
+                Expression? id = declarator.Id;
 
-            // Now write the id
-            if (id is null)
-                ThrowCompilationError(varDeclaration, "Variable declaration for id is null.");
-
-            if (id is Identifier idIdentifier) // var hello [= world];
-            {
-                if (initValue != null || pushWhenNoInit)
+                // We need to add the defined value first
+                if (initValue != null)
                 {
-                    // Variable is being defined with a value.
-                    InsertVariablePush(frame, idIdentifier, true);
+                    if (initValue.Type == Nodes.UpdateExpression)
+                        CompileUnaryExpression(frame, initValue as UpdateExpression, popResult: true);
+                    else
+                        CompileExpression(frame, initValue);
+                }
 
-                    // Perform assignment
-                    InsertAssignPop(frame);
+
+                // Now write the id
+                if (id is null)
+                    ThrowCompilationError(varDeclaration, "Variable declaration for id is null.");
+
+                if (id is Identifier idIdentifier) // var hello [= world];
+                {
+                    if (initValue != null || pushWhenNoInit)
+                    {
+                        // Variable is being defined with a value.
+                        InsertVariablePush(frame, idIdentifier, true);
+
+                        // Perform assignment
+                        InsertAssignPop(frame);
+                    }
+                    else
+                    {
+                        // Variable is declared but not assigned to anything yet. Do not add any variable push.
+                        AdhocSymbol varSymb = SymbolMap.RegisterSymbol(idIdentifier.Name);
+                        frame.AddScopeVariable(varSymb, isAssignment: true, isLocalDeclaration: true);
+                    }
+                }
+                else if (id is ArrayPattern arrayPattern) // var [hello, world] = helloworld; - deconstruct array
+                {
+                    CompileArrayPatternPush(frame, arrayPattern, isDeclaration: true);
                 }
                 else
                 {
-                    // Variable is declared but not assigned to anything yet. Do not add any variable push.
-                    AdhocSymbol varSymb = SymbolMap.RegisterSymbol(idIdentifier.Name);
-                    frame.AddScopeVariable(varSymb, isAssignment: true, isLocalDeclaration: true);
+                    ThrowCompilationError(varDeclaration, "Variable declaration for id is not an identifier.");
                 }
-            }
-            else if (id is ArrayPattern arrayPattern) // var [hello, world] = helloworld; - deconstruct array
-            {
-                CompileArrayPatternPush(frame, arrayPattern, isDeclaration: true);
-            }
-            else
-            {
-                ThrowCompilationError(varDeclaration, "Variable declaration for id is not an identifier.");
             }
         }
 
