@@ -150,12 +150,21 @@ namespace GTAdhocToolchain.Compiler
                 case Nodes.UndefStatement:
                     CompileUndefStatement(frame, node as UndefStatement);
                     break;
+                case Nodes.SourceFileStatement:
+                    CompileSourceFileStatement(frame, node as SourceFileStatement);
+                    break;
                 case Nodes.EmptyStatement:
                     break;
                 default:
                     ThrowCompilationError(node, "Statement not supported");
                     break;
             }
+        }
+
+        public void CompileSourceFileStatement(AdhocCodeFrame frame, SourceFileStatement srcFileStatement)
+        {
+            InsSourceFile srcFileIns = new InsSourceFile(SymbolMap.RegisterSymbol(srcFileStatement.Path, false));
+            frame.AddInstruction(srcFileIns, 0);
         }
 
         public void CompileUndefStatement(AdhocCodeFrame frame, UndefStatement undefStatement)
@@ -602,7 +611,7 @@ namespace GTAdhocToolchain.Compiler
 
             // Test - fetch_next returns whether the iterator is done or not
             int testInsIndex = frame.GetLastInstructionIndex();
-            InsertVariableEvalFromSymbol(frame, itorIdentifier);
+            InsertVariableEvalFromSymbol(frame, itorIdentifier, foreachStatement.Right.Location);
             InsAttributeEvaluation fetchNextIns = new InsAttributeEvaluation();
             fetchNextIns.AttributeSymbols.Add(SymbolMap.RegisterSymbol("fetch_next"));
             frame.AddInstruction(fetchNextIns, foreachStatement.Right.Location.Start.Line);
@@ -761,7 +770,7 @@ namespace GTAdhocToolchain.Compiler
                     subroutine.CodeFrame.FunctionParameters.Add(paramSymb);
 
                     // Function param is uninitialized, push nil
-                    frame.AddInstruction(InsNilConst.Empty, paramIdent.Location.Start.Line);
+                    frame.AddInstruction(new InsNilConst(), paramIdent.Location.Start.Line);
                     
                 }
                 else if (param is AssignmentExpression assignmentExpression)
@@ -831,7 +840,7 @@ namespace GTAdhocToolchain.Compiler
             else
             {
                 // Void const is returned
-                frame.AddInstruction(InsVoidConst.Empty, retStatement.Location.Start.Line);
+                frame.AddInstruction(new InsVoidConst(), retStatement.Location.Start.Line);
             }
 
             frame.AddInstruction(new InsSetState(AdhocRunState.RETURN), 0);
@@ -1084,7 +1093,7 @@ namespace GTAdhocToolchain.Compiler
 
         private void CompileYield(AdhocCodeFrame frame, YieldExpression yield)
         {
-            frame.AddInstruction(InsVoidConst.Empty, yield.Location.Start.Line);
+            frame.AddInstruction(new InsVoidConst(), yield.Location.Start.Line);
             frame.AddInstruction(new InsSetState(AdhocRunState.YIELD), 0);
         }
 
@@ -1161,7 +1170,7 @@ namespace GTAdhocToolchain.Compiler
             LeaveScope(subroutine.CodeFrame, insertLeaveInstruction: false);
 
             for (int i = 0; i < subroutine.CodeFrame.FunctionParameters.Count; i++)
-                frame.AddInstruction(InsNilConst.Empty, 0);
+                frame.AddInstruction(new InsNilConst(), 0);
 
             // "Insert" by evaluating each captured variable
             foreach (var capturedVariable in subroutine.CodeFrame.CapturedCallbackVariables)
@@ -1252,11 +1261,11 @@ namespace GTAdhocToolchain.Compiler
                 // attribute definition with no value
 
                 // defaults to nil
-                frame.AddInstruction(InsNilConst.Empty, ident.Location.Start.Line);
+                frame.AddInstruction(new InsNilConst(), ident.Location.Start.Line);
 
                 var idSymb = SymbolMap.RegisterSymbol(ident.Name);
                 InsAttributeDefine staticDefine = new InsAttributeDefine(idSymb);
-                frame.AddInstruction(staticDefine, attrVariableDefinition.Location.End.Line);
+                frame.AddInstruction(staticDefine, attrVariableDefinition.Location.Start.Line);
 
                 if (!frame.CurrentModule.DefineAttribute(idSymb))
                     ThrowCompilationError(attrVariableDefinition, "Attribute is already defined.");
@@ -2066,8 +2075,7 @@ namespace GTAdhocToolchain.Compiler
             switch (literal.TokenType)
             {
                 case TokenType.NilLiteral:
-                    InsNilConst nil = new InsNilConst();
-                    frame.AddInstruction(nil, literal.Location.Start.Line);
+                    frame.AddInstruction(new InsNilConst(), literal.Location.Start.Line);
                     break;
 
                 case TokenType.BooleanLiteral:
@@ -2235,7 +2243,7 @@ namespace GTAdhocToolchain.Compiler
             {
                 // All functions return a value internally, even if they don't in the code.
                 // So, add one.
-                frame.AddInstruction(InsVoidConst.Empty, bodyNode.Location.End.Line);
+                frame.AddInstruction(new InsVoidConst(), bodyNode.Location.End.Line);
                 frame.AddInstruction(new InsSetState(AdhocRunState.RETURN), 0);
             }
         }
@@ -2458,7 +2466,7 @@ namespace GTAdhocToolchain.Compiler
         /// <param name="symbol"></param>
         /// <returns></returns>
         // Mostly used for temp variables produced by the compiler
-        private void InsertVariableEvalFromSymbol(AdhocCodeFrame frame, AdhocSymbol symbol)
+        private void InsertVariableEvalFromSymbol(AdhocCodeFrame frame, AdhocSymbol symbol, Location location = default)
         {
             LocalVariable taskVariable = frame.Stack.GetLocalVariableBySymbol(symbol);
             int taskVariableStoreIdx = frame.Stack.GetLocalVariableIndex(taskVariable);
@@ -2466,7 +2474,7 @@ namespace GTAdhocToolchain.Compiler
             var insVarEval = new InsVariableEvaluation();
             insVarEval.VariableSymbols.Add(symbol);
             insVarEval.VariableStorageIndex = taskVariableStoreIdx;
-            frame.AddInstruction(insVarEval, 0);
+            frame.AddInstruction(insVarEval, location.Start.Line);
         }
 
         /// <summary>

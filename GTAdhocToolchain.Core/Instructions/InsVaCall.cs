@@ -11,8 +11,6 @@ namespace GTAdhocToolchain.Core.Instructions
     /// </summary>
     public class InsVaCall : InstructionBase
     {
-        public static readonly InsVoidConst Empty = new();
-
         public override AdhocInstructionType InstructionType => AdhocInstructionType.VA_CALL;
 
         public override string InstructionName => "VA_CALL";
