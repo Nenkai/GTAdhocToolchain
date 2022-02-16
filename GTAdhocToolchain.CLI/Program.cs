@@ -119,7 +119,7 @@ namespace GTAdhocToolchain.CLI
             if (packVerbs.OutputPath.ToLower().EndsWith("gpb"))
             {
                 var gpb = new GpbData3();
-                gpb.AddFilesFromFolder(packVerbs.InputPath);
+                gpb.AddFilesFromFolder(packVerbs.InputPath, packVerbs.GT5PackMode);
                 gpb.Pack(packVerbs.OutputPath, !packVerbs.LittleEndian);
             }
             else if (packVerbs.OutputPath.EndsWith("mpackage"))
@@ -311,6 +311,8 @@ namespace GTAdhocToolchain.CLI
         [Option("le", HelpText = "Pack as little endian?")]
         public bool LittleEndian { get; set; }
 
+        [Option("gt5", HelpText = "Use GT5 pack mode (no leading /'s)")]
+        public bool GT5PackMode { get; set; }
     }
 
     [Verb("unpack", HelpText = "Unpack files like gpb's, or mpackage's.")]
