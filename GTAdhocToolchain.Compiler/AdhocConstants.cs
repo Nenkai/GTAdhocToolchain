@@ -38,6 +38,7 @@ namespace GTAdhocToolchain.Compiler
             { "CELL_PAD_CTRL_R2", new InsIntConst(0xFFDD) },
             { "CELL_PAD_CTRL_R3", new InsIntConst(0xFFDE) },
 
+            { "COLOR_DEFAULT", new InsStringConst(new AdhocSymbol(((char)0x10).ToString())) },
             { "COLOR_WHITE", new InsStringConst(new AdhocSymbol(((char)0x11).ToString())) },
             { "COLOR_RED", new InsStringConst(new AdhocSymbol( ((char)0x12).ToString()))},
             { "COLOR_GREEN", new InsStringConst(new AdhocSymbol(((char)0x13).ToString())) },
