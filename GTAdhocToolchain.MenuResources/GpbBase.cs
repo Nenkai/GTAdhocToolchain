@@ -54,7 +54,7 @@ namespace GTAdhocToolchain.Menu.Resources
             }
         }
 
-        public void AddFilesFromFolder(string folderName)
+        public void AddFilesFromFolder(string folderName, bool gt5 = false)
         {
             List<string> files = Directory.GetFiles(folderName, "*", SearchOption.AllDirectories).ToList();
             files.Sort(Utils.AlphaNumericStringSorter);
@@ -65,8 +65,16 @@ namespace GTAdhocToolchain.Menu.Resources
 
                 string fileName = file.Replace('\\', '/'); // Replace to any wanted path separator
                 fileName = fileName.Substring(fileName.IndexOf('/')); // Remove the parent
-                if (!fileName.StartsWith('/'))
-                    fileName = '/' + fileName; // Ensure it starts with '/'
+                if (!gt5)
+                {
+                    if (!fileName.StartsWith('/'))
+                        fileName = '/' + fileName; // Ensure it starts with '/' if not GT5
+                }
+                else
+                {
+                    if (fileName.StartsWith('/'))
+                        fileName = fileName.Substring(1); // Ensure it DOESN'T start with '/' if GT5
+                }
 
                 pair.FileName = fileName;
                 pair.FileData = File.ReadAllBytes(file);
