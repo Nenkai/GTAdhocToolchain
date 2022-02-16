@@ -42,7 +42,7 @@ namespace GTAdhocToolchain.Core.Instructions
                 AdhocInstructionType.LEAVE => new InsLeaveScope(),
                 AdhocInstructionType.VOID_CONST => new InsVoidConst(),
                 AdhocInstructionType.SET_STATE => new InsSetState(),
-                //AdhocInstructionType.SET_STATE_OLD => new OpSetState() { CallType = type },
+                AdhocInstructionType.SET_STATE_OLD => new InsSetStateOld(),
                 AdhocInstructionType.NIL_CONST => new InsNilConst(),
                 AdhocInstructionType.ATTRIBUTE_DEFINE => new InsAttributeDefine(),
                 AdhocInstructionType.BOOL_CONST => new InsBoolConst(),
@@ -120,8 +120,8 @@ namespace GTAdhocToolchain.Core.Instructions
         IMPORT,
         INT_CONST,
         JUMP,
-        JUMP_IF_TRUE,
-        JUMP_IF_FALSE,
+        JUMP_IF_TRUE, // Also known as JUMP_NOT_ZERO
+        JUMP_IF_FALSE, // Also known as JUMP_ZERO
         LIST_ASSIGN_OLD,
         LOCAL_DEFINE,
         LOGICAL_AND_OLD,
@@ -146,6 +146,8 @@ namespace GTAdhocToolchain.Core.Instructions
         ATTRIBUTE_EVAL,
         VARIABLE_EVAL,
         SOURCE_FILE,
+
+        // GTHD Release (V10)
         FUNCTION_CONST,
         METHOD_CONST,
         MAP_CONST_OLD,
@@ -153,10 +155,14 @@ namespace GTAdhocToolchain.Core.Instructions
         ASSIGN,
         LIST_ASSIGN,
         CALL_OLD,
+
+        // GT5P JP Demo (V10)
         OBJECT_SELECTOR, // Also known as SELF_SELECTOR earlier than GT5P Demo
         SYMBOL_CONST,
         LEAVE, // Also known as CODE_CONST earlier than GT5P Demo
-        ARRAY_CONST,
+
+        // V11
+        ARRAY_CONST, 
         ARRAY_PUSH,
         MAP_CONST,
         MAP_INSERT,
@@ -164,21 +170,35 @@ namespace GTAdhocToolchain.Core.Instructions
         SET_STATE,
         VOID_CONST,
         ASSIGN_POP,
+
+        // GT5 Spec 3 (V12)
         U_INT_CONST,
         U_LONG_CONST,
         DOUBLE_CONST,
+
+        // GT5 TT Challenge (V12)
         ELEMENT_PUSH,
         ELEMENT_EVAL,
         LOGICAL_AND,
         LOGICAL_OR,
         BOOL_CONST,
         MODULE_CONSTRUCTOR,
+
+        // GT6 (V12)
         VA_CALL,
         CODE_EVAL,
 
-        // GT Sport
+        // GT Sport (V12)
         UNK_69,
         UNK_70,
         UNK_71,
+    }
+
+    enum AdhocVersion
+    {
+        GT5P, // V11 -> V12, adds 3 instructions
+        GT5TT, // Adds 6 instructions
+        GT6, // Adds 2 instructions
+        GTSport, // Adds 3 instructions
     }
 }

@@ -32,7 +32,7 @@ namespace GTAdhocToolchain.Core.Instructions
         public override void Deserialize(AdhocStream stream)
         {
             VariableCount = stream.ReadInt32();
-            if (stream.Version >= 11)
+            if (stream.Version > 11)
                 Unk = stream.ReadBoolean();
         }
 

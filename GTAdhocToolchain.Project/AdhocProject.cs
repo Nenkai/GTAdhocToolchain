@@ -85,7 +85,7 @@ namespace GTAdhocToolchain.Project
 
             var compiler = new AdhocScriptCompiler();
             compiler.SetProjectDirectory(Path.GetFullPath(Path.Combine(ProjectFilePath, BaseIncludeFolder)));
-            compiler.SetSourcePath(compiler.SymbolMap, Path.Combine(ProjectFolder, tmpFileName));
+            compiler.SetSourcePath(compiler.SymbolMap, ProjectFolder + "/" + tmpFileName);
             compiler.CompileScript(program);
 
             AdhocCodeGen codeGen = new AdhocCodeGen(compiler, compiler.SymbolMap);
@@ -126,13 +126,15 @@ namespace GTAdhocToolchain.Project
             using StreamWriter mergedFile = new StreamWriter(Path.Combine(FullProjectPath, tmpFileName));
             foreach (AdhocProjectFile srcFile in FilesToCompile)
             {
+                string srcFilePath = Path.Combine(FullProjectPath, srcFile.Name);
+
                 if (!srcFile.IsMain)
                 {
                     mergedFile.WriteLine($"module {ProjectName} // Compiler Generated");
                     mergedFile.WriteLine("{");
                 }
 
-                string srcFilePath = Path.Combine(FullProjectPath, srcFile.Name);
+                mergedFile.WriteLine($"#source " + "\"" + ProjectFolder + "/" + srcFile.Name +"\"");
                 if (!File.Exists(srcFilePath))
                     throw new FileNotFoundException($"Source file {srcFile.Name} for linking was not found.");
 

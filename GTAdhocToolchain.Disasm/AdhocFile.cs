@@ -40,6 +40,8 @@ namespace GTAdhocToolchain.Disasm
             byte version = (byte)int.Parse(magic.AsSpan(4, 3));
             var adhoc = new AdhocFile(version);
 
+            stream.Version = version;
+
             if (adhoc.Version >= 9)
                 stream.ReadSymbolTable();
             adhoc.SymbolTable = stream.Symbols;
@@ -115,6 +117,8 @@ namespace GTAdhocToolchain.Disasm
                     modOrClass.Push((inst as InsModuleDefine).Names[^1].Name);
                 else if (inst.InstructionType == AdhocInstructionType.CLASS_DEFINE)
                     modOrClass.Push((inst as InsClassDefine).Name.Name);
+                else if (inst.InstructionType == AdhocInstructionType.TRY_CATCH)
+                    modOrClass.Push("TryCatch");
                 else if (inst is InsSetState state && state.State == AdhocRunState.EXIT)
                     sw.Write($"  [EXIT {modOrClass.Pop()}]");
 
@@ -160,7 +164,6 @@ namespace GTAdhocToolchain.Disasm
             {
                 InstructionBase inst = subroutine.CodeFrame.Instructions[i];
                 sw.Write(curDepthStr);
-
                 if (ifdepth > 0)
                     sw.Write(new string(' ', 2 * ifdepth));
 
@@ -180,6 +183,8 @@ namespace GTAdhocToolchain.Disasm
                     modOrClass.Push((inst as InsModuleDefine).Names[^1].Name);
                 else if (inst.InstructionType == AdhocInstructionType.CLASS_DEFINE)
                     modOrClass.Push((inst as InsClassDefine).Name.Name);
+                else if (inst.InstructionType == AdhocInstructionType.TRY_CATCH)
+                    modOrClass.Push("TryCatch");
                 else if (inst is InsSetState state && state.State == AdhocRunState.EXIT)
                     sw.Write($"  [EXIT {modOrClass.Pop()}]");
 
