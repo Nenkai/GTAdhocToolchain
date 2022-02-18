@@ -185,6 +185,10 @@ namespace GTAdhocToolchain.CLI
                 prj.Build();
                 return;
             }
+            catch (ParserException parseException)
+            {
+                Logger.Fatal($"Syntax error: {parseException.Description} at {parseException.SourceText}:{parseException.Column}");
+            }
             catch (AdhocCompilationException compileException)
             {
                 Logger.Fatal($"Compilation error: {compileException.Message}");
@@ -216,6 +220,10 @@ namespace GTAdhocToolchain.CLI
 
                 Logger.Info($"Script build successful.");
                 return;
+            }
+            catch (ParserException parseException)
+            {
+                Logger.Fatal($"Syntax error: {parseException.Description} at ({parseException.SourceText}:{parseException.Column}'");
             }
             catch (AdhocCompilationException compileException)
             {

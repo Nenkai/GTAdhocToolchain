@@ -27,7 +27,15 @@ namespace GTAdhocToolchain.Project
 
         public int Version { get; set; } = 12;
 
+        /// <summary>
+        /// ../../projects/<code>/<project_name>
+        /// </summary>
         public string ProjectFolder { get; set; }
+
+        /// <summary>
+        /// projects/<code>/<project_name>
+        /// </summary>
+        public string SourceProjectFolder { get; set; }
 
         public string FullProjectPath { get; set; }
 
@@ -66,6 +74,7 @@ namespace GTAdhocToolchain.Project
         {
             // Convert project folder into full path
             FullProjectPath = Path.GetFullPath(Path.Combine(ProjectFilePath, ProjectFolder));
+            SourceProjectFolder = ProjectFolder.TrimStart('.', '/'); // Trim ../
 
             string tmpFileName = $"_tmp_{OutputName}.ad";
             LinkFiles(tmpFileName);
@@ -134,7 +143,8 @@ namespace GTAdhocToolchain.Project
                     mergedFile.WriteLine("{");
                 }
 
-                mergedFile.WriteLine($"#source " + "\"" + ProjectFolder + "/" + srcFile.Name +"\"");
+                string srcPath = SourceProjectFolder + "/" + srcFile.Name;
+                mergedFile.WriteLine($"#source " + "\"" + srcPath + "\"");
                 if (!File.Exists(srcFilePath))
                     throw new FileNotFoundException($"Source file {srcFile.Name} for linking was not found.");
 
@@ -143,6 +153,8 @@ namespace GTAdhocToolchain.Project
                 string line;
                 while ((line = fileReader.ReadLine()) != null)
                     mergedFile.WriteLine(line);
+
+                mergedFile.WriteLine($"#resetline");
 
                 if (!srcFile.IsMain)
                 {

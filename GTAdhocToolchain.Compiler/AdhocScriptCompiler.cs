@@ -165,6 +165,7 @@ namespace GTAdhocToolchain.Compiler
         {
             InsSourceFile srcFileIns = new InsSourceFile(SymbolMap.RegisterSymbol(srcFileStatement.Path, false));
             frame.AddInstruction(srcFileIns, 0);
+            frame.SetSourcePath(SymbolMap, srcFileStatement.Path);
         }
 
         public void CompileUndefStatement(AdhocCodeFrame frame, UndefStatement undefStatement)
@@ -186,7 +187,7 @@ namespace GTAdhocToolchain.Compiler
         public void CompileTryStatement(AdhocCodeFrame frame, TryStatement tryStatement)
         {
             InsTryCatch tryCatch = new InsTryCatch();
-            frame.AddInstruction(tryCatch, tryStatement.Location.End.Line);
+            frame.AddInstruction(tryCatch, tryStatement.Location.Start.Line);
 
             if (tryStatement.Block.Type != Nodes.BlockStatement)
                 ThrowCompilationError(tryStatement.Block, "Expected try body to be a block statement.");
@@ -1070,10 +1071,27 @@ namespace GTAdhocToolchain.Compiler
                 case Nodes.SpreadElement:
                     CompileSpreadElement(frame, exp as SpreadElement);
                     break;
+                case Nodes.SelfExpression:
+                    CompileSelfExpression(frame, exp as SelfExpression);
+                    break;
                 default:
                     ThrowCompilationError(exp, $"Expression {exp.Type} not supported");
                     break;
             }
+        }
+
+        /// <summary>
+        /// Compiles <self>
+        /// </summary>
+        /// <param name="frame"></param>
+        /// <param name="spreadElement"></param>
+        private void CompileSelfExpression(AdhocCodeFrame frame, SelfExpression selfExpression)
+        {
+            AdhocSymbol symb = SymbolMap.RegisterSymbol("self");
+            int idx = 0; // Always 0 when refering to self
+            var varEval = new InsVariableEvaluation(idx);
+            varEval.VariableSymbols.Add(symb); // Self is always considered as a local. Just one
+            frame.AddInstruction(varEval, selfExpression.Location.Start.Line);
         }
 
         /// <summary>
@@ -1193,7 +1211,7 @@ namespace GTAdhocToolchain.Compiler
                 // static definition with no value
                 var idSymb = SymbolMap.RegisterSymbol(ident.Name);
                 InsStaticDefine staticDefine = new InsStaticDefine(idSymb);
-                frame.AddInstruction(staticDefine, staticExpression.Location.End.Line);
+                frame.AddInstruction(staticDefine, staticExpression.Location.Start.Line);
 
                 if (!frame.CurrentModule.DefineStatic(idSymb))
                     ThrowCompilationError(staticExpression, $"Static member {idSymb.Name} was already declared in this module.");
@@ -1222,7 +1240,7 @@ namespace GTAdhocToolchain.Compiler
                 var idSymb = SymbolMap.RegisterSymbol(identifier.Name);
 
                 InsStaticDefine staticDefine = new InsStaticDefine(idSymb);
-                frame.AddInstruction(staticDefine, staticExpression.Location.End.Line);
+                frame.AddInstruction(staticDefine, staticExpression.Location.Start.Line);
 
                 if (!frame.CurrentModule.DefineStatic(idSymb))
                     ThrowCompilationError(staticExpression, $"Static member {idSymb.Name} was already declared in this module.");
@@ -2209,14 +2227,13 @@ namespace GTAdhocToolchain.Compiler
                 return;
 
             AdhocSymbol symb = SymbolMap.RegisterSymbol(identifier.Name);
-            int idx = identifier.Name != "self" ? frame.AddScopeVariable(symb, isAssignment: false) : 0;
+            int idx = frame.AddScopeVariable(symb, isAssignment: false);
             var varEval = new InsVariableEvaluation(idx);
             varEval.VariableSymbols.Add(symb); // Only one
             frame.AddInstruction(varEval, identifier.Location.Start.Line);
 
             // Static references or pushes always have double their own symbol
             // If its a static reference, do not add it as a declared variable within this scope
-            // "self" keyword is ignored
             if (frame.IsStaticVariable(symb))
                 varEval.VariableSymbols.Add(symb); // Static, two symbols
         }
@@ -2391,7 +2408,7 @@ namespace GTAdhocToolchain.Compiler
         /// <returns></returns>
         private AdhocCompilationException GetCompilationError(Node node, string message)
         {
-            return new AdhocCompilationException($"{message} Line {node.Location.Start.Line}:{node.Location.Start.Column}");
+            return new AdhocCompilationException($"{message} at {node.Location.Source}:{node.Location.Start.Line}");
         }
 
         private LoopContext EnterLoop(AdhocCodeFrame frame, Statement loopStatement)
