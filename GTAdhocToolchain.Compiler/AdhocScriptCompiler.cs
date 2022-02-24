@@ -363,26 +363,12 @@ namespace GTAdhocToolchain.Compiler
                 moduleOrClass.Name = id.Name;
 
                 var superClassIdent = superClass as Identifier;
-                if (superClassIdent != null)
+                if (superClass != null)
                 {
+                    foreach (var path in superClassIdent.Name.Split("::"))
+                        @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol(path));
+
                     @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol(superClassIdent.Name));
-                }
-                else if (superClass != null)
-                {
-                    string fullSuperClassName = "";
-                    foreach (var node in superClass.ChildNodes)
-                    {
-                        var nodeIdent = node as Identifier;
-                        if (nodeIdent == null)
-                        {
-                            ThrowCompilationError(superClass, "Superclasses must be identifiers or module::identifiers.");
-                            return;
-                        }
-                        @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol(nodeIdent.Name));
-                        fullSuperClassName += $"{nodeIdent.Name}::";
-                    }
-                    fullSuperClassName = fullSuperClassName.Remove(fullSuperClassName.Length - 2);
-                    @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol(fullSuperClassName));
                 }
                 else
                 {
@@ -398,7 +384,7 @@ namespace GTAdhocToolchain.Compiler
             // Compile statements directly, we don't need a regular leave.
             CompileStatements(frame, body as BlockStatement);
 
-            LeaveModuleOrClass(frame);
+            LeaveModuleOrClass(frame, fromSubroutine: frame is not AdhocScriptCompiler);
 
             // Exit class or module scope. Important.
             InsSetState state = new InsSetState(AdhocRunState.EXIT);
@@ -2469,7 +2455,10 @@ namespace GTAdhocToolchain.Compiler
         /// <param name="frame"></param>
         /// <param name="insertLeaveInstruction"></param>
         /// <param name="isModuleLeave"></param>
-        private void LeaveScope(AdhocCodeFrame frame, bool insertLeaveInstruction = true, bool isModuleLeave = false)
+        private void LeaveScope(AdhocCodeFrame frame, 
+            bool insertLeaveInstruction = true, 
+            bool isModuleLeave = false, 
+            bool isModuleExitFromSubroutine = false)
         {
             var lastScope = frame.CurrentScopes.Pop();
 
@@ -2491,8 +2480,12 @@ namespace GTAdhocToolchain.Compiler
 
                 if (isModuleLeave)
                 {
-                    leave.VariableStorageRewindIndex = 1;
                     leave.ModuleOrClassDepthRewindIndex = ModuleStack.Count - 1;
+
+                    if (isModuleExitFromSubroutine)
+                        leave.VariableStorageRewindIndex = frame.Stack.GetLastLocalVariableIndex();
+                    else
+                        leave.VariableStorageRewindIndex = 1;
                 }
                 else
                 {
@@ -2503,9 +2496,9 @@ namespace GTAdhocToolchain.Compiler
             }
         }
 
-        private void LeaveModuleOrClass(AdhocCodeFrame frame)
+        private void LeaveModuleOrClass(AdhocCodeFrame frame, bool fromSubroutine = false)
         {
-            LeaveScope(frame, isModuleLeave: true);
+            LeaveScope(frame, isModuleLeave: true, isModuleExitFromSubroutine: fromSubroutine);
             ModuleStack.Pop();
             frame.CurrentModule = ModuleStack.Peek();
         }
