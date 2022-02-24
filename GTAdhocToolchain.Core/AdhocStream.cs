@@ -124,47 +124,28 @@ namespace GTAdhocToolchain.Core
             return true;
         }
 
-        public void WriteVarInt(int val)
+        // Credits xfileFin
+        public void WriteVarInt(int value)
         {
-            Span<byte> buffer = Array.Empty<byte>();
-
-            if (val <= 0x7F)
+            if ((value & 0xFFFFFF80) == 0)
             {
-                WriteByte((byte)val);
+                Write((byte)value);
                 return;
             }
-            else if (val <= 0x3FFF)
-            {
-                Span<byte> tempBuf = BitConverter.GetBytes(val).AsSpan();
-                tempBuf.Reverse();
-                buffer = tempBuf.Slice(2, 2);
-            }
-            else if (val <= 0x1FFFFF)
-            {
-                Span<byte> tempBuf = BitConverter.GetBytes(val).AsSpan();
-                tempBuf.Reverse();
-                buffer = tempBuf.Slice(1, 3);
-            }
-            else if (val <= 0xFFFFFFF)
-            {
-                buffer = BitConverter.GetBytes(val).AsSpan();
-                buffer.Reverse();
-            }
-            else if (val <= 0xFFFFFFFF)
-            {
-                buffer = BitConverter.GetBytes(val);
-                buffer.Reverse();
-                buffer = new byte[] { 0, buffer[0], buffer[1], buffer[2], buffer[3] };
-            }
 
+            var bytesToWrite = 1;
             uint mask = 0x80;
-            for (int i = 1; i < buffer.Length; i++)
+            long retVal = 0;
+            do
             {
-                buffer[0] += (byte)mask;
-                mask >>= 1;
-            }
+                retVal = (retVal + mask) << 8;
+                mask <<= 7;
+                bytesToWrite++;
+            } while ((value & -mask) > 0);
 
-            Write(buffer);
+            var finalValue = retVal | value;
+            for (var i = bytesToWrite; i > 0; i--)
+                Write((byte)(finalValue >> (i - 1) * 8));
         }
 
         public static byte[] EncodeAndAdvance(uint value)

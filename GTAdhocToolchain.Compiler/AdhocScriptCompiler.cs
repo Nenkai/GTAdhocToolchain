@@ -178,6 +178,8 @@ namespace GTAdhocToolchain.Compiler
                 foreach (string part in undefStatement.Symbol.Split("::"))
                     undefIns.Symbols.Add(SymbolMap.RegisterSymbol(part));
             }
+            else
+                undefIns.Symbols.Add(SymbolMap.RegisterSymbol(parts[0]));
 
             undefIns.Symbols.Add(SymbolMap.RegisterSymbol(undefStatement.Symbol)); // full
 
@@ -789,8 +791,12 @@ namespace GTAdhocToolchain.Compiler
                 {
                     var pattern = param as AssignmentPattern;
 
-                    if (pattern.Right.Type != Nodes.Literal && pattern.Right.Type != Nodes.ArrayExpression && pattern.Right.Type != Nodes.MapExpression)
-                        ThrowCompilationError(parentNode, "Subroutine parameter assignment must be an identifier to a literal.");
+                    if (pattern.Right.Type != Nodes.Literal &&
+                        pattern.Right.Type != Nodes.Identifier &&
+                        pattern.Right.Type != Nodes.MemberExpression &&
+                        pattern.Right.Type != Nodes.ArrayExpression &&
+                        pattern.Right.Type != Nodes.MapExpression)
+                        ThrowCompilationError(parentNode, "Subroutine default parameter value must be an identifier to a literal or other identifier.");
 
                     AdhocSymbol paramSymb = SymbolMap.RegisterSymbol((pattern.Left as Identifier).Name);
                     subroutine.CodeFrame.FunctionParameters.Add(paramSymb);
@@ -864,6 +870,9 @@ namespace GTAdhocToolchain.Compiler
                 Expression? initValue = declarator.Init;
                 Expression? id = declarator.Id;
 
+                if ((id as Identifier)?.Name == "key0")
+                    ;
+
                 // We need to add the defined value first
                 if (initValue != null)
                 {
@@ -882,6 +891,9 @@ namespace GTAdhocToolchain.Compiler
 
                 if (id is Identifier idIdentifier) // var hello [= world];
                 {
+                    if (idIdentifier.Name == "key0")
+                        ;
+
                     if (initValue != null || pushWhenNoInit)
                     {
                         // Variable is being defined with a value.
@@ -1433,7 +1445,7 @@ namespace GTAdhocToolchain.Compiler
                         if (literal.Expressions.Count == 0)
                         {
                             TemplateElement element = literal.Quasis[0];
-                            AdhocSymbol strSymb = SymbolMap.RegisterSymbol(element.Value.Cooked);
+                            AdhocSymbol strSymb = SymbolMap.RegisterSymbol(element.Value.Cooked, convertToOperand: false);
                             InsStringConst strConst = new InsStringConst(strSymb);
                             frame.AddInstruction(strConst, element.Location.Start.Line);
 
@@ -1453,7 +1465,7 @@ namespace GTAdhocToolchain.Compiler
                             {
                                 if (n is TemplateElement tElem)
                                 {
-                                    AdhocSymbol valSymb = SymbolMap.RegisterSymbol(tElem.Value.Cooked);
+                                    AdhocSymbol valSymb = SymbolMap.RegisterSymbol(tElem.Value.Cooked, convertToOperand: false);
                                     InsStringConst strConst = new InsStringConst(valSymb);
                                     frame.AddInstruction(strConst, n.Location.Start.Line);
                                 }
@@ -1711,7 +1723,7 @@ namespace GTAdhocToolchain.Compiler
         }
 
         /// <summary>
-        /// Compiles array or map element assignment
+        /// Compiles array or map element assignment (ELEMENT_PUSH)
         /// </summary>
         private void CompileComputedMemberExpressionAssignment(AdhocCodeFrame frame, ComputedMemberExpression computedMember)
         {
@@ -2027,7 +2039,7 @@ namespace GTAdhocToolchain.Compiler
                     else if (unaryExp.Argument is AttributeMemberExpression attr)
                         InsertAttributeMemberAssignmentPush(frame, attr);
                     else if (unaryExp.Argument is ComputedMemberExpression comp)
-                        CompileComputedMemberExpression(frame, comp);
+                        CompileComputedMemberExpressionAssignment(frame, comp);
                     else if (unaryExp.Argument.Type == Nodes.Literal) // -1 -> int const + unary op
                         CompileLiteral(frame, unaryExp.Argument as Literal);
                     else if (unaryExp.Argument.Type == Nodes.CallExpression)

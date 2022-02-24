@@ -187,7 +187,7 @@ namespace GTAdhocToolchain.CLI
             }
             catch (ParserException parseException)
             {
-                Logger.Fatal($"Syntax error: {parseException.Description} at {parseException.SourceText}:{parseException.Column}");
+                Logger.Fatal($"Syntax error: {parseException.Description} at {parseException.SourceText}:{parseException.LineNumber}");
             }
             catch (AdhocCompilationException compileException)
             {

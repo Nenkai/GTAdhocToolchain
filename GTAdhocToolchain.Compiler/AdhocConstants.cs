@@ -13,6 +13,15 @@ namespace GTAdhocToolchain.Compiler
     {
         public static Dictionary<string, InstructionBase> CompilerProvidedConstants = new()
         {
+            { "INT_MIN", new InsIntConst(int.MinValue) },
+            { "INT_MAX", new InsIntConst(int.MaxValue) },
+            { "UINT_MIN", new InsUIntConst(uint.MinValue) },
+            { "UINT_MAX", new InsUIntConst(uint.MaxValue) },
+            { "LONG_MIN", new InsLongConst(long.MinValue) },
+            { "LONG_MAX", new InsLongConst(long.MaxValue) },
+            { "ULONG_MIN", new InsULongConst(ulong.MinValue) },
+            { "ULONG_MAX", new InsULongConst(ulong.MaxValue) },
+
             { "CELL_PAD_CTRL_L3_LEFT", new InsIntConst(0xFF51) },
             { "CELL_PAD_CTRL_L3_UP", new InsIntConst(0xFF52) },
             { "CELL_PAD_CTRL_L3_RIGHT", new InsIntConst(0xFF53) },
