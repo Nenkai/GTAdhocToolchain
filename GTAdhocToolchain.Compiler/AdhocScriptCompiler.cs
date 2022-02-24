@@ -870,9 +870,6 @@ namespace GTAdhocToolchain.Compiler
                 Expression? initValue = declarator.Init;
                 Expression? id = declarator.Id;
 
-                if ((id as Identifier)?.Name == "key0")
-                    ;
-
                 // We need to add the defined value first
                 if (initValue != null)
                 {
@@ -891,9 +888,6 @@ namespace GTAdhocToolchain.Compiler
 
                 if (id is Identifier idIdentifier) // var hello [= world];
                 {
-                    if (idIdentifier.Name == "key0")
-                        ;
-
                     if (initValue != null || pushWhenNoInit)
                     {
                         // Variable is being defined with a value.
