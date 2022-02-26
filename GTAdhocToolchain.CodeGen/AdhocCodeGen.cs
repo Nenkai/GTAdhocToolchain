@@ -71,7 +71,7 @@ namespace GTAdhocToolchain.CodeGen
                 }
 
                 if (Version >= 12)
-                    stream.WriteByte(0);
+                    stream.WriteBoolean(block.HasRestElement);
 
                 stream.WriteInt32(block.FunctionParameters.Count);
                 for (int i = 0; i < block.FunctionParameters.Count; i++)

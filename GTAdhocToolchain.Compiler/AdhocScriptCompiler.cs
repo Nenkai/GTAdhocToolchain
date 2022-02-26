@@ -365,8 +365,11 @@ namespace GTAdhocToolchain.Compiler
                 var superClassIdent = superClass as Identifier;
                 if (superClass != null)
                 {
-                    foreach (var path in superClassIdent.Name.Split("::"))
-                        @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol(path));
+                    if (superClassIdent.Name.Contains("::"))
+                    {
+                        foreach (var path in superClassIdent.Name.Split("::"))
+                            @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol(path));
+                    }
 
                     @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol(superClassIdent.Name));
                 }
@@ -790,8 +793,19 @@ namespace GTAdhocToolchain.Compiler
                     // Push default value
                     CompileExpression(frame, pattern.Right);
                 }
+                else if (param.Type == Nodes.RestElement) // params
+                {
+                    subroutine.CodeFrame.HasRestElement = true;
+
+                    Identifier paramIdent = (param as RestElement).Argument as Identifier;
+                    AdhocSymbol paramSymb = SymbolMap.RegisterSymbol(paramIdent.Name);
+                    subroutine.CodeFrame.FunctionParameters.Add(paramSymb);
+
+                    frame.AddInstruction(new InsNilConst(), paramIdent.Location.Start.Line);
+                }
                 else
                     ThrowCompilationError(parentNode, "Subroutine definition parameters must all be identifier or assignment to a literal.");
+
             }
 
             if (frame.CurrentScope.StaticScopeVariables.ContainsKey(subroutine.Name.Name))

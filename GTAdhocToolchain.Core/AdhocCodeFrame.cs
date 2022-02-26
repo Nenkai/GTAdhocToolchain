@@ -88,6 +88,11 @@ namespace GTAdhocToolchain.Core
         public uint InstructionCountOffset { get; set; }
         public bool HasDebuggingInformation { get; set; }
 
+        /// <summary>
+        /// Version 12 only. Indicatesd a subroutine with a rest/params[] element/argument.
+        /// </summary>
+        public bool HasRestElement { get; set; }
+
         public void SetSourcePath(AdhocSymbolMap symbolMap, string path)
         {
             SourceFilePath = symbolMap.RegisterSymbol(path);
@@ -425,9 +430,7 @@ namespace GTAdhocToolchain.Core
 
 
                 if (Version >= 12)
-                {
-                    byte unk = stream.Read1Byte();
-                }
+                    HasRestElement = stream.ReadBoolean();
 
                 uint argCount = stream.ReadUInt32();
 
@@ -511,7 +514,6 @@ namespace GTAdhocToolchain.Core
                 }
             }
             sb.Append(")");
-
             if (CapturedCallbackVariables.Count != 0)
             {
                 sb.Append("[");
@@ -523,6 +525,9 @@ namespace GTAdhocToolchain.Core
                 }
                 sb.Append("]");
             }
+
+            if (HasRestElement)
+                sb.Append(" params[]");
 
             sb.AppendLine();
 
