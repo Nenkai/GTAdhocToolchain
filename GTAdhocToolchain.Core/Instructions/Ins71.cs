@@ -12,11 +12,9 @@ namespace GTAdhocToolchain.Core.Instructions
 
         public override string InstructionName => "UNK_71";
 
-        public int Value { get; set; }
-
         public override void Deserialize(AdhocStream stream)
         {
-            Value = stream.ReadInt32();
+            
         }
 
         public override string ToString()

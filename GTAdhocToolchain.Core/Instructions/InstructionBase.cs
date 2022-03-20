@@ -89,10 +89,8 @@ namespace GTAdhocToolchain.Core.Instructions
                 AdhocInstructionType.U_INT_CONST => new InsUIntConst(),
                 AdhocInstructionType.REQUIRE => new InsRequire(),
                 AdhocInstructionType.U_LONG_CONST => new InsULongConst(),
-                /*
-                AdhocInstructionType.PRINT => new OpPrint(),
-                AdhocInstructionType.MODULE_CONSTRUCTOR => new OpModuleCtor(),
-                */
+                //AdhocInstructionType.PRINT => new OpPrint(),
+                AdhocInstructionType.MODULE_CONSTRUCTOR => new InsModuleConstructor(),
                 AdhocInstructionType.VA_CALL => new InsVaCall(),
                 AdhocInstructionType.NOP => new InsNop(),
                 AdhocInstructionType.DOUBLE_CONST => new InsDoubleConst(),
