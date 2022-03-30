@@ -14,7 +14,7 @@ namespace GTAdhocToolchain.Core.Instructions
 
         public double Value { get; set; }
 
-        public InsDoubleConst(ulong value)
+        public InsDoubleConst(double value)
         {
             Value = value;
         }

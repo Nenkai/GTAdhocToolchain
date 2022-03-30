@@ -2184,8 +2184,14 @@ namespace GTAdhocToolchain.Compiler
 
                         case NumericTokenType.UnsignedLong:
                             if (frame.Version < 12)
-                                ThrowCompilationError(literal, "Unsigned long literals are only available in Adhoc version 1 and above.");
+                                ThrowCompilationError(literal, "Unsigned long literals are only available in Adhoc version 12 and above.");
                             ins = new InsULongConst((ulong)literal.NumericValue);
+                            break;
+
+                        case NumericTokenType.Double:
+                            if (frame.Version < 12)
+                                ThrowCompilationError(literal, "Unsigned long literals are only available in Adhoc version 12 and above.");
+                            ins = new InsDoubleConst((double)literal.NumericValue);
                             break;
 
                         default:

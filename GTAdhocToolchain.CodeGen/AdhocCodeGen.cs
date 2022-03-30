@@ -178,6 +178,8 @@ namespace GTAdhocToolchain.CodeGen
                     WriteULongConst(instruction as InsULongConst); break;
                 case AdhocInstructionType.FLOAT_CONST:
                     WriteFloatConst(instruction as InsFloatConst); break;
+                case AdhocInstructionType.DOUBLE_CONST:
+                    WriteDoubleConst(instruction as InsDoubleConst); break;
                 case AdhocInstructionType.SYMBOL_CONST:
                     WriteSymbolConst(instruction as InsSymbolConst); break;
                 case AdhocInstructionType.SET_STATE:
@@ -327,6 +329,11 @@ namespace GTAdhocToolchain.CodeGen
         private void WriteFloatConst(InsFloatConst floatConst)
         {
             stream.WriteSingle(floatConst.Value);
+        }
+
+        private void WriteDoubleConst(InsDoubleConst doubleConst)
+        {
+            stream.WriteDouble(doubleConst.Value);
         }
 
         private void WriteStringConst(InsStringConst stringConst)
