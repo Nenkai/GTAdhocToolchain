@@ -2190,7 +2190,7 @@ namespace GTAdhocToolchain.Compiler
 
                         case NumericTokenType.Double:
                             if (frame.Version < 12)
-                                ThrowCompilationError(literal, "Unsigned long literals are only available in Adhoc version 12 and above.");
+                                ThrowCompilationError(literal, "Double literals are only available in Adhoc version 12 and above.");
                             ins = new InsDoubleConst((double)literal.NumericValue);
                             break;
 
