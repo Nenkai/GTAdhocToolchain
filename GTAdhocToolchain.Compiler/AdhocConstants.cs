@@ -90,5 +90,13 @@ namespace GTAdhocToolchain.Compiler
             { "SQLITE_ROW",         new InsIntConst(100)},  /* sqlite3_step() has another row ready */
             { "SQLITE_DONE",        new InsIntConst(101)},  /* sqlite3_step() has finished executing */
         };
+
+        static AdhocConstants()
+        {
+            foreach (var i in Enum.GetValues<Keycodes>())
+            {
+                CompilerProvidedConstants.Add(i.ToString(), new InsIntConst((int)i));
+            }
+        }
     }
 }
