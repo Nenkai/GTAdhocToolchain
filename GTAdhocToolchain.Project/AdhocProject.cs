@@ -102,6 +102,12 @@ namespace GTAdhocToolchain.Project
             codeGen.SaveTo(Path.Combine(FullProjectPath, OutputName + ".adc"));
 
             Logger.Info("Project build successful.");
+
+            if (File.Exists(tmpFilePath))
+            {
+                File.Delete(tmpFileName);
+                return;
+            }
         }
 
         public (bool Result, string ErrorMessage) VerifyProjectFile()
