@@ -749,7 +749,7 @@ namespace GTAdhocToolchain.Compiler
             if (isMethod)
             {
                 if (!frame.CurrentModule.DefineMethod(subroutine.Name))
-                    ThrowCompilationError(id, "Method name already defined in this scope.");
+                    ThrowCompilationError(id, $"Method name '{subroutine.Name}' already defined in this scope.");
             }
 
             foreach (Expression param in subParams)
@@ -768,7 +768,7 @@ namespace GTAdhocToolchain.Compiler
                 else if (param is AssignmentExpression assignmentExpression)
                 {
                     if (assignmentExpression.Left.Type != Nodes.Identifier || assignmentExpression.Right.Type != Nodes.Literal)
-                        ThrowCompilationError(parentNode, "Subroutine parameter assignment must be an identifier to a literal. (value = 0)");
+                        ThrowCompilationError(parentNode, "Subroutine parameter assignment must be an identifier to a literal. (i.e 'value = 0')");
 
                     AdhocSymbol paramSymb = SymbolMap.RegisterSymbol((assignmentExpression.Left as Identifier).Name);
                     subroutine.CodeFrame.FunctionParameters.Add(paramSymb);
@@ -781,6 +781,7 @@ namespace GTAdhocToolchain.Compiler
                     var pattern = param as AssignmentPattern;
 
                     if (pattern.Right.Type != Nodes.Literal &&
+                        (pattern.Right.Type == Nodes.UnaryExpression && (pattern.Right as UnaryExpression).Argument.Type != Nodes.Literal) && // Stuff like -1
                         pattern.Right.Type != Nodes.Identifier &&
                         pattern.Right.Type != Nodes.MemberExpression &&
                         pattern.Right.Type != Nodes.ArrayExpression &&
