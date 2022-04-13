@@ -105,7 +105,7 @@ namespace GTAdhocToolchain.Project
 
             if (File.Exists(tmpFilePath))
             {
-                File.Delete(tmpFileName);
+                File.Delete(tmpFilePath);
                 return;
             }
         }
