@@ -233,6 +233,13 @@ namespace GTAdhocToolchain.Compiler
                 InsertVariablePush(frame, new Identifier(tmpCaseVariable), true);
                 InsertAssignPop(frame);
             }
+            else
+            {
+                // Discard (pop) exception object as 0
+                frame.AddInstruction(new InsIntConst(0), 0);
+                frame.AddInstruction(InsPop.Default, 0);
+
+            }
 
             CompileBlockStatement(frame, catchClause.Body);
         }
