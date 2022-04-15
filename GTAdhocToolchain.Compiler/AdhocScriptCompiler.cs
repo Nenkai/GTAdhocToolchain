@@ -1616,42 +1616,47 @@ namespace GTAdhocToolchain.Compiler
         /// <param name="expression"></param>
         public void CompileVariableAssignment(AdhocCodeFrame frame, Expression expression, bool popValue = true)
         {
-            if (expression is Identifier ident) // hello = world
+            if (expression.Type == Nodes.Identifier) // hello = world
             {
-                InsertVariablePush(frame, ident, false);
+                InsertVariablePush(frame, expression as Identifier, false);
             }
-            else if (expression is AttributeMemberExpression attrMember) // Pushing into an object i.e hello.world = "!"
+            else if (expression.Type == Nodes.MemberExpression)
             {
-                InsertAttributeMemberAssignmentPush(frame, attrMember);
-            }
-            else if (expression is ComputedMemberExpression compExpression)
-            {
-                CompileComputedMemberExpressionAssignment(frame, compExpression);
-            }
-            else if (expression is ObjectSelectorMemberExpression objSelectExpression)
-            {
-                CompileObjectSelectorExpressionAssignment(frame, objSelectExpression);
-            }
-            else if (expression is UnaryExpression unaryExp && unaryExp.Operator == UnaryOperator.Indirection)
-            {
-                if (unaryExp.Argument.Type == Nodes.Identifier || unaryExp.Argument is AttributeMemberExpression)
-                    CompileExpression(frame, unaryExp.Argument);
+                if (expression is AttributeMemberExpression attrMember) // Pushing into an object i.e hello.world = "!"
+                {
+                    InsertAttributeMemberAssignmentPush(frame, attrMember);
+                }
+                else if (expression is ComputedMemberExpression compExpression) // hello[world] = "foo"
+                {
+                    CompileComputedMemberExpressionAssignment(frame, compExpression);
+                }
+                else if (expression is ObjectSelectorMemberExpression objSelectExpression)
+                {
+                    CompileObjectSelectorExpressionAssignment(frame, objSelectExpression);
+                }
+                else if (expression is StaticMemberExpression staticMembExpression) // main::hello = hi
+                {
+                    CompileStaticMemberExpressionAssignment(frame, staticMembExpression);
+                }
+                else if (expression is UnaryExpression unaryExp && (unaryExp.Operator == UnaryOperator.Indirection || unaryExp.Operator == UnaryOperator.ReferenceOf)) // (*/&)hello = world
+                {
+                    if (unaryExp.Argument.Type == Nodes.Identifier || unaryExp.Argument is AttributeMemberExpression)
+                        CompileExpression(frame, unaryExp.Argument);
+                    else
+                        ThrowCompilationError(expression, "Unexpected assignment to unary argument. Only Indirection (*) or Reference (&) is allowed.");
+                }
                 else
-                    ThrowCompilationError(expression, "TODO: Ref stuff");
+                    ThrowCompilationError(expression, $"Unimplemented member expression assignment type: '{expression.Type}'");
+
             }
-            else if (expression is StaticMemberExpression staticMembExpression) // main::hello = hi
+            else if (expression.Type == Nodes.ArrayPattern) // var [hi, hello] = args
             {
-                CompileStaticMemberExpressionAssignment(frame, staticMembExpression);
-            }
-            else if (expression is ArrayPattern pattern) // var [hi, hello] = variable
-            {
-                CompileArrayPatternPush(frame, pattern, isDeclaration: false);
+                CompileArrayPatternPush(frame, expression as ArrayPattern, isDeclaration: false);
                 return; // No need for assign pop
             }
             else
             {
-                // Error
-                ThrowCompilationError(expression, "Unimplemented");
+                ThrowCompilationError(expression, $"Unimplemented variable assignment type: '{expression.Type}'");
             }
 
             if (popValue)
