@@ -204,12 +204,14 @@ namespace GTAdhocToolchain.CLI
         private static void BuildScript(string inputPath, string output)
         {
             var source = File.ReadAllText(inputPath);
-            var parser = new AdhocAbstractSyntaxTree(source);
-            var program = parser.ParseScript();
 
             Logger.Info($"Started script build ({inputPath}).");
             try
             {
+                var parser = new AdhocAbstractSyntaxTree(source);
+                parser.SetFileName(inputPath);
+                var program = parser.ParseScript();
+
                 var compiler = new AdhocScriptCompiler();
                 compiler.SetSourcePath(compiler.SymbolMap, inputPath);
                 compiler.CompileScript(program);
@@ -223,7 +225,7 @@ namespace GTAdhocToolchain.CLI
             }
             catch (ParserException parseException)
             {
-                Logger.Fatal($"Syntax error: {parseException.Description} at ({parseException.SourceText}:{parseException.Column}'");
+                Logger.Fatal($"Syntax error: {parseException.Description} at {parseException.SourceText}:{parseException.LineNumber}");
             }
             catch (AdhocCompilationException compileException)
             {
