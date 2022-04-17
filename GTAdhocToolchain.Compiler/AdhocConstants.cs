@@ -56,6 +56,13 @@ namespace GTAdhocToolchain.Compiler
             { "COLOR_CYAN", new InsStringConst(new AdhocSymbol(((char)0x16).ToString())) },
             { "COLOR_BLACK", new InsStringConst(new AdhocSymbol(((char)0x17).ToString())) },
 
+            { "STATE_EXIT", new InsIntConst((int)AdhocRunState.EXIT) },
+            { "STATE_RETURN", new InsIntConst((int)AdhocRunState.RETURN) },
+            { "STATE_YIELD", new InsIntConst((int)AdhocRunState.YIELD) },
+            { "STATE_EXCEPTION", new InsIntConst((int)AdhocRunState.EXCEPTION) },
+            { "STATE_CALL", new InsIntConst((int)AdhocRunState.CALL) },
+            { "STATE_RUN", new InsIntConst((int)AdhocRunState.RUN) },
+
             // sqlite3.h
             { "SQLITE_OK",          new InsIntConst(0) },   /* Successful result */
             /* beginning-of-error-codes */
