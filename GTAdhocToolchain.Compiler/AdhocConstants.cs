@@ -63,6 +63,12 @@ namespace GTAdhocToolchain.Compiler
             { "STATE_CALL", new InsIntConst((int)AdhocRunState.CALL) },
             { "STATE_RUN", new InsIntConst((int)AdhocRunState.RUN) },
 
+            // mScrollClip - scroll_mode
+            { "SCROLL_MODE_FOLLOW_FOCUS", new InsIntConst(0) }, // follow_focus
+            { "SCROLL_MODE_FLOATING", new InsIntConst(1) }, // floating
+            { "SCROLL_MODE_MANUAL", new InsIntConst(2) }, // manual
+            { "SCROLL_MODE_FOLLOW_MODE", new InsIntConst(3) }, // follow_mode
+
             // sqlite3.h
             { "SQLITE_OK",          new InsIntConst(0) },   /* Successful result */
             /* beginning-of-error-codes */
