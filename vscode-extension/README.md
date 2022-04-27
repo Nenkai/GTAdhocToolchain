@@ -6,4 +6,4 @@ Provides syntax highlighting and snippets. (Recommended to browse with the [Snip
 * `npm install -g vsce`
 * `vsce package`
 
-Double click on the built `.vsix` file.
+Drag the built `.vsix` file into the extension pane of Visual Studio Code.
