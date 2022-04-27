@@ -1,0 +1,863 @@
+{
+	"For Loop": {
+		"prefix": "for",
+		"body": [
+			"for (var ${1:i} = 0; ${1:i} < ${2:arr}.size; ${1:i}++)\n{",
+			"\tvar ${3:elem} = ${2:arr}[${1:i}];",
+			"\t$TM_SELECTED_TEXT$0",
+			"}"
+		],
+		"description": "For Loop"
+	},
+	"For Iterator": {
+		"prefix": "foritor",
+		"body": [
+			"for (var ${1:it} = ${1:it}.first; ${1:it} != nil; ${1:it} = ${1:it}.next)\n{",
+			"\t$TM_SELECTED_TEXT$0",
+			"}"
+		],
+		"description": "For Loop (iterator for widgets/other)"
+	},
+	"For-Each Loop": {
+		"prefix": "foreach",
+		"body": [
+			"foreach (var ${1:elem} in ${2:array})\n{",
+			"\t$TM_SELECTED_TEXT$0",
+			"}"
+		],
+		"description": "For-Each Loop"
+	},
+	"Module Statement": {
+		"prefix": "module",
+		"body": [
+			"module ${1:name}\n{",
+			"\t$TM_SELECTED_TEXT$0",
+			"}"
+		],
+		"description": "New Module Statement"
+	},
+	"Init Constructor": {
+		"prefix": ["init", "ctor"],
+		"body": [
+			"method __init__(${1:params})\n{",
+			"\t$TM_SELECTED_TEXT$0",
+			"}"
+		],
+		"description": "Module/Class Constructor"
+	},
+	"Function Statement": {
+		"prefix": "function",
+		"body": [
+			"function ${1:name}(${2:params})\n{",
+			"\t$TM_SELECTED_TEXT$0",
+			"}"
+		],
+		"description": "Function Statement"
+	},
+	"Method Statement": {
+		"prefix": "method",
+		"body": [
+			"method ${1:name}(${2:params})\n{",
+			"\t$TM_SELECTED_TEXT$0",
+			"}"
+		],
+		"description": "Function Statement"
+	},
+	"If Statement": {
+		"prefix": "if",
+		"body": [
+			"if (${1:condition})\n{",
+			"\t$TM_SELECTED_TEXT$0",
+			"}"
+		],
+		"description": "If Statement"
+	},
+	"If-Else Statement": {
+		"prefix": "ifelse",
+		"body": [
+			"if (${1:condition})\n{",
+			"\t$TM_SELECTED_TEXT$0",
+			"}\nelse\n{",
+			"\t",
+			"}"
+		],
+		"description": "If-Else Statement"
+	},
+	"Attribute Expression": 
+	{
+		"prefix": "attr",
+		"body": [
+			"attribute ${1:name};",
+		],
+		"description": "Attribute Definition"
+	},
+	"Static Expression": 
+	{
+		"prefix": "static",
+		"body": [
+			"static ${1:name};",
+		],
+		"description": "Static Definition"
+	},
+	"Switch Statement": {
+		"prefix": "switch",
+		"body": [
+			"switch (${1:key})\n{",
+			"\tcase ${2:value}:",
+			"\t\t$0",
+			"\t\tbreak;",
+			"",
+			"\tdefault:",
+			"\t\tbreak;",
+			"}"
+		],
+		"description": "Switch Statement"
+	},
+	"While Statement": {
+		"prefix": "while",
+		"body": [
+			"while (${1:condition})\n{",
+			"\t$TM_SELECTED_TEXT$0",
+			"}"
+		],
+		"description": "While Statement"
+	},
+	"While True Statement": {
+		"prefix": "whiletrue",
+		"body": [
+			"while (true)\n{",
+			"\t$TM_SELECTED_TEXT$0",
+			"}"
+		],
+		"description": "While True Statement"
+	},
+	"Do-While Statement": {
+		"prefix": "dowhile",
+		"body": [
+			"do\n{",
+			"\t$TM_SELECTED_TEXT$0",
+			"} while (${1:condition});"
+		],
+		"description": "Do-While Statement"
+	},
+	"Try-Catch Statement": {
+		"prefix": "trycatch",
+		"body": [
+			"try\n{",
+			"\t$TM_SELECTED_TEXT$0",
+			"}\ncatch (${1:error})\n{",
+			"\t",
+			"}"
+		],
+		"description": "Try-Catch Statement"
+	},
+	"Import module from script.": {
+		"prefix": "import",
+		"body": [
+			"import ${1:path};"
+		],
+		"description": "Import module."
+	},
+	"Map": {
+		"prefix": "mapvar",
+		"body": [
+			"var ${1:name} = [\n\t${2:key} : ${3:value}\n];"
+		],
+		"description": "New map variable"
+	},
+	"Symbol Expression": {
+		"prefix": ["symb", "symbol", "$"],
+		"body": [
+			"$\"$1\"$0"
+		],
+		"description": "New symbol variable"
+	},
+
+	// Adhoc utils
+	"Play OK":
+	{
+		"prefix": "oksound",
+		"body": [
+			"main::sound.play(\"ok\");"
+		],
+		"description": "Plays 'ok' sound"
+	},
+	"Play Cancel":
+	{
+		"prefix": "cancelsound",
+		"body": [
+			"main::sound.play(\"cancel\");"
+		],
+		"description": "Plays 'cancel' sound"
+	},
+	"Play Cursor":
+	{
+		"prefix": "cursorsound",
+		"body": [
+			"main::sound.play(\"cursor\");"
+		],
+		"description": "Plays 'cursor' sound"
+	},
+	"Play Disable":
+	{
+		"prefix": "disablesound",
+		"body": [
+			"main::sound.play(\"disable\");"
+		],
+		"description": "Plays 'disable' sound"
+	},
+	"Sleep":
+	{
+		"prefix": "sleep",
+		"body": [
+			"Thread::Sleep(${1:time});"
+		],
+		"description": "Sleep for X seconds"
+	},
+	"Translate":
+	{
+		"prefix": "translate",
+		"body": [
+			"manager.translate(${1:page}, ${2:key});"
+		],
+		"description": "Localize String"
+	},
+	"Shows OK prompt": {
+		"prefix": "showok",
+		"body": [
+			"DialogUtil::openConfirmDialog(context, DialogUtil::OK, $1);"
+		],
+		"description": "Opens a 'OK' dialog"
+	},
+	"Shows YES/NO prompt": {
+		"prefix": "showyesno",
+		"body": [
+			"var res = DialogUtil::openConfirmDialog(context, DialogUtil::YESNO, $1);"
+		],
+		"description": "Opens a 'YES/NO' dialog"
+	},
+	"Shows YES/NO prompt statement": {
+		"prefix": "showyesnocheck",
+		"body": [
+			"if (DialogUtil::openConfirmDialog(context, DialogUtil::YESNO, $1))\n{",
+			"\t$TM_SELECTED_TEXT$0",
+			"}",
+		],
+		"description": "Opens a 'YES/NO' dialog as a statement"
+	},
+	"Shows an error prompt": {
+		"prefix": "showerror",
+		"body": [
+			"DialogUtil::openConfirmDialog(context, DialogUtil::ERROR, $1);"
+		],
+		"description": "Opens a 'ERROR' dialog"
+	},
+	"Format": {
+		"prefix": "fmt",
+		"body": [
+			"\"$1\".format($2);"
+		],
+		"description": "Format string"
+	},
+	"Open XML": { // Hi ddm
+		"prefix": "xmlfile",
+		"body": [
+			"var fst = pdistd::ReadFile(${1:path});",
+			"var buf = fst[\"buffer\"]",
+			"if (buf != nil)",
+			"{",
+			"\tvar xml = pdistd::MXml();",
+			"\txml.parse(buf);",
+			"\tvar dom = xml.result;",
+			"\tvar xml_nodes = dom[\"xml\"];",
+			"\t$TM_SELECTED_TEXT$0",
+			"}"
+		]
+	},
+
+	// PDI Utils
+	"Read File (With Condition)": {
+		"prefix": "readfilesafe",
+		"body": [
+			"var fst = pdistd::ReadFile(${1:path});",
+			"var buf = fst[\"buffer\"];",
+			"if (buf)\n{",
+			"\t$TM_SELECTED_TEXT$0",
+			"}",
+		],
+		"description": "Reads a file with a checked statement"
+	},
+	"Make Directory For File": {
+		"prefix": "mkdir",
+		"body": [
+			"pdistd::MakeDirectoryForFile(${1:path});"
+		],
+		"description": "Creates a directory for a file path"
+	},
+	"Copy File": {
+		"prefix": "copyfile",
+		"body": [
+			"var res = pdistd::CopyFile(${1:src}, ${2:dst});"
+		],
+		"description": "Copy a file from a path to another"
+	},
+	"Rename File": {
+		"prefix": "renfile",
+		"body": [
+			"var res = pdistd::RenameFile(${1:src}, ${2:dst});"
+		],
+		"description": "Renames a file from a path to another"
+	},
+	"Remove File": {
+		"prefix": ["delfile", "remfile"],
+		"body": [
+			"var res = pdistd::RemoveFile(${1:src});"
+		],
+		"description": "Removes/Deletes a file"
+	},
+	"Append File": {
+		"prefix": "appendfile",
+		"body": [
+			"pdistd::AppendFile(${1:path}, ${2:data});"
+		],
+		"description": "Appends to a file"
+	},
+	"Write File": {
+		"prefix": "writefile",
+		"body": [
+			"pdistd::WriteFile(${1:path}, ${2:data});"
+		],
+		"description": "Writes a file (overwrites)"
+	},
+	"File Status": {
+		"prefix": ["fileinfo", "filestatus"],
+		"body": [
+			"var status = pdistd::GetFileStatus(${1:path});"
+		],
+		"description": "Writes a file (overwrites)"
+	},
+	"File Exists": {
+		"prefix": "fileexists",
+		"body": [
+			"if (pdistd::Exist(${1:path})\n{",
+			"\t$TM_SELECTED_TEXT$0",
+			"}"
+		],
+		"description": "Checks if a file exist"
+	},
+	"File Not Exists": {
+		"prefix": "filenotexists",
+		"body": [
+			"if (!pdistd::Exist(${1:path})\n{",
+			"\t$TM_SELECTED_TEXT$0",
+			"}"
+		],
+		"description": "Checks if a file exist"
+	},
+	"File Entries": {
+		"prefix": ["direntries", "fileentries"],
+		"body": [
+			"var ${2:entries} = pdistd::GetFileEntries(${1:dir});"
+		],
+		"description": "Creates a directory for a file path"
+	},
+	"Disk Free Size": {
+		"prefix": "freesize",
+		"body": [
+			"var ${2:free_size} = pdistd::GetDiskFreeSize(${1:dir});"
+		],
+		"description": "Gets free size for a certain dir"
+	},
+	"File Size": {
+		"prefix": "filesize",
+		"body": [
+			"var ${2:free_size} = IO::File::GetFileSize(${1:file});"
+		],
+		"description": "Gets the size of a certain file"
+	},
+	"Language": {
+		"prefix": ["lang", "language"],
+		"body": [
+			"var ${1:lang} = pdistd::MLocale::getLanguage();",
+		],
+		"description": "Gets the current running language (US, JP, etc)"
+	},
+	"Random": {
+		"prefix": ["rand", "random"],
+		"body": [
+			"var ${3:name} = pdistd::MRandom::getValue(${1:min}, ${2:max});",
+		],
+		"description": "Generates a value between two values (max exclusive)."
+	},
+	"Time Microsecond": {
+		"prefix": ["timemicro"],
+		"body": [
+			"var ${1:time} = pdistd::GetSystemTimeMicroSecond();",
+		],
+		"description": "Gets current time as microseconds"
+	},
+	"Time Milliseconds": {
+		"prefix": ["timemilli"],
+		"body": [
+			"var ${1:time} = pdistd::GetSystemTimeMilliSecond();",
+		],
+		"description": "Gets current time as milliseconds"
+	},
+	"Current Time": {
+		"prefix": ["current time"],
+		"body": [
+			"var ${1:time} = pdistd::MTime::getCurrentTime();",
+		],
+		"description": "Gets current time object"
+	},
+	"Time": {
+		"prefix": ["time"],
+		"body": [
+			"var ${1:time} = pdistd::MTime();",
+		],
+		"description": "Gets new time object"
+	},
+	"TextConv": {
+		"prefix": ["textconv"],
+		"body": [
+			"var ${2:str} = pdistd::TextConv(${1:input});",
+		],
+		"description": "Converts text"
+	},
+	"Mac Address": {
+		"prefix": ["macaddr"],
+		"body": [
+			"var mac = pdistd::MNetworkInterface::getMacAddress();",
+		],
+		"description": "Gets mac address as string"
+	},
+	"Decompress/Inflate": {
+		"prefix": ["decompress", "inflate"],
+		"body": [
+			"var ${2:out} = pdistd::Inflate(${1:in});",
+		],
+		"description": "Decompress data"
+	},
+	"Compress/Deflate": {
+		"prefix": ["compress", "deflate"],
+		"body": [
+			"var ${2:out} = pdistd::Deflate(${1:in});",
+		],
+		"description": "Compresses data"
+	},
+	"Decode Base64 String": {
+		"prefix": ["b64decode"],
+		"body": [
+			"var ${2:out} = pdistd::DecodeBase64(${1:in});",
+		],
+		"description": "Decodes Base64 string"
+	},
+	"Encode Base64": {
+		"prefix": ["b64encode"],
+		"body": [
+			"var ${2:out} = pdistd::EncodeBase64(${1:in});",
+		],
+		"description": "Encodes Base64 data"
+	},
+
+	// UI Events
+	"On Activate": {
+		"prefix": "onactivate",
+		"body": [
+			"method onActivate(context)\n{",
+			"\t$TM_SELECTED_TEXT$0",
+			"}"
+		],
+	},
+	"On Initialize": {
+		"prefix": "oninitialize",
+		"body": [
+			"method onInitialize(context)\n{",
+			"\t$TM_SELECTED_TEXT$0",
+			"}"
+		],
+	},
+	"On Finalize": {
+		"prefix": "onfinalize",
+		"body": [
+			"method onFinalize(context)\n{",
+			"\t$TM_SELECTED_TEXT$0",
+			"}"
+		],
+	},
+	"On Realize": {
+		"prefix": "onrealize",
+		"body": [
+			"method onRealize(context)\n{",
+			"\t$TM_SELECTED_TEXT$0",
+			"}"
+		],
+	},
+	"On Key Press": {
+		"prefix": "onkeypress",
+		"body": [
+			"method onKeyPress(context, event)\n{",
+			"\t$TM_SELECTED_TEXT$0",
+			"}"
+		],
+	},
+	"On Cancel": {
+		"prefix": "oncancel",
+		"body": [
+			"method onCancel(context)\n{",
+			"\t$TM_SELECTED_TEXT$0",
+			"}"
+		],
+	},
+	"On Load": {
+		"prefix": "onload",
+		"body": [
+			"method onLoad(${1:params})\n{",
+			"\t$TM_SELECTED_TEXT$0",
+			"}"
+		],
+	},
+	"On Focus Enter": {
+		"prefix": "onfocusenter",
+		"body": [
+			"method onFocusEnter(context, event)\n{",
+			"\t$TM_SELECTED_TEXT$0",
+			"}"
+		],
+	},
+	"On Focus Enter": {
+		"prefix": "onfocusleave",
+		"body": [
+			"method onFocusLeave(context, event)\n{",
+			"\t$TM_SELECTED_TEXT$0",
+			"}"
+		],
+	},
+	"On Focus Notify": {
+		"prefix": "onfocusnotify",
+		"body": [
+			"method onFocusNotify(context, new_index, old_index)\n{",
+			"\t$TM_SELECTED_TEXT$0",
+			"}"
+		],
+	},
+	"On Visible Notify": {
+		"prefix": "onvisiblenotify",
+		"body": [
+			"method onVisibleNotify(context, indexes)\n{",
+			"\t$TM_SELECTED_TEXT$0",
+			"}"
+		],
+	},
+	"On Text Input": {
+		"prefix": "ontextinput",
+		"body": [
+			"method onTextInput(context, event)\n{",
+			"\t$TM_SELECTED_TEXT$0",
+			"}"
+		],
+	},
+	"Close Root": {
+		"prefix": "closeroot",
+		"body": [
+			"self.close(context, $1);"
+		],
+	},
+
+	"User Profile": {
+		"prefix": "userprofile",
+		"body": [
+			"GAME_STATUS.user_profile"
+		],
+
+	},
+	"User Garage": {
+		"prefix": "usergarage",
+		"body": [
+			"GAME_STATUS.user_profile.garage"
+		],
+	},
+	"User Context": {
+		"prefix": "usercontext",
+		"body": [
+			"GAME_STATUS.user_profile.context"
+		],
+	},
+	"User Option": {
+		"prefix": "useroption",
+		"body": [
+			"GAME_STATUS.user_profile.option"
+		],
+	},
+	"User Residence": {
+		"prefix": "userresidence",
+		"body": [
+			"GAME_STATUS.user_profile.residence"
+		],
+	},
+	"User Import Garage": {
+		"prefix": "userimportgarage",
+		"body": [
+			"GAME_STATUS.user_profile.import_garage"
+		],
+	},
+	"User Branch (runviewer only)": {
+		"prefix": "userbranch",
+		"body": [
+			"GAME_STATUS.user_profile.branch"
+		],
+	},
+	"User Record": {
+		"prefix": "userbranch",
+		"body": [
+			"GAME_STATUS.user_profile.record"
+		],
+	},
+	"User Event Record": {
+		"prefix": "usereventrecord",
+		"body": [
+			"GAME_STATUS.user_profile.record.event_record"
+		],
+	},
+	"User Suspender": {
+		"prefix": "usersuspender",
+		"body": [
+			"GAME_STATUS.user_profile.suspender"
+		],
+	},
+	"User Item": {
+		"prefix": "useritem",
+		"body": [
+			"GAME_STATUS.user_profile.item"
+		],
+	},
+	"User Game Flags": {
+		"prefix": "usergameflags",
+		"body": [
+			"GAME_STATUS.user_profile.game_flags"
+		],
+	},
+
+	"Get Riding Car": {
+		"prefix": "currentcar",
+		"body": [
+			"var cp = GAME_STATUS.user_profile.garage.getRidingCar();"
+		],
+		"description": "Gets the current user's car",
+	},
+	"Get Cash": {
+		"prefix": ["cash", "credits"],
+		"body": [
+			"var credits = GAME_STATUS.user_profile.cash;"
+		],
+		"description": "Gets the current user's credits/cash",
+	},
+	"Get Running Branch": {
+		"prefix": "branch",
+		"body": [
+			"GetVersionBranch()"
+		],
+		"description": "Gets the current running branch",
+	},
+	"Is QA Build": {
+		"prefix": "isqa",
+		"body": [
+			"pdiext::isQABuild()"
+		],
+		"description": "Returns whether the game is running as a qa build",
+	},
+	"Save Data Directory": {
+		"prefix": "savedatadir",
+		"body": [
+			"var dir = pdiext::MProductInformation::GetSaveDataDirectory();"
+		],
+		"description": "Gets the save data directory",
+	},
+	"Has Command Line Argument": {
+		"prefix": "argdefined",
+		"body": [
+			"AppOpt.defined(\"${1:arg}\")"
+		],
+		"description": "Gets whether a command line argument is defined",
+	},
+	"Has Command Line Argument Statement": {
+		"prefix": "argdefinedstatement",
+		"body": [
+			"if (AppOpt.defined(\"${1:arg}\"))\n{",
+			"\tvar ${1:arg} = AppOpt[\"${1:arg}\"];",
+			"\t$TM_SELECTED_TEXT$0",
+			"}"
+		],
+		"description": "Gets whether a command line argument is defined as a statement",
+	},
+
+	// SpecDB Stuff
+	"Get Car Name": {
+		"prefix": "getcarname",
+		"body": [
+			"var ${2:car_name} = gtengine::MSpecDB::getCarName(${1:car_code});"
+		],
+		"description": "Gets a car name from a car code",
+	},
+	"Get Car Short Name": {
+		"prefix": "getcarshortname",
+		"body": [
+			"var ${2:car_name} = gtengine::MSpecDB::getCarShortName(${1:car_code});"
+		],
+		"description": "Gets a short car name from a car code",
+	},
+	"Get Car Country": {
+		"prefix": "getcarcountry",
+		"body": [
+			"var ${2:country} = gtengine::MSpecDB::getCarCountry(${1:car_label});"
+		],
+		"description": "Gets a car country from a car label (i.e US)",
+	},
+	"Get Car Price": {
+		"prefix": "getcarprice",
+		"body": [
+			"var ${2:price} = gtengine::MSpecDB::getCarPrice(${1:car_label});"
+		],
+		"description": "Gets a car price from a car label",
+	},
+	"Get Car Code": {
+		"prefix": "getcarcode",
+		"body": [
+			"var ${2:car_code} = gtengine::MSpecDB::getCarCode(${1:car_label});"
+		],
+		"description": "Gets a car code from a car label (i.e _787b_std)",
+	},
+	"Get Car Label": {
+		"prefix": "getcarlabel",
+		"body": [
+			"var ${2:car_label} = gtengine::MSpecDB::getCarLabel(${1:car_code});"
+		],
+		"description": "Gets a car label from a car code",
+	},
+	"Get Course Code": {
+		"prefix": "getcoursecode",
+		"body": [
+			"var ${2:crs_code} = gtengine::MSpecDB::getCourseCode(${1:crs_label});"
+		],
+		"description": "Gets a course code from a car label (i.e mini -> Autumn Ring Mini)",
+	},
+	"Get Course Label": {
+		"prefix": "getcourselabel",
+		"body": [
+			"var ${2:crs_label} = gtengine::MSpecDB::getCourseLabel(${1:crs_code});"
+		],
+		"description": "Gets a course label from a course code",
+	},
+	"SpecDB No Code": {
+		"prefix": "nocodespecdb",
+		"body": [
+			"gtengine::MSpecDB::NO_CODE64"
+		],
+		"description": "Gets no code specdb",
+	},
+
+	// Key codes
+	"CELL_PAD_CTRL_L3_LEFT (0xFF51)": { "prefix": "CELL_PAD_CTRL_L3_LEFT", "body": [ "CELL_PAD_CTRL_L3_LEFT" ], "description": "Left Stick LEFT"},
+	"CELL_PAD_CTRL_L3_UP (0xFF52)": { "prefix": "CELL_PAD_CTRL_L3_UP", "body": [ "CELL_PAD_CTRL_L3_UP" ], "description": "Left Stick UP"},
+	"CELL_PAD_CTRL_L3_RIGHT (0xFF53)": { "prefix": "CELL_PAD_CTRL_L3_RIGHT", "body": [ "CELL_PAD_CTRL_L3_RIGHT" ], "description": "Left Stick RIGHT"},
+	"CELL_PAD_CTRL_L3_DOWN (0xFF54)": { "prefix": "CELL_PAD_CTRL_L3_DOWN", "body": [ "CELL_PAD_CTRL_L3_DOWN" ], "description": "Left Stick DOWN"},
+	
+	"CELL_PAD_CTRL_R3_LEFT (0xFFB4)": { "prefix": "CELL_PAD_CTRL_R3_LEFT", "body": [ "CELL_PAD_CTRL_R3_LEFT" ], "description": "Right Stick LEFT"},
+	"CELL_PAD_CTRL_R3_UP (0xFFB8)": { "prefix": "CELL_PAD_CTRL_R3_UP", "body": [ "CELL_PAD_CTRL_R3_UP" ], "description": "Right Stick UP"},
+	"CELL_PAD_CTRL_R3_RIGHT (0xFF51)": { "prefix": "CELL_PAD_CTRL_R3_RIGHT", "body": [ "CELL_PAD_CTRL_R3_RIGHT" ], "description": "Right Stick RIGHT"},
+	"CELL_PAD_CTRL_R3_DOWN (0xFFB2)": { "prefix": "CELL_PAD_CTRL_R3_DOWN", "body": [ "CELL_PAD_CTRL_R3_DOWN" ], "description": "Right Stick DOWN"},
+	
+	"CELL_PAD_CTRL_CROSS (0xFF0D)": { "prefix": "CELL_PAD_CTRL_CROSS", "body": [ "CELL_PAD_CTRL_CROSS" ], "description": "X Button"},
+	"CELL_PAD_CTRL_SQUARE (0xFFBF)": { "prefix": "CELL_PAD_CTRL_SQUARE", "body": [ "CELL_PAD_CTRL_SQUARE" ], "description": "□ Button"},
+	"CELL_PAD_CTRL_TRIANGLE (0xFFBE)": { "prefix": "CELL_PAD_CTRL_TRIANGLE", "body": [ "CELL_PAD_CTRL_TRIANGLE" ], "description": "△ Triangle Button"},
+	"CELL_PAD_CTRL_CIRCLE (0xFF1B)": { "prefix": "CELL_PAD_CTRL_CIRCLE", "body": [ "CELL_PAD_CTRL_CIRCLE" ], "description": "O Button"},
+	
+	"CELL_PAD_CTRL_SELECT (0xFF63)": { "prefix": "CELL_PAD_CTRL_SELECT", "body": [ "CELL_PAD_CTRL_SELECT" ], "description": "Select Button"},
+	"CELL_PAD_CTRL_START (0xFF8D)": { "prefix": "CELL_PAD_CTRL_START", "body": [ "CELL_PAD_CTRL_START" ], "description": "Start Buton"},
+	
+	"CELL_PAD_CTRL_L1 (0xFFD7)": { "prefix": "CELL_PAD_CTRL_L1", "body": [ "CELL_PAD_CTRL_L1" ], "description": "L1 Button"},
+	"CELL_PAD_CTRL_L2 (0xFFD8)": { "prefix": "CELL_PAD_CTRL_L2", "body": [ "CELL_PAD_CTRL_L2" ], "description": "L2 Button"},
+	"CELL_PAD_CTRL_L3 (0xFFD9)": { "prefix": "CELL_PAD_CTRL_L3", "body": [ "CELL_PAD_CTRL_L3" ], "description": "L3 Button"},
+	"CELL_PAD_CTRL_R1 (0xFFDC)": { "prefix": "CELL_PAD_CTRL_R1", "body": [ "CELL_PAD_CTRL_R1" ], "description": "R1 Button"},
+	"CELL_PAD_CTRL_R2 (0xFFDD)": { "prefix": "CELL_PAD_CTRL_R2", "body": [ "CELL_PAD_CTRL_R2" ], "description": "R2 Button"},
+	"CELL_PAD_CTRL_R3 (0xFFDE)": { "prefix": "CELL_PAD_CTRL_R3", "body": [ "CELL_PAD_CTRL_R3" ], "description": "R3 Button"},
+
+	// Text colors
+	"COLOR_DEFAULT (0x10)": { "prefix": "TEXT_COLOR_DEFAULT", "body": [ "COLOR_DEFAULT" ], "description": "Reverts to normal color"},
+	"COLOR_WHITE (0x11)": { "prefix": "TEXT_COLOR_WHITE", "body": [ "COLOR_WHITE" ], "description": "Sets next text to white"},
+	"COLOR_RED (0x12)": { "prefix": "TEXT_COLOR_RED", "body": [ "COLOR_RED" ], "description": "Sets next text to red"},
+	"COLOR_GREEN (0x13)": { "prefix": "TEXT_COLOR_GREEN", "body": [ "COLOR_GREEN" ], "description": "Sets next text to green"},
+	"COLOR_BLUE (0x14)": { "prefix": "TEXT_COLOR_BLUE", "body": [ "COLOR_BLUE" ], "description": "Sets next text to blue"},
+	"COLOR_YELLOW (0x15)": { "prefix": "TEXT_COLOR_YELLOW", "body": [ "COLOR_YELLOW" ], "description": "Sets next text to yellow"},
+	"COLOR_CYAN (0x16)": { "prefix": "TEXT_COLOR_CYAN", "body": [ "COLOR_CYAN" ], "description": "Sets next text to cyan"},
+	"COLOR_BLACK (0x17)": { "prefix": "TEXT_COLOR_BLACK", "body": [ "COLOR_BLACK" ], "description": "Sets next text to black"},
+
+	// Thread States
+	"STATE_EXIT (0)": { "prefix": "THREAD_STATE_EXIT", "body": [ "STATE_EXIT" ], "description": "State Exit"},
+	"STATE_RETURN (1)": { "prefix": "THREAD_STATE_RETURN", "body": [ "STATE_RETURN" ], "description": "State Return"},
+	"STATE_YIELD (2)": { "prefix": "THREAD_STATE_YIELD", "body": [ "STATE_YIELD" ], "description": "State Yield"},
+	"STATE_EXCEPTION (3)": { "prefix": "THREAD_STATE_EXCEPTION", "body": [ "STATE_EXCEPTION" ], "description": "State Exception"},
+	"STATE_CALL (4)": { "prefix": "THREAD_STATE_CALL", "body": [ "STATE_CALL" ], "description": "State Call"},
+	"STATE_RUN (5)": { "prefix": "THREAD_STATE_RUN", "body": [ "STATE_RUN" ], "description": "State Run"},
+
+	// Numeric limits
+	"IntMin": {
+		"prefix": "intmin",
+		"body": [
+			"INT_MIN"
+		],
+		"description": "Int Min Value",
+	},
+	"IntMax": {
+		"prefix": "intmax",
+		"body": [
+			"INT_MAX"
+		],
+		"description": "Int Max Value",
+	},
+	"UIntMin": {
+		"prefix": "uintmin",
+		"body": [
+			"UINT_MIN"
+		],
+		"description": "UInt Min Value",
+	},
+
+	"UIntMax": {
+		"prefix": "uintmax",
+		"body": [
+			"INT_MAX"
+		],
+		"description": "UInt Max Value",
+	},
+	"LongMin": {
+		"prefix": "longmin",
+		"body": [
+			"LONG_MIN"
+		],
+		"description": "Long Min Value",
+	},
+
+	"LongMax": {
+		"prefix": "longmax",
+		"body": [
+			"LONG_MAX"
+		],
+		"description": "Long Max Value",
+	},
+	"ULongMin": {
+		"prefix": "ulongmin",
+		"body": [
+			"ULONG_MIN"
+		],
+		"description": "ULong Min Value",
+	},
+
+	"ULongMax": {
+		"prefix": "ulongmax",
+		"body": [
+			"ULONG_MAX"
+		],
+		"description": "ULong Max Value",
+	},
+}
