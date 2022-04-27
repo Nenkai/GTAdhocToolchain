@@ -6,6 +6,7 @@ Adhoc is a scripting language that is used for roughly 99% of the entire games's
 The toolchain contains the following:
 * **Adhoc Script Compiler** (`.ad` -> `.adc` for Adhoc Version 12, GT PSP to GT Sport)
 * Adhoc Project Builder
+* VS Code Extension (syntax highlighting mostly)
 * Script Disassembler (`.adc` to assembly-like syntax)
 * Menu Layout Reader/Serializer (`mproject/mwidget`)
 * Script and Menu Layout Packager (GT6 `.mpackage`)
