@@ -156,7 +156,7 @@ namespace GTAdhocToolchain.Compiler
                 case Nodes.EmptyStatement:
                     break;
                 default:
-                    ThrowCompilationError(node, "Statement not supported");
+                    ThrowCompilationError(node, $"Unsupported statement: {node.Type}");
                     break;
             }
         }
@@ -192,7 +192,7 @@ namespace GTAdhocToolchain.Compiler
             frame.AddInstruction(tryCatch, tryStatement.Location.Start.Line);
 
             if (tryStatement.Block.Type != Nodes.BlockStatement)
-                ThrowCompilationError(tryStatement.Block, "Expected try body to be a block statement.");
+                ThrowCompilationError(tryStatement.Block, CompilationMessages.Error_TryClauseNotBody);
 
             CompileBlockStatement(frame, tryStatement.Block as BlockStatement);
             frame.AddInstruction(new InsSetState(AdhocRunState.EXIT), 0);
@@ -211,7 +211,7 @@ namespace GTAdhocToolchain.Compiler
             if (tryStatement.Finalizer != null)
             {
                 if (tryStatement.Finalizer.Type != Nodes.BlockStatement)
-                    ThrowCompilationError(tryStatement.Block, "Expected catch clause to be a block statement.");
+                    ThrowCompilationError(tryStatement.Block, CompilationMessages.Error_CatchClauseNotBody);
 
                 CompileStatementWithScope(frame, tryStatement.Finalizer);
             }
@@ -222,7 +222,7 @@ namespace GTAdhocToolchain.Compiler
             if (catchClause.Param is not null)
             {
                 if (catchClause.Param.Type != Nodes.Identifier)
-                    ThrowCompilationError(catchClause.Param, "Expected catch clause parameter to be an identifier.");
+                    ThrowCompilationError(catchClause.Param, CompilationMessages.Error_CatchClauseParameterNotIdentifier);
 
                 // Create temp variable for the exception
                 frame.AddInstruction(new InsIntConst(0), 0);
@@ -317,7 +317,7 @@ namespace GTAdhocToolchain.Compiler
             }
             else
             {
-                ThrowCompilationError(breakStatement, "Expected break statement to be in a loop or switch frame.");
+                ThrowCompilationError(breakStatement, CompilationMessages.Error_BreakWithoutContextualScope);
             }
         }
 
@@ -330,7 +330,7 @@ namespace GTAdhocToolchain.Compiler
         {
             if (id is null || id.Type != Nodes.Identifier)
             {
-                ThrowCompilationError(id, "Class or module name must have a valid identifier.");
+                ThrowCompilationError(id, CompilationMessages.Error_ModuleOrClassNameInvalid);
                 return;
             }
 
@@ -363,7 +363,7 @@ namespace GTAdhocToolchain.Compiler
             else
             {
                 if (id.Name.Contains("::"))
-                    ThrowCompilationError(superClass, "Class name must be an identifier without a scope path (::).");
+                    ThrowCompilationError(superClass, CompilationMessages.Error_ClassNameIsStatic);
 
                 InsClassDefine @class = new InsClassDefine();
                 @class.Name = SymbolMap.RegisterSymbol(id.Name);
@@ -404,7 +404,7 @@ namespace GTAdhocToolchain.Compiler
         public void CompileContinue(AdhocCodeFrame frame, ContinueStatement continueStatement)
         {
             if (frame.CurrentLoops.Count == 0)
-                ThrowCompilationError(continueStatement, "Got continue keyword without loop.");
+                ThrowCompilationError(continueStatement, CompilationMessages.Error_ContinueWithoutContextualScope);
 
             LoopContext loop = frame.GetLastLoop();
 
@@ -466,7 +466,7 @@ namespace GTAdhocToolchain.Compiler
                     case Nodes.Identifier:
                         CompileIdentifier(frame, forStatement.Init as Identifier); break;
                     default:
-                        ThrowCompilationError(forStatement.Init, "Unsupported for statement init type");
+                        ThrowCompilationError(forStatement.Init, CompilationMessages.Error_ForLoopInitializationType);
                         break;
                 }
             }
@@ -495,10 +495,14 @@ namespace GTAdhocToolchain.Compiler
             // Update Counter
             if (forStatement.Update != null)
             {
-                if (forStatement.Update is UpdateExpression)
+                if (forStatement.Update.Type == Nodes.UpdateExpression)
                     CompileUnaryExpression(frame, forStatement.Update as UpdateExpression, popResult: true);
+                else if (forStatement.Update.Type == Nodes.CallExpression)
+                    CompileCall(frame, forStatement.Update as CallExpression, popReturnValue: true);
+                else if (forStatement.Update.Type == Nodes.AssignmentExpression)
+                    CompileAssignmentExpression(frame, forStatement.Update as AssignmentExpression, popResult: true);
                 else
-                    CompileExpression(frame, forStatement.Update);
+                    ThrowCompilationError(forStatement.Update, CompilationMessages.Error_StatementExpressionOnly);
             }
 
             // Insert jump to go back to the beginning of the loop
@@ -623,7 +627,7 @@ namespace GTAdhocToolchain.Compiler
             frame.AddInstruction(InsEval.Default, 0);
 
             if (foreachStatement.Left is not VariableDeclaration)
-                ThrowCompilationError(foreachStatement, "Expected foreach to have a variable declaration.");
+                ThrowCompilationError(foreachStatement, CompilationMessages.Error_ForeachDeclarationNotVariable);
 
             CompileVariableDeclaration(frame, foreachStatement.Left as VariableDeclaration, pushWhenNoInit: true); // We're unboxing, gotta push anyway
 
@@ -686,7 +690,7 @@ namespace GTAdhocToolchain.Compiler
                 else // Default
                 {
                     if (hasDefault)
-                        ThrowCompilationError(swCase, "Switch already has a default case.");
+                        ThrowCompilationError(swCase, CompilationMessages.Error_SwitchAlreadyHasDefault);
 
                     hasDefault = true;
                     defaultJump = new InsJump();
@@ -742,7 +746,7 @@ namespace GTAdhocToolchain.Compiler
         public void CompileSubroutine(AdhocCodeFrame frame, Node parentNode, Node body, Identifier id, NodeList<Expression> subParams, bool isMethod = false, bool isAsync = false)
         {
             if (id is null)
-                ThrowCompilationError(parentNode, "Expected subroutine to have an identifier.");
+                ThrowCompilationError(parentNode, CompilationMessages.Error_SubroutineWithoutIdentifier);
 
             Logger.Debug($"L{parentNode.Location.Start.Line} - Compiling subroutine '{id.Name}'");
 
@@ -775,7 +779,7 @@ namespace GTAdhocToolchain.Compiler
                 else if (param is AssignmentExpression assignmentExpression)
                 {
                     if (assignmentExpression.Left.Type != Nodes.Identifier || assignmentExpression.Right.Type != Nodes.Literal)
-                        ThrowCompilationError(parentNode, "Subroutine parameter assignment must be an identifier to a literal. (i.e 'value = 0')");
+                        ThrowCompilationError(parentNode, CompilationMessages.Error_InvalidParameterValueAssignment);
 
                     AdhocSymbol paramSymb = SymbolMap.RegisterSymbol((assignmentExpression.Left as Identifier).Name);
                     subroutine.CodeFrame.FunctionParameters.Add(paramSymb);
@@ -892,7 +896,7 @@ namespace GTAdhocToolchain.Compiler
 
                 // Now write the id
                 if (id is null)
-                    ThrowCompilationError(varDeclaration, "Variable declaration for id is null.");
+                    ThrowCompilationError(varDeclaration, CompilationMessages.Error_VariableDeclarationIsNull);
 
                 if (id is Identifier idIdentifier) // var hello [= world];
                 {
@@ -925,7 +929,7 @@ namespace GTAdhocToolchain.Compiler
         private void CompileArrayPatternPush(AdhocCodeFrame frame, ArrayPattern arrayPattern, bool isDeclaration = false)
         {
             if (arrayPattern.Elements.Count == 0)
-                ThrowCompilationError(arrayPattern, "Array pattern has no elements.");
+                ThrowCompilationError(arrayPattern, CompilationMessages.Error_ArrayPatternNoElements);
 
             foreach (Expression exp in arrayPattern.Elements)
             {
@@ -955,9 +959,7 @@ namespace GTAdhocToolchain.Compiler
         public void CompileImport(AdhocCodeFrame frame, ImportDeclaration import)
         {
             if (import.Specifiers.Count == 0)
-            {
-                ThrowCompilationError(import, "Import declaration is empty.");
-            }
+                ThrowCompilationError(import, CompilationMessages.Error_ImportDeclarationEmpty);
 
             string fullImportNamespace = "";
 
@@ -2322,7 +2324,7 @@ namespace GTAdhocToolchain.Compiler
             // Pushing to object attribute
             CompileExpression(frame, attr.Object);
             if (attr.Property is not Identifier)
-                ThrowCompilationError(attr.Property, "Expected attribute member property identifier");
+                ThrowCompilationError(attr.Property, "Expected attribute member property identifier.");
 
             var propIdent = attr.Property as Identifier;
 
@@ -2344,7 +2346,7 @@ namespace GTAdhocToolchain.Compiler
         {
             string opStr = AssignOperatorToString(assignOperator);
             if (string.IsNullOrEmpty(opStr))
-                ThrowCompilationError(parentNode, "Unrecognized operator");
+                ThrowCompilationError(parentNode, $"Unrecognized operator '{opStr}'");
 
             bool opToSymbol = frame.Version >= 12;
             var symb = SymbolMap.RegisterSymbol(opStr, opToSymbol);
