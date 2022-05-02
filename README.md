@@ -12,6 +12,10 @@ The toolchain contains the following:
 * Script and Menu Layout Packager (GT6 `.mpackage`)
 * Asset Packager (`.gpb`)
 
+## Current State
+
+The toolchain is capable of compiling fully working projects from original reverse-engineered compiled scripts.
+
 ## Adhoc Language Specifications
 
 Adhoc is very similar to javascript but with a few changes and additions. Refer to the [language spec](LANGUAGE_SPECIFICATION.md).
