@@ -41,5 +41,7 @@ namespace GTAdhocToolchain.Compiler
         public const string Error_ArrayPatternNoElements = "Array pattern has no elements.";
 
         public const string Error_VariableDeclarationIsNull = "Variable declaration for id is null.";
+
+        public const string Error_UnsupportedUnaryOprationOnMemberExpression = "Unsupported unary operation on member expression";
     }
 }

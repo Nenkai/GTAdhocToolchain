@@ -2044,19 +2044,46 @@ namespace GTAdhocToolchain.Compiler
                 {
                     // Assigning - we need to push
                     if (unaryExp.Argument.Type == Nodes.Identifier)
+                    {
                         InsertVariablePush(frame, unaryExp.Argument as Identifier, false);
-                    else if (unaryExp.Argument is AttributeMemberExpression attr)
-                        InsertAttributeMemberAssignmentPush(frame, attr);
-                    else if (unaryExp.Argument is ComputedMemberExpression comp)
-                        CompileComputedMemberExpressionAssignment(frame, comp);
-                    else if (unaryExp.Argument.Type == Nodes.Literal) // -1 -> int const + unary op
+                    }
+                    else if (unaryExp.Argument.Type == Nodes.MemberExpression)
+                    {
+                        if (unaryExp.Argument is AttributeMemberExpression attr)
+                        {
+                            // ++myObj.property
+                            InsertAttributeMemberAssignmentPush(frame, attr);
+                        }
+                        else if (unaryExp.Argument is ComputedMemberExpression comp)
+                        {
+                            // --hello["world"];
+                            CompileComputedMemberExpressionAssignment(frame, comp);
+                        }
+                        else if (unaryExp.Argument is StaticMemberExpression staticMemberExpression)
+                        {
+                            // ++GameParameterUtil::loaded_time;
+                            CompileStaticMemberExpressionAssignment(frame, staticMemberExpression);
+                        }
+                        else
+                            ThrowCompilationError(unaryExp.Argument, CompilationMessages.Error_UnsupportedUnaryOprationOnMemberExpression);
+                    }
+                    else if (unaryExp.Argument.Type == Nodes.Literal)
+                    {
+                        // Special case: -1 -> int const + unary op
                         CompileLiteral(frame, unaryExp.Argument as Literal);
+                    }
                     else if (unaryExp.Argument.Type == Nodes.CallExpression)
+                    {
+                        // --doThing();
                         CompileCall(frame, unaryExp.Argument as CallExpression);
-                    else if (unaryExp.Argument is BinaryExpression binaryExp)
-                        CompileBinaryExpression(frame, binaryExp);
+                    }
+                    else if (unaryExp.Argument.Type == Nodes.BinaryExpression)
+                    {
+                        // ++(1 + 1)
+                        CompileBinaryExpression(frame, unaryExp.Argument as BinaryExpression);
+                    }
                     else
-                        ThrowCompilationError(unaryExp.Argument, "Unsupported");
+                        ThrowCompilationError(unaryExp.Argument, $"Unsupported unary operation on type: {unaryExp.Argument.Type}");
                 }
                 else
                 {
