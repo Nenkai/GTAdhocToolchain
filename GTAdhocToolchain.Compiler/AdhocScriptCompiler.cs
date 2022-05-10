@@ -953,7 +953,7 @@ namespace GTAdhocToolchain.Compiler
                 }
                 else if (exp is AttributeMemberExpression)
                 {
-                    InsertAttributeMemberAssignmentPush(frame, exp as AttributeMemberExpression);
+                    CompileAttributeMemberAssignmentPush(frame, exp as AttributeMemberExpression);
                 }
                 else
                     ThrowCompilationError(exp, "Expected array pattern element to be an identifier or attribute member expression.");
@@ -1591,7 +1591,7 @@ namespace GTAdhocToolchain.Compiler
                 }
                 else if (assignExpression.Left is AttributeMemberExpression attr)
                 {
-                    InsertAttributeMemberAssignmentPush(frame, attr);
+                    CompileAttributeMemberAssignmentPush(frame, attr);
                 }
                 else if (assignExpression.Left is ComputedMemberExpression compExpression)
                 {
@@ -1639,7 +1639,7 @@ namespace GTAdhocToolchain.Compiler
             {
                 if (expression is AttributeMemberExpression attrMember) // Pushing into an object i.e hello.world = "!"
                 {
-                    InsertAttributeMemberAssignmentPush(frame, attrMember);
+                    CompileAttributeMemberAssignmentPush(frame, attrMember);
                 }
                 else if (expression is ComputedMemberExpression compExpression) // hello[world] = "foo"
                 {
@@ -1653,13 +1653,6 @@ namespace GTAdhocToolchain.Compiler
                 {
                     CompileStaticMemberExpressionAssignment(frame, staticMembExpression);
                 }
-                else if (expression is UnaryExpression unaryExp && (unaryExp.Operator == UnaryOperator.Indirection || unaryExp.Operator == UnaryOperator.ReferenceOf)) // (*/&)hello = world
-                {
-                    if (unaryExp.Argument.Type == Nodes.Identifier || unaryExp.Argument is AttributeMemberExpression)
-                        CompileExpression(frame, unaryExp.Argument);
-                    else
-                        ThrowCompilationError(expression, "Unexpected assignment to unary argument. Only Indirection (*) or Reference (&) is allowed.");
-                }
                 else
                     ThrowCompilationError(expression, $"Unimplemented member expression assignment type: '{expression.Type}'");
 
@@ -1668,6 +1661,13 @@ namespace GTAdhocToolchain.Compiler
             {
                 CompileArrayPatternPush(frame, expression as ArrayPattern, isDeclaration: false);
                 return; // No need for assign pop
+            }
+            else if (expression is UnaryExpression unaryExp && (unaryExp.Operator == UnaryOperator.Indirection || unaryExp.Operator == UnaryOperator.ReferenceOf)) // (*/&)hello = world
+            {
+                if (unaryExp.Argument.Type == Nodes.Identifier || unaryExp.Argument is AttributeMemberExpression)
+                    CompileExpression(frame, unaryExp.Argument);
+                else
+                    ThrowCompilationError(expression, "Unexpected assignment to unary argument. Only Indirection (*) or Reference (&) is allowed.");
             }
             else
             {
@@ -2065,7 +2065,7 @@ namespace GTAdhocToolchain.Compiler
                         if (unaryExp.Argument is AttributeMemberExpression attr)
                         {
                             // ++myObj.property
-                            InsertAttributeMemberAssignmentPush(frame, attr);
+                            CompileAttributeMemberAssignmentPush(frame, attr);
                         }
                         else if (unaryExp.Argument is ComputedMemberExpression comp)
                         {
@@ -2163,7 +2163,7 @@ namespace GTAdhocToolchain.Compiler
             if (unaryExp.Argument is AttributeMemberExpression attrMemberExp)
             {
                 // We need to push the object's reference, instead of simply evaluating it
-                InsertAttributeMemberAssignmentPush(frame, attrMemberExp);
+                CompileAttributeMemberAssignmentPush(frame, attrMemberExp);
             }
             else if (unaryExp.Argument is StaticMemberExpression staticExpr)
             {
@@ -2359,7 +2359,7 @@ namespace GTAdhocToolchain.Compiler
         /// </summary>
         /// <param name="frame"></param>
         /// <param name="attr"></param>
-        private void InsertAttributeMemberAssignmentPush(AdhocCodeFrame frame, AttributeMemberExpression attr)
+        private void CompileAttributeMemberAssignmentPush(AdhocCodeFrame frame, AttributeMemberExpression attr)
         {
             // Pushing to object attribute
             CompileExpression(frame, attr.Object);
