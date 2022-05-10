@@ -29,8 +29,14 @@ namespace GTAdhocToolchain.Compiler
             this.CurrentModule = topLevelModule;
         }
 
+        public string BaseIncludeFolder { get; set; }
         public string ProjectDirectory { get; set; }
         public string BaseDirectory { get; set; }
+
+        public void SetBaseIncludeFolder(string dir)
+        {
+            BaseIncludeFolder = dir;
+        }
 
         public void SetProjectDirectory(string dir)
         {
@@ -262,12 +268,19 @@ namespace GTAdhocToolchain.Compiler
 
         public void CompileIncludeStatement(AdhocCodeFrame frame, IncludeStatement include)
         {
-            if (string.IsNullOrEmpty(ProjectDirectory))
-                ProjectDirectory = Path.GetDirectoryName(frame.SourceFilePath.Name);
+            if (string.IsNullOrEmpty(BaseIncludeFolder))
+                BaseIncludeFolder = Path.GetDirectoryName(frame.SourceFilePath.Name);
 
-            string pathToIncludeFile = Path.Combine(ProjectDirectory, include.Path);
+            // Look for the file relative to the provided include path
+            string pathToIncludeFile = Path.Combine(BaseIncludeFolder, include.Path);
             if (!File.Exists(pathToIncludeFile))
-                ThrowCompilationError(include, $"Include file does not exist: {pathToIncludeFile}.");
+            {
+                // Try project folder
+                pathToIncludeFile = Path.Combine(ProjectDirectory, include.Path);
+                if (!File.Exists(pathToIncludeFile))
+                    ThrowCompilationError(include, $"Include file does not exist: {pathToIncludeFile}.");
+            }
+                
 
             Logger.Info($"Linking include file {include.Path} for {frame.SourceFilePath}.");
 

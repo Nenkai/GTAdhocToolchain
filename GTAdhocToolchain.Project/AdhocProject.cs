@@ -93,7 +93,8 @@ namespace GTAdhocToolchain.Project
             var program = parser.ParseScript();
 
             var compiler = new AdhocScriptCompiler();
-            compiler.SetProjectDirectory(Path.GetFullPath(Path.Combine(ProjectFilePath, BaseIncludeFolder)));
+            compiler.SetBaseIncludeFolder(Path.GetFullPath(Path.Combine(ProjectFilePath, BaseIncludeFolder)));
+            compiler.SetProjectDirectory(FullProjectPath);
             compiler.SetSourcePath(compiler.SymbolMap, ProjectFolder + "/" + tmpFileName);
             compiler.CompileScript(program);
 
