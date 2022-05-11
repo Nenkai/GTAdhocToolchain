@@ -181,7 +181,7 @@ namespace GTAdhocToolchain.Compiler
 
             if (parts.Length > 1)
             {
-                foreach (string part in undefStatement.Symbol.Split("::"))
+                foreach (string part in undefStatement.Symbol.Split(AdhocConstants.OPERATOR_STATIC))
                     undefIns.Symbols.Add(SymbolMap.RegisterSymbol(part));
             }
             else
@@ -355,9 +355,9 @@ namespace GTAdhocToolchain.Compiler
             {
                 InsModuleDefine mod = new InsModuleDefine();
 
-                if (id.Name.Contains("::"))
+                if (id.Name.Contains(AdhocConstants.OPERATOR_STATIC))
                 {
-                    foreach (string identifier in id.Name.Split("::"))
+                    foreach (string identifier in id.Name.Split(AdhocConstants.OPERATOR_STATIC))
                         mod.Names.Add(SymbolMap.RegisterSymbol(identifier));
                     mod.Names.Add(SymbolMap.RegisterSymbol(id.Name)); // Full
                 }
@@ -375,7 +375,7 @@ namespace GTAdhocToolchain.Compiler
             }
             else
             {
-                if (id.Name.Contains("::"))
+                if (id.Name.Contains(AdhocConstants.OPERATOR_STATIC))
                     ThrowCompilationError(superClass, CompilationMessages.Error_ClassNameIsStatic);
 
                 InsClassDefine @class = new InsClassDefine();
@@ -385,9 +385,9 @@ namespace GTAdhocToolchain.Compiler
                 var superClassIdent = superClass as Identifier;
                 if (superClass != null)
                 {
-                    if (superClassIdent.Name.Contains("::"))
+                    if (superClassIdent.Name.Contains(AdhocConstants.OPERATOR_STATIC))
                     {
-                        foreach (var path in superClassIdent.Name.Split("::"))
+                        foreach (var path in superClassIdent.Name.Split(AdhocConstants.OPERATOR_STATIC))
                             @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol(path));
                     }
 
@@ -396,9 +396,9 @@ namespace GTAdhocToolchain.Compiler
                 else
                 {
                     // Not provided, inherits from base object (System::Object)
-                    @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol("System"));
-                    @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol("Object"));
-                    @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol("System::Object"));
+                    @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol(AdhocConstants.SYSTEM));
+                    @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol(AdhocConstants.OBJECT));
+                    @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol($"{AdhocConstants.SYSTEM}{AdhocConstants.OPERATOR_STATIC}{AdhocConstants.OBJECT}"));
                 }
 
                 frame.AddInstruction(@class, id.Location.Start.Line);
@@ -619,7 +619,7 @@ namespace GTAdhocToolchain.Compiler
 
             // Access object iterator
             InsAttributeEvaluation attrIns = new InsAttributeEvaluation();
-            attrIns.AttributeSymbols.Add(SymbolMap.RegisterSymbol("iterator"));
+            attrIns.AttributeSymbols.Add(SymbolMap.RegisterSymbol(AdhocConstants.ITERATOR));
             frame.AddInstruction(attrIns, foreachStatement.Right.Location.Start.Line);
 
             // Assign it to a temporary value for the iteration
@@ -986,18 +986,18 @@ namespace GTAdhocToolchain.Compiler
                 fullImportNamespace += specifier.Local.Name;
 
                 if (i < import.Specifiers.Count - 1)
-                    fullImportNamespace += "::";
+                    fullImportNamespace += AdhocConstants.OPERATOR_STATIC;
             }
 
             AdhocSymbol namespaceSymbol = SymbolMap.RegisterSymbol(fullImportNamespace);
             AdhocSymbol value = SymbolMap.RegisterSymbol(import.Target.Name);
-            AdhocSymbol nilSymbol = SymbolMap.RegisterSymbol("nil");
+            AdhocSymbol nilSymbol = SymbolMap.RegisterSymbol(AdhocConstants.NIL);
 
             importIns.ImportNamespaceParts.Add(namespaceSymbol);
             importIns.ModuleValue = value;
 
             /* Imports actually copies the static members from the target */
-            if (import.Target.Name == "*")
+            if (import.Target.Name == AdhocConstants.OPERATOR_IMPORT_ALL)
             {
                 if (TopLevelModules.TryGetValue(fullImportNamespace, out AdhocModule mod))
                 {
@@ -1116,7 +1116,7 @@ namespace GTAdhocToolchain.Compiler
         /// <param name="spreadElement"></param>
         private void CompileSelfExpression(AdhocCodeFrame frame, SelfExpression selfExpression)
         {
-            AdhocSymbol symb = SymbolMap.RegisterSymbol("self");
+            AdhocSymbol symb = SymbolMap.RegisterSymbol(AdhocConstants.SELF);
             int idx = 0; // Always 0 when refering to self
             var varEval = new InsVariableEvaluation(idx);
             varEval.VariableSymbols.Add(symb); // Self is always considered as a local. Just one
@@ -1146,7 +1146,7 @@ namespace GTAdhocToolchain.Compiler
 
         private void CompileAwait(AdhocCodeFrame frame, AwaitExpression awaitExpr)
         {
-            var awaitStart = new StaticMemberExpression(new Identifier("System"), new Identifier("AwaitTaskStart"), false);
+            var awaitStart = new StaticMemberExpression(new Identifier(AdhocConstants.SYSTEM), new Identifier("AwaitTaskStart"), false);
             CompileExpression(frame, awaitStart);
 
             // Function body
@@ -1159,7 +1159,7 @@ namespace GTAdhocToolchain.Compiler
             frame.AddInstruction(InsAssignPop.Default, 0);
 
             // Get result of task - <result> = System::AwaitTaskResult(<task>);
-            var awaitResult = new StaticMemberExpression(new Identifier("System"), new Identifier("AwaitTaskResult"), false);
+            var awaitResult = new StaticMemberExpression(new Identifier(AdhocConstants.SYSTEM), new Identifier("AwaitTaskResult"), false);
             CompileExpression(frame, awaitResult);
             InsertVariableEvalFromSymbol(frame, taskSymb);
             frame.AddInstruction(new InsCall(1), 0);
@@ -1735,7 +1735,7 @@ namespace GTAdhocToolchain.Compiler
             else
             {
                 // Below, including 11 uses direct symbols
-                var indexerIns = new InsBinaryOperator(SymbolMap.RegisterSymbol("[]"));
+                var indexerIns = new InsBinaryOperator(SymbolMap.RegisterSymbol(AdhocConstants.OPERATOR_SUBSCRIPT));
 
                 frame.AddInstruction(indexerIns, computedMember.Location.Start.Line);
                 InsertAssignPop(frame);
@@ -1757,7 +1757,7 @@ namespace GTAdhocToolchain.Compiler
             else
             {
                 // Below, including 11 uses direct symbols
-                var indexerIns = new InsBinaryOperator(SymbolMap.RegisterSymbol("[]"));
+                var indexerIns = new InsBinaryOperator(SymbolMap.RegisterSymbol(AdhocConstants.OPERATOR_SUBSCRIPT));
 
                 frame.AddInstruction(indexerIns, computedMember.Location.Start.Line);
                 InsertAssignPop(frame);
@@ -1818,7 +1818,7 @@ namespace GTAdhocToolchain.Compiler
                 eval.VariableSymbols.Add(symb);
             }
 
-            string fullPath = string.Join("::", pathParts);
+            string fullPath = string.Join(AdhocConstants.OPERATOR_STATIC, pathParts);
             AdhocSymbol fullPathSymb = SymbolMap.RegisterSymbol(fullPath);
             eval.VariableSymbols.Add(fullPathSymb);
 
@@ -1846,7 +1846,7 @@ namespace GTAdhocToolchain.Compiler
                 push.VariableSymbols.Add(symb);
             }
 
-            string fullPath = string.Join("::", pathParts);
+            string fullPath = string.Join(AdhocConstants.OPERATOR_STATIC, pathParts);
             AdhocSymbol fullPathSymb = SymbolMap.RegisterSymbol(fullPath);
             push.VariableSymbols.Add(fullPathSymb);
 
@@ -1874,7 +1874,7 @@ namespace GTAdhocToolchain.Compiler
                 attrEval.AttributeSymbols.Add(symb);
             }
 
-            string fullPath = string.Join("::", pathParts);
+            string fullPath = string.Join(AdhocConstants.OPERATOR_STATIC, pathParts);
             AdhocSymbol fullPathSymb = SymbolMap.RegisterSymbol(fullPath);
             attrEval.AttributeSymbols.Add(fullPathSymb);
             frame.AddInstruction(attrEval, staticExp.Location.Start.Line);
@@ -1977,23 +1977,23 @@ namespace GTAdhocToolchain.Compiler
 
                 string opStr = binExp.Operator switch
                 {
-                    BinaryOperator.Equal => "==",
-                    BinaryOperator.NotEqual => "!=",
-                    BinaryOperator.Less => "<",
-                    BinaryOperator.Greater => ">",
-                    BinaryOperator.LessOrEqual => "<=",
-                    BinaryOperator.GreaterOrEqual => ">=",
-                    BinaryOperator.Plus => "+",
-                    BinaryOperator.Minus => "-",
-                    BinaryOperator.Divide => "/",
-                    BinaryOperator.Times => "*",
-                    BinaryOperator.Modulo => "%",
-                    BinaryOperator.BitwiseOr => "|",
-                    BinaryOperator.BitwiseXOr => "^",
-                    BinaryOperator.BitwiseAnd => "&",
-                    BinaryOperator.LeftShift => "<<",
-                    BinaryOperator.RightShift => ">>",
-                    BinaryOperator.Exponentiation => "**",
+                    BinaryOperator.Equal => AdhocConstants.OPERATOR_EQUAL,
+                    BinaryOperator.NotEqual => AdhocConstants.OPERATOR_NOT_EQUAL,
+                    BinaryOperator.Less => AdhocConstants.OPERATOR_LESS,
+                    BinaryOperator.Greater => AdhocConstants.OPERATOR_GREATER,
+                    BinaryOperator.LessOrEqual => AdhocConstants.OPERATOR_LESS_OR_EQUAL,
+                    BinaryOperator.GreaterOrEqual => AdhocConstants.OPERATOR_GREATER_OR_EQUAL,
+                    BinaryOperator.Plus => AdhocConstants.OPERATOR_PLUS,
+                    BinaryOperator.Minus => AdhocConstants.OPERATOR_MINUS,
+                    BinaryOperator.Divide => AdhocConstants.OPERATOR_DIVIDE,
+                    BinaryOperator.Times => AdhocConstants.OPERATOR_MULTIPLY,
+                    BinaryOperator.Modulo => AdhocConstants.OPERATOR_MODULO,
+                    BinaryOperator.BitwiseOr => AdhocConstants.OPERATOR_BITWISE_OR,
+                    BinaryOperator.BitwiseXOr => AdhocConstants.OPERATOR_BITWISE_XOR,
+                    BinaryOperator.BitwiseAnd => AdhocConstants.OPERATOR_BITWISE_AND,
+                    BinaryOperator.LeftShift => AdhocConstants.OPERATOR_LEFT_SHIFT,
+                    BinaryOperator.RightShift => AdhocConstants.OPERATOR_RIGHT_SHIFT,
+                    BinaryOperator.Exponentiation => AdhocConstants.OPERATOR_EXPONENTIATION,
                     _ => null
                 };
 
@@ -2116,10 +2116,10 @@ namespace GTAdhocToolchain.Compiler
 
                 string op = unaryExp.Operator switch
                 {
-                    UnaryOperator.Increment when !preIncrement => "@++",
-                    UnaryOperator.Increment when preIncrement => "++@",
-                    UnaryOperator.Decrement when !preIncrement => "@--",
-                    UnaryOperator.Decrement when preIncrement => "--@",
+                    UnaryOperator.Increment when !preIncrement => AdhocConstants.UNARY_OPERATOR_POST_INCREMENT,
+                    UnaryOperator.Increment when preIncrement => AdhocConstants.UNARY_OPERATOR_PRE_INCREMENT,
+                    UnaryOperator.Decrement when !preIncrement => AdhocConstants.UNARY_OPERATOR_POST_DECREMENT,
+                    UnaryOperator.Decrement when preIncrement => AdhocConstants.UNARY_OPERATOR_PRE_DECREMENT,
                     _ => throw new NotImplementedException("TODO"),
                 };
 
@@ -2144,10 +2144,10 @@ namespace GTAdhocToolchain.Compiler
                     CompileExpression(frame, unaryExp.Argument);
                     string op = unaryExp.Operator switch
                     {
-                        UnaryOperator.LogicalNot => "!",
-                        UnaryOperator.Minus => "-@",
-                        UnaryOperator.Plus => "+@",
-                        UnaryOperator.BitwiseNot => "~",
+                        UnaryOperator.LogicalNot => AdhocConstants.UNARY_OPERATOR_LOGICAL_NOT,
+                        UnaryOperator.Minus => AdhocConstants.UNARY_OPERATOR_MINUS,
+                        UnaryOperator.Plus => AdhocConstants.UNARY_OPERATOR_PLUS,
+                        UnaryOperator.BitwiseNot => AdhocConstants.UNARY_OPERATOR_BITWISE_NOT,
                         _ => throw new NotImplementedException("TODO"),
                     };
 
@@ -2433,17 +2433,17 @@ namespace GTAdhocToolchain.Compiler
         {
             return op switch
             {
-                AssignmentOperator.PlusAssign => "+",
-                AssignmentOperator.MinusAssign => "-",
-                AssignmentOperator.TimesAssign => "*",
-                AssignmentOperator.DivideAssign => "/",
-                AssignmentOperator.ModuloAssign => "%",
-                AssignmentOperator.BitwiseAndAssign => "&",
-                AssignmentOperator.BitwiseOrAssign => "|",
-                AssignmentOperator.BitwiseXOrAssign => "^",
-                AssignmentOperator.ExponentiationAssign => "**",
-                AssignmentOperator.RightShiftAssign => ">>",
-                AssignmentOperator.LeftShiftAssign => "<<",
+                AssignmentOperator.PlusAssign => AdhocConstants.OPERATOR_PLUS,
+                AssignmentOperator.MinusAssign => AdhocConstants.OPERATOR_MINUS,
+                AssignmentOperator.TimesAssign => AdhocConstants.OPERATOR_MULTIPLY,
+                AssignmentOperator.DivideAssign => AdhocConstants.OPERATOR_DIVIDE,
+                AssignmentOperator.ModuloAssign => AdhocConstants.OPERATOR_MODULO,
+                AssignmentOperator.BitwiseAndAssign => AdhocConstants.OPERATOR_BITWISE_AND,
+                AssignmentOperator.BitwiseOrAssign => AdhocConstants.OPERATOR_BITWISE_OR,
+                AssignmentOperator.BitwiseXOrAssign => AdhocConstants.OPERATOR_BITWISE_XOR,
+                AssignmentOperator.ExponentiationAssign => AdhocConstants.OPERATOR_EXPONENTIATION,
+                AssignmentOperator.RightShiftAssign => AdhocConstants.OPERATOR_RIGHT_SHIFT,
+                AssignmentOperator.LeftShiftAssign => AdhocConstants.OPERATOR_LEFT_SHIFT,
                 _ => null
             };
         }
