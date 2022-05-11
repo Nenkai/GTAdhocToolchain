@@ -17,8 +17,9 @@ jobs:
         dotnet-version: '6.0.x'
         include-prerelease: true
 
-    - name: Dotnet publish
+    - name: Dotnet publish GTAdhocToolchain.CLI
       run: dotnet publish --configuration Release
+      working-directory: ./GTAdhocToolchain.CLI
 
     - uses: actions/upload-artifact@v3
       with:
