@@ -32,6 +32,6 @@ jobs:
 
       - uses: actions/upload-artifact@v3
         with:
-          name: vscode-extension
+          name: adhoc-vscode-extension
           path: vscode-extension/adhoc-*.vsix
           if-no-files-found: error
