@@ -1931,7 +1931,15 @@ namespace GTAdhocToolchain.Compiler
         /// <exception cref="InvalidOperationException"></exception>
         private void CompileBinaryExpression(AdhocCodeFrame frame, BinaryExpression binExp)
         {
-            CompileExpression(frame, binExp.Left);
+            if (binExp.Left.Type == Nodes.AssignmentExpression)
+            {
+                // (r = x % y) != 0 - reuse result
+                CompileAssignmentExpression(frame, binExp.Left as AssignmentExpression, false);
+            }
+            else
+            {
+                CompileExpression(frame, binExp.Left);
+            }
 
             // Check for logical operators that checks between both conditions
             if (binExp.Operator == BinaryOperator.LogicalAnd || binExp.Operator == BinaryOperator.LogicalOr)
