@@ -18,12 +18,12 @@ jobs:
         include-prerelease: true
 
     - name: Build
-      run: dotnet build
+      run: dotnet build --configuration Release
       
     - uses: actions/upload-artifact@v3
       with:
         name: GTAdhocToolchain
         path: |
-          GTAdhocToolchain.CLI/bin/**/*
-          !GTAdhocToolchain.CLI/bin/**/*.pdb
+          GTAdhocToolchain.CLI/bin/Release/net6.0/*
+          !GTAdhocToolchain.CLI/bin/Release/net6.0/*.pdb
         if-no-files-found: error
