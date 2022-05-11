@@ -24,10 +24,6 @@ jobs:
       with:
         name: GTAdhocToolchain
         path: |
-          GTAdhocToolchain.CLI/bin/Release/net6.0/*.exe
-          GTAdhocToolchain.CLI/bin/Release/net6.0/*.dll
-          GTAdhocToolchain.CLI/bin/Release/net6.0/*.json
-          GTAdhocToolchain.CLI/bin/Release/net6.0/*.txt
-          GTAdhocToolchain.CLI/bin/Release/net6.0/*.config
-          GTAdhocToolchain.CLI/bin/Release/net6.0/*.xml
-          GTAdhocToolchain.CLI/bin/Release/net6.0/ref/*.dll
+          GTAdhocToolchain.CLI/bin/**/*
+          !GTAdhocToolchain.CLI/bin/**/*.pdb
+        if-no-files-found: error
