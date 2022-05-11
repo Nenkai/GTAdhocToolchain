@@ -1979,12 +1979,12 @@ namespace GTAdhocToolchain.Compiler
                 {
                     BinaryOperator.Equal => AdhocConstants.OPERATOR_EQUAL,
                     BinaryOperator.NotEqual => AdhocConstants.OPERATOR_NOT_EQUAL,
-                    BinaryOperator.Less => AdhocConstants.OPERATOR_LESS,
-                    BinaryOperator.Greater => AdhocConstants.OPERATOR_GREATER,
+                    BinaryOperator.Less => AdhocConstants.OPERATOR_LESS_THAN,
+                    BinaryOperator.Greater => AdhocConstants.OPERATOR_GREATER_THAN,
                     BinaryOperator.LessOrEqual => AdhocConstants.OPERATOR_LESS_OR_EQUAL,
                     BinaryOperator.GreaterOrEqual => AdhocConstants.OPERATOR_GREATER_OR_EQUAL,
-                    BinaryOperator.Plus => AdhocConstants.OPERATOR_PLUS,
-                    BinaryOperator.Minus => AdhocConstants.OPERATOR_MINUS,
+                    BinaryOperator.Plus => AdhocConstants.OPERATOR_ADD,
+                    BinaryOperator.Minus => AdhocConstants.OPERATOR_SUBTRACT,
                     BinaryOperator.Divide => AdhocConstants.OPERATOR_DIVIDE,
                     BinaryOperator.Times => AdhocConstants.OPERATOR_MULTIPLY,
                     BinaryOperator.Modulo => AdhocConstants.OPERATOR_MODULO,
@@ -1993,7 +1993,7 @@ namespace GTAdhocToolchain.Compiler
                     BinaryOperator.BitwiseAnd => AdhocConstants.OPERATOR_BITWISE_AND,
                     BinaryOperator.LeftShift => AdhocConstants.OPERATOR_LEFT_SHIFT,
                     BinaryOperator.RightShift => AdhocConstants.OPERATOR_RIGHT_SHIFT,
-                    BinaryOperator.Exponentiation => AdhocConstants.OPERATOR_EXPONENTIATION,
+                    BinaryOperator.Exponentiation => AdhocConstants.OPERATOR_POWER,
                     _ => null
                 };
 
@@ -2147,7 +2147,7 @@ namespace GTAdhocToolchain.Compiler
                         UnaryOperator.LogicalNot => AdhocConstants.UNARY_OPERATOR_LOGICAL_NOT,
                         UnaryOperator.Minus => AdhocConstants.UNARY_OPERATOR_MINUS,
                         UnaryOperator.Plus => AdhocConstants.UNARY_OPERATOR_PLUS,
-                        UnaryOperator.BitwiseNot => AdhocConstants.UNARY_OPERATOR_BITWISE_NOT,
+                        UnaryOperator.BitwiseNot => AdhocConstants.UNARY_OPERATOR_BITWISE_INVERT,
                         _ => throw new NotImplementedException("TODO"),
                     };
 
@@ -2433,15 +2433,15 @@ namespace GTAdhocToolchain.Compiler
         {
             return op switch
             {
-                AssignmentOperator.PlusAssign => AdhocConstants.OPERATOR_PLUS,
-                AssignmentOperator.MinusAssign => AdhocConstants.OPERATOR_MINUS,
+                AssignmentOperator.PlusAssign => AdhocConstants.OPERATOR_ADD,
+                AssignmentOperator.MinusAssign => AdhocConstants.OPERATOR_SUBTRACT,
                 AssignmentOperator.TimesAssign => AdhocConstants.OPERATOR_MULTIPLY,
                 AssignmentOperator.DivideAssign => AdhocConstants.OPERATOR_DIVIDE,
                 AssignmentOperator.ModuloAssign => AdhocConstants.OPERATOR_MODULO,
                 AssignmentOperator.BitwiseAndAssign => AdhocConstants.OPERATOR_BITWISE_AND,
                 AssignmentOperator.BitwiseOrAssign => AdhocConstants.OPERATOR_BITWISE_OR,
                 AssignmentOperator.BitwiseXOrAssign => AdhocConstants.OPERATOR_BITWISE_XOR,
-                AssignmentOperator.ExponentiationAssign => AdhocConstants.OPERATOR_EXPONENTIATION,
+                AssignmentOperator.ExponentiationAssign => AdhocConstants.OPERATOR_POWER,
                 AssignmentOperator.RightShiftAssign => AdhocConstants.OPERATOR_RIGHT_SHIFT,
                 AssignmentOperator.LeftShiftAssign => AdhocConstants.OPERATOR_LEFT_SHIFT,
                 _ => null

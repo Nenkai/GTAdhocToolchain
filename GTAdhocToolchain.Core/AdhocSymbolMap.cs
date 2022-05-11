@@ -44,34 +44,34 @@ namespace GTAdhocToolchain.Core
         {
             return symbolName switch
             {
-                "==" => "__eq__", // Equals
-                "!=" => "__ne__", // Not Equal
-                ">=" => "__ge__", // Greater Equal
-                ">" => "__gt__", // Greater Than
-                "<=" => "__le__", // Lesser Equal
-                "<" => "__lt__", // Lesser Than
-                "!" => "__not__", // Logical Not
+                AdhocConstants.OPERATOR_EQUAL => "__eq__",
+                AdhocConstants.OPERATOR_NOT_EQUAL => "__ne__",
+                AdhocConstants.OPERATOR_GREATER_OR_EQUAL => "__ge__",
+                AdhocConstants.OPERATOR_GREATER_THAN => "__gt__",
+                AdhocConstants.OPERATOR_LESS_OR_EQUAL => "__le__",
+                AdhocConstants.OPERATOR_LESS_THAN => "__lt__",
+                AdhocConstants.UNARY_OPERATOR_LOGICAL_NOT => "__not__",
 
                 // __minus__
-                "+" => "__add__", // Add,
-                "-" => "__sub__", // Subtract,
-                "*" => "__mul__", // Multiply or Import Wildcard
-                "/" => "__div__", // Division
-                "^" => "__xor__", // Xor,
-                "%" => "__mod__", // Modulo
-                "**" => "__pow__", // Pow
-                "<<" => "__lshift__", // Left Shift
-                ">>" => "__rshift__", // Right Shift
-                "~" => "__invert__", // Invert
-                "|" => "__or__", // Or
-                "&" => "__and__",
+                AdhocConstants.OPERATOR_ADD => "__add__",
+                AdhocConstants.OPERATOR_SUBTRACT => "__sub__", 
+                AdhocConstants.OPERATOR_MULTIPLY => "__mul__", 
+                AdhocConstants.OPERATOR_DIVIDE => "__div__", 
+                AdhocConstants.OPERATOR_BITWISE_XOR => "__xor__", 
+                AdhocConstants.OPERATOR_MODULO => "__mod__",
+                AdhocConstants.OPERATOR_POWER => "__pow__",
+                AdhocConstants.OPERATOR_LEFT_SHIFT => "__lshift__", 
+                AdhocConstants.OPERATOR_RIGHT_SHIFT => "__rshift__",
+                AdhocConstants.UNARY_OPERATOR_BITWISE_INVERT => "__invert__",
+                AdhocConstants.OPERATOR_BITWISE_OR => "__or__",
+                AdhocConstants.OPERATOR_BITWISE_AND => "__and__",
 
-                "-@" => "__uminus__", // Unary Minus
-                "+@" => "__uplus__", // Unary Plus
-                "--@" => "__pre_decr__", // Pre Decrementation,
-                "++@" => "__pre_incr__", // Pre Incrementation
-                "@--" => "__post_decr__", // Post Decrementation,
-                "@++" => "__post_incr__", // Post Incrementation
+                AdhocConstants.UNARY_OPERATOR_MINUS => "__uminus__",
+                AdhocConstants.UNARY_OPERATOR_PLUS => "__uplus__",
+                AdhocConstants.UNARY_OPERATOR_PRE_DECREMENT => "__pre_decr__",
+                AdhocConstants.UNARY_OPERATOR_PRE_INCREMENT => "__pre_incr__",
+                AdhocConstants.UNARY_OPERATOR_POST_DECREMENT => "__post_decr__",
+                AdhocConstants.UNARY_OPERATOR_POST_INCREMENT => "__post_incr__",
 
                 _ => symbolName,
             };

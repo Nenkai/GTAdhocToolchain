@@ -16,7 +16,7 @@ namespace GTAdhocToolchain.Core
         public const string UNARY_OPERATOR_LOGICAL_NOT = "!";
         public const string UNARY_OPERATOR_MINUS = "-@";
         public const string UNARY_OPERATOR_PLUS = "+@";
-        public const string UNARY_OPERATOR_BITWISE_NOT = "~";
+        public const string UNARY_OPERATOR_BITWISE_INVERT = "~";
 
         /// <summary>
         /// Post increment variable
@@ -51,12 +51,12 @@ namespace GTAdhocToolchain.Core
         /// <summary>
         /// Logical Lesser than
         /// </summary>
-        public const string OPERATOR_LESS = "<";
+        public const string OPERATOR_LESS_THAN = "<";
 
         /// <summary>
         /// Logical Greater than
         /// </summary>
-        public const string OPERATOR_GREATER = ">";
+        public const string OPERATOR_GREATER_THAN = ">";
 
         /// <summary>
         /// Logical Less or equal to
@@ -71,12 +71,12 @@ namespace GTAdhocToolchain.Core
         /// <summary>
         /// Addition
         /// </summary>
-        public const string OPERATOR_PLUS = "+";
+        public const string OPERATOR_ADD = "+";
 
         /// <summary>
         /// Subtraction
         /// </summary>
-        public const string OPERATOR_MINUS = "-";
+        public const string OPERATOR_SUBTRACT = "-";
 
         /// <summary>
         /// Multiplication/Import
@@ -96,7 +96,7 @@ namespace GTAdhocToolchain.Core
         /// <summary>
         /// Exponentiation/Power
         /// </summary>
-        public const string OPERATOR_EXPONENTIATION = "**";
+        public const string OPERATOR_POWER = "**";
 
         /// <summary>
         /// Bitwise AND
