@@ -1,0 +1,35 @@
+name: Build VSCode extension
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v3
+
+      # get npm
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 14
+
+      - name: Install npm dependencies
+        run: |
+          npm install -g vsce
+          npm install
+  
+      - name: Copy license file to make Visual Studio Code Extension Manager not cry
+        run: cp LICENSE vscode-extension/LICENSE
+
+      - name: Build package
+        run: vsce package
+        working-directory: ./vscode-extension
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: vscode-extension
+          path: vscode-extension/adhoc-*.vsix
+          if-no-files-found: error
