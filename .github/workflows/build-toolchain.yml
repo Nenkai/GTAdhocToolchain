@@ -1,4 +1,4 @@
-name: build toolchain
+name: Build GTAdhocToolchain
 
 on:
   workflow_dispatch:
@@ -19,3 +19,15 @@ jobs:
 
     - name: Build
       run: dotnet build
+      
+    - uses: actions/upload-artifact@v3
+      with:
+        name: GTAdhocToolchain
+        path: |
+          GTAdhocToolchain.CLI/bin/Release/net6.0/*.exe
+          GTAdhocToolchain.CLI/bin/Release/net6.0/*.dll
+          GTAdhocToolchain.CLI/bin/Release/net6.0/*.json
+          GTAdhocToolchain.CLI/bin/Release/net6.0/*.txt
+          GTAdhocToolchain.CLI/bin/Release/net6.0/*.config
+          GTAdhocToolchain.CLI/bin/Release/net6.0/*.xml
+          GTAdhocToolchain.CLI/bin/Release/net6.0/ref/*.dll
