@@ -9,7 +9,7 @@ using GTAdhocToolchain.Core;
 
 namespace GTAdhocToolchain.Compiler
 {
-    public class AdhocConstants
+    public class AdhocDefineConstants
     {
         public static Dictionary<string, InstructionBase> CompilerProvidedConstants = new()
         {
@@ -104,7 +104,7 @@ namespace GTAdhocToolchain.Compiler
             { "SQLITE_DONE",        new InsIntConst(101)},  /* sqlite3_step() has finished executing */
         };
 
-        static AdhocConstants()
+        static AdhocDefineConstants()
         {
             foreach (var i in Enum.GetValues<Keycodes>())
             {
