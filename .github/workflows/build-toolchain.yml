@@ -6,6 +6,9 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    strategy:
+      matrix:
+        arch: ['win-x86', 'linux-x64']
 
     steps:
     - uses: actions/checkout@v3
@@ -17,14 +20,14 @@ jobs:
         dotnet-version: '6.0.x'
         include-prerelease: true
 
-    - name: Dotnet publish GTAdhocToolchain.CLI
-      run: dotnet publish --configuration Release
+    - name: Publish GTAdhocToolchain.CLI for ${{ matrix.arch }}
+      run: dotnet publish -r ${{ matrix.arch }} --configuration Release
       working-directory: ./GTAdhocToolchain.CLI
 
     - uses: actions/upload-artifact@v3
       with:
-        name: GTAdhocToolchain
+        name: GTAdhocToolchain-${{ matrix.arch }}
         path: |
-          GTAdhocToolchain.CLI/bin/Release/net6.0/publish/*
-          !GTAdhocToolchain.CLI/bin/Release/net6.0/publish/*.pdb
+          GTAdhocToolchain.CLI/bin/Release/net6.0/${{ matrix.arch }}/publish/*
+          !GTAdhocToolchain.CLI/bin/Release/net6.0/${{ matrix.arch }}/publish/*.pdb
         if-no-files-found: error
