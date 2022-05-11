@@ -17,14 +17,58 @@ jobs:
         dotnet-version: '6.0.x'
         include-prerelease: true
 
-    - name: Dotnet publish GTAdhocToolchain.CLI
+    - name: Publish GTAdhocToolchain.CLI for Windows (framework dependent)
       run: dotnet publish --configuration Release
       working-directory: ./GTAdhocToolchain.CLI
+      continue-on-error: true
+
+    - name: Publish GTAdhocToolchain.CLI for Windows (self contained)
+      run: dotnet publish --configuration Release -r win-x86 -p:PublishSingleFile=true -p:PublishTrimmed=true
+      working-directory: ./GTAdhocToolchain.CLI
+      continue-on-error: true
+
+    - name: Publish GTAdhocToolchain.CLI for Linux (self contained)
+      run: dotnet publish --configuration Release -r linux-x64 -p:PublishSingleFile=true -p:PublishTrimmed=true
+      working-directory: ./GTAdhocToolchain.CLI
+      continue-on-error: true
+
+    - name: Publish GTAdhocToolchain.CLI for Mac OSX (self contained)
+      run: dotnet publish --configuration Release -r osx-x64 -p:PublishSingleFile=true -p:PublishTrimmed=true
+      working-directory: ./GTAdhocToolchain.CLI
+      continue-on-error: true
 
     - uses: actions/upload-artifact@v3
       with:
-        name: GTAdhocToolchain
+        name: GTAdhocToolchain-win-framework
         path: |
           GTAdhocToolchain.CLI/bin/Release/net6.0/publish/*
           !GTAdhocToolchain.CLI/bin/Release/net6.0/publish/*.pdb
         if-no-files-found: error
+      continue-on-error: true
+
+    - uses: actions/upload-artifact@v3
+      with:
+        name: GTAdhocToolchain-win-x86
+        path: |
+          GTAdhocToolchain.CLI/bin/Release/net6.0/win-x86/publish/*
+          !GTAdhocToolchain.CLI/bin/Release/net6.0/win-x86/publish/*.pdb
+        if-no-files-found: error
+      continue-on-error: true
+
+    - uses: actions/upload-artifact@v3
+      with:
+        name: GTAdhocToolchain-linux-x64
+        path: |
+          GTAdhocToolchain.CLI/bin/Release/net6.0/linux-x64/publish/*
+          !GTAdhocToolchain.CLI/bin/Release/net6.0/linux-x64/publish/*.pdb
+        if-no-files-found: error
+      continue-on-error: true
+
+    - uses: actions/upload-artifact@v3
+      with:
+        name: GTAdhocToolchain-osx-x64
+        path: |
+          GTAdhocToolchain.CLI/bin/Release/net6.0/osx-x64/publish/*
+          !GTAdhocToolchain.CLI/bin/Release/net6.0/osx-x64/publish/*.pdb
+        if-no-files-found: error
+      continue-on-error: true
