@@ -21,13 +21,13 @@ namespace GTAdhocToolchain.Core
         /// </summary>
         /// <param name="symbolName"></param>
         /// <returns>Symbol entity.</returns>
-        public AdhocSymbol RegisterSymbol(string symbolName, bool convertToOperand = true)
+        public AdhocSymbol RegisterSymbol(string symbolName, bool convertToOperand = true, bool isHexSequence = false)
         {
             string identifier = convertToOperand ? ConvertSymbol(symbolName) : symbolName;
 
             if (!Symbols.TryGetValue(identifier, out var symbol))
             {
-                symbol = new AdhocSymbol(Symbols.Count, identifier);
+                symbol = new AdhocSymbol(Symbols.Count, identifier, isHexSequence);
                 Symbols.Add(identifier, symbol);
             }
 

@@ -10,12 +10,13 @@ namespace GTAdhocToolchain.Core
     {
         public int Id { get; set; }
         public string Name { get; set; }
+        public bool HasHexEscape { get; set; }
 
-        public AdhocSymbol(int id, string name)
+        public AdhocSymbol(int id, string name, bool isHexSequence = false)
         {
             Id = id;
             Name = name;
-
+            HasHexEscape = isHexSequence;
         }
 
         public AdhocSymbol(string name)

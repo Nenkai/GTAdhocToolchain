@@ -442,7 +442,7 @@ namespace GTAdhocToolchain.CodeGen
 
             stream.WriteVarInt(SymbolMap.Symbols.Count);
             foreach (AdhocSymbol symb in SymbolMap.Symbols.Values)
-                stream.WriteVarString(symb.Name);
+                stream.WriteVarString(symb.Name, !symb.HasHexEscape);
         }
     }
 }

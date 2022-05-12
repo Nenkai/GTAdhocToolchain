@@ -94,9 +94,18 @@ namespace GTAdhocToolchain.Core
             return value;
         }
 
-        public void WriteVarString(string str)
+        public void WriteVarString(string str, bool asUtf8 = true)
         {
-            if (IsAscii(str))
+            // HACK: Hex sequences may not be only hex escapes, they may be incorrectly written
+            // Best way to handle it for now (?) is just to treat anything with a hex escaped character as full ascii
+
+            if (asUtf8)
+            {
+                // Must convert, has some utf8 chars, i.e japanese
+                WriteVarInt(Encoding.UTF8.GetByteCount(str));
+                StreamExtensions.WriteString(this, str, StringCoding.Raw);
+            }
+            else
             {
                 // Non UTF8 operation, incase the string is a escaped byte array as string
                 WriteVarInt(str.Length);
@@ -105,12 +114,6 @@ namespace GTAdhocToolchain.Core
                     data[i] = (byte)str[i];
 
                 this.Write(data);
-            }
-            else
-            {
-                // Must convert, has some utf8 chars, i.e japanese
-                WriteVarInt(Encoding.UTF8.GetByteCount(str));
-                StreamExtensions.WriteString(this, str, StringCoding.Raw);
             }
         }
 

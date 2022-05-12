@@ -509,11 +509,21 @@ namespace GTAdhocToolchain.Compiler
             if (forStatement.Update != null)
             {
                 if (forStatement.Update.Type == Nodes.UpdateExpression)
+                {
                     CompileUnaryExpression(frame, forStatement.Update as UpdateExpression, popResult: true);
+                }
                 else if (forStatement.Update.Type == Nodes.CallExpression)
+                {
                     CompileCall(frame, forStatement.Update as CallExpression, popReturnValue: true);
+                }
                 else if (forStatement.Update.Type == Nodes.AssignmentExpression)
+                {
                     CompileAssignmentExpression(frame, forStatement.Update as AssignmentExpression, popResult: true);
+                }
+                else if (forStatement.Update.Type == Nodes.SequenceExpression)
+                {
+                    CompileSequenceExpressionAssignmentsOrCall(frame, forStatement.Update as SequenceExpression);
+                }
                 else
                     ThrowCompilationError(forStatement.Update, CompilationMessages.Error_StatementExpressionOnly);
             }
@@ -534,6 +544,26 @@ namespace GTAdhocToolchain.Compiler
 
             // Insert final leave
             LeaveLoop(frame);
+        }
+
+        /// <summary>
+        /// Compiles 'a = b, c = d', assignments or calls only
+        /// </summary>
+        /// <param name="frame"></param>
+        /// <param name="sequenceExpression"></param>
+        private void CompileSequenceExpressionAssignmentsOrCall(AdhocCodeFrame frame, SequenceExpression sequenceExpression)
+        {
+            foreach (var exp in sequenceExpression.Expressions)
+            {
+                if (exp.Type == Nodes.AssignmentExpression)
+                    CompileAssignmentExpression(frame, exp as AssignmentExpression, popResult: true);
+                else if (exp.Type == Nodes.UpdateExpression)
+                    CompileUnaryExpression(frame, exp as UpdateExpression, popResult: true);
+                else if (exp.Type == Nodes.CallExpression)
+                    CompileCall(frame, exp as CallExpression, popReturnValue: true);
+                else
+                    ThrowCompilationError(exp, CompilationMessages.Error_StatementExpressionOnly);
+            }
         }
 
         public void CompileWhile(AdhocCodeFrame frame, WhileStatement whileStatement)
@@ -1525,7 +1555,7 @@ namespace GTAdhocToolchain.Compiler
                 }
                 else 
                 {
-                    AdhocSymbol strSymb = SymbolMap.RegisterSymbol(strElement.Value.Cooked, convertToOperand: false);
+                    AdhocSymbol strSymb = SymbolMap.RegisterSymbol(strElement.Value.Cooked, convertToOperand: false, strElement.Value.HasHexEscape);
                     InsStringConst strConst = new InsStringConst(strSymb);
                     frame.AddInstruction(strConst, strElement.Location.Start.Line);
                 }
@@ -1544,7 +1574,7 @@ namespace GTAdhocToolchain.Compiler
                 {
                     if (node is TemplateElement tElem)
                     {
-                        AdhocSymbol valSymb = SymbolMap.RegisterSymbol(tElem.Value.Cooked, convertToOperand: false);
+                        AdhocSymbol valSymb = SymbolMap.RegisterSymbol(tElem.Value.Cooked, convertToOperand: false, tElem.Value.HasHexEscape);
                         InsStringConst strConst = new InsStringConst(valSymb);
                         frame.AddInstruction(strConst, tElem.Location.Start.Line);
                     }
