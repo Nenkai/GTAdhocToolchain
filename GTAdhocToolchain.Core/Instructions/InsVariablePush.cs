@@ -12,10 +12,10 @@ namespace GTAdhocToolchain.Core.Instructions
     public class InsVariablePush : InstructionBase
     {
         public override AdhocInstructionType InstructionType => AdhocInstructionType.VARIABLE_PUSH;
-
         public override string InstructionName => "VARIABLE_PUSH";
 
         public List<AdhocSymbol> VariableSymbols { get; set; } = new();
+        public bool IsStatic => VariableSymbols.Count > 1;
 
         public int VariableStorageIndex { get; set; }
 
@@ -26,7 +26,11 @@ namespace GTAdhocToolchain.Core.Instructions
         }
 
         public override string ToString()
-            => $"{InstructionType}: {string.Join(',', VariableSymbols.Select(e => e.Name))}, PushAt:{VariableStorageIndex}";
-
+        {
+            if (IsStatic)
+                return $"{InstructionType}: {string.Join(',', VariableSymbols.Select(e => e.Name))}, Static:{VariableStorageIndex}";
+            else
+                return $"{InstructionType}: {string.Join(',', VariableSymbols.Select(e => e.Name))}, Local:{VariableStorageIndex}";
+        }
     }
 }

@@ -18,6 +18,7 @@ namespace GTAdhocToolchain.Core.Instructions
         public List<AdhocSymbol> VariableSymbols { get; set; } = new();
 
         public int VariableStorageIndex { get; set; }
+        public bool IsStatic => VariableSymbols.Count > 1;
 
         public InsVariableEvaluation(int index)
         {
@@ -36,6 +37,11 @@ namespace GTAdhocToolchain.Core.Instructions
         }
 
         public override string ToString()
-            => $"{InstructionType}: {string.Join(',', VariableSymbols.Select(e => e.Name))}, Index:{VariableStorageIndex}";
+        {
+            if (IsStatic)
+                return $"{InstructionType}: {string.Join(',', VariableSymbols.Select(e => e.Name))}, Static:{VariableStorageIndex}";
+            else
+                return $"{InstructionType}: {string.Join(',', VariableSymbols.Select(e => e.Name))}, Local:{VariableStorageIndex}";
+        }
     }
 }

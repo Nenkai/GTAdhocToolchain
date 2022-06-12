@@ -279,7 +279,8 @@ namespace GTAdhocToolchain.Core
                 }
                 else if (!isLocalDeclaration) // Reassignment to a static?
                 {
-                    if (Stack.HasStaticVariable(symbol) || IsStaticModuleAttribute(symbol) || !Stack.HasLocalVariable(symbol))
+                    // Check if the symbol is a static reference, a direct reference to a module attribute, AND doesn't overlap with any locals
+                    if ((Stack.HasStaticVariable(symbol) || IsStaticModuleAttribute(symbol)) && !Stack.HasLocalVariable(symbol))
                     {
                         bool added = Stack.TryAddStaticVariable(symbol, out newVariable);
                         if (added)
@@ -419,18 +420,29 @@ namespace GTAdhocToolchain.Core
             }
             else
             {
-                HasDebuggingInformation = stream.ReadBoolean();
-                Version = stream.ReadByte();
-
-                if (Version != 8) // Why PDI? Changed your mind after 8?
+                if (Version >= 13)
                 {
-                    if (HasDebuggingInformation)
-                        SourceFilePath = stream.ReadSymbol();
+                    HasDebuggingInformation = true;
+
+                    SourceFilePath = stream.ReadSymbol();
+                    stream.ReadByte();
                 }
+                else
+                {
+                    HasDebuggingInformation = stream.ReadBoolean();
+                    Version = stream.ReadByte();
 
 
-                if (Version >= 12)
-                    HasRestElement = stream.ReadBoolean();
+                    if (Version != 8) // Why PDI? Changed your mind after 8?
+                    {
+                        if (HasDebuggingInformation)
+                            SourceFilePath = stream.ReadSymbol();
+                    }
+
+
+                    if (Version >= 12)
+                        HasRestElement = stream.ReadBoolean();
+                }
 
                 uint argCount = stream.ReadUInt32();
 
@@ -450,11 +462,12 @@ namespace GTAdhocToolchain.Core
                     {
                         var symbol = stream.ReadSymbol();
                         CapturedCallbackVariables.Add(new AdhocSymbol(stream.ReadInt32(), symbol.Name));
-                        
+
                     }
                 }
 
                 uint unkVarHeapIndex = stream.ReadUInt32();
+                
             }
 
             if (Version <= 10)

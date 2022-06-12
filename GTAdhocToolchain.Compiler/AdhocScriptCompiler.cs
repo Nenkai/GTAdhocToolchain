@@ -214,7 +214,7 @@ namespace GTAdhocToolchain.Compiler
                 catchClauseSkipper.JumpInstructionIndex = frame.GetLastInstructionIndex();
             }
 
-            if (tryStatement.Finalizer != null)
+            if (tryStatement.Finalizer is not null)
             {
                 if (tryStatement.Finalizer.Type != Nodes.BlockStatement)
                     ThrowCompilationError(tryStatement.Block, CompilationMessages.Error_CatchClauseNotBody);
@@ -383,7 +383,7 @@ namespace GTAdhocToolchain.Compiler
                 moduleOrClass.Name = id.Name;
 
                 var superClassIdent = superClass as Identifier;
-                if (superClass != null)
+                if (superClass is not null)
                 {
                     if (superClassIdent.Name.Contains(AdhocConstants.OPERATOR_STATIC))
                     {
@@ -431,7 +431,7 @@ namespace GTAdhocToolchain.Compiler
         {
             EnterScope(frame, ifStatement);
 
-            CompileExpression(frame, ifStatement.Test); // if (<test>)
+            CompileTestStatement(frame, ifStatement.Test);
 
             // Create jump
             InsJumpIfFalse endOrNextIfJump = new InsJumpIfFalse();
@@ -463,6 +463,27 @@ namespace GTAdhocToolchain.Compiler
             LeaveScope(frame, insertLeaveInstruction: false);
         }
 
+        /// <summary>
+        /// Compiles a test statement where the result, or assignment, is not immediately discarded.
+        /// </summary>
+        /// <param name="frame"></param>
+        /// <param name="testExpression"></param>
+        private void CompileTestStatement(AdhocCodeFrame frame, Expression testExpression)
+        {
+            if (testExpression.Type == Nodes.AssignmentExpression)
+            {
+                CompileAssignmentExpression(frame, testExpression as AssignmentExpression, popResult: false); // if (<test>)
+            }
+            else if (testExpression.Type == Nodes.UpdateExpression)
+            {
+                CompileUnaryExpression(frame, testExpression as UpdateExpression, popResult: false); // var a = ++b; - Do not discard b
+            }
+            else
+            {
+                CompileExpression(frame, testExpression);
+            }
+        }
+
         public void CompileFor(AdhocCodeFrame frame, ForStatement forStatement)
         {
             LoopContext loopCtx = EnterLoop(frame, forStatement);
@@ -488,9 +509,9 @@ namespace GTAdhocToolchain.Compiler
 
             // Condition
             InsJumpIfFalse jumpIfFalse = null; // will only be inserted if the condition exists, else its essentially a while true loop
-            if (forStatement.Test != null)
+            if (forStatement.Test is not null)
             {
-                CompileExpression(frame, forStatement.Test);
+                CompileTestStatement(frame, forStatement.Test);
 
                 // Insert jump to the end of loop frame
                 jumpIfFalse = new InsJumpIfFalse();
@@ -506,27 +527,8 @@ namespace GTAdhocToolchain.Compiler
                 continueJmp.JumpInstructionIndex = loopUpdInsIndex;
 
             // Update Counter
-            if (forStatement.Update != null)
-            {
-                if (forStatement.Update.Type == Nodes.UpdateExpression)
-                {
-                    CompileUnaryExpression(frame, forStatement.Update as UpdateExpression, popResult: true);
-                }
-                else if (forStatement.Update.Type == Nodes.CallExpression)
-                {
-                    CompileCall(frame, forStatement.Update as CallExpression, popReturnValue: true);
-                }
-                else if (forStatement.Update.Type == Nodes.AssignmentExpression)
-                {
-                    CompileAssignmentExpression(frame, forStatement.Update as AssignmentExpression, popResult: true);
-                }
-                else if (forStatement.Update.Type == Nodes.SequenceExpression)
-                {
-                    CompileSequenceExpressionAssignmentsOrCall(frame, forStatement.Update as SequenceExpression);
-                }
-                else
-                    ThrowCompilationError(forStatement.Update, CompilationMessages.Error_StatementExpressionOnly);
-            }
+            if (forStatement.Update is not null)
+                CompileForUpdate(frame, forStatement);
 
             // Insert jump to go back to the beginning of the loop
             InsJump startJump = new InsJump();
@@ -535,7 +537,7 @@ namespace GTAdhocToolchain.Compiler
 
             // Update jump that exits the loop if it exists
             int loopExitInsIndex = frame.GetLastInstructionIndex();
-            if (jumpIfFalse != null)
+            if (jumpIfFalse is not null)
                 jumpIfFalse.JumpIndex = loopExitInsIndex;
 
             // Process break jumps before doing the final exit
@@ -544,6 +546,28 @@ namespace GTAdhocToolchain.Compiler
 
             // Insert final leave
             LeaveLoop(frame);
+        }
+
+        private void CompileForUpdate(AdhocCodeFrame frame, ForStatement forStatement)
+        {
+            if (forStatement.Update.Type == Nodes.UpdateExpression)
+            {
+                CompileUnaryExpression(frame, forStatement.Update as UpdateExpression, popResult: true);
+            }
+            else if (forStatement.Update.Type == Nodes.CallExpression)
+            {
+                CompileCall(frame, forStatement.Update as CallExpression, popReturnValue: true);
+            }
+            else if (forStatement.Update.Type == Nodes.AssignmentExpression)
+            {
+                CompileAssignmentExpression(frame, forStatement.Update as AssignmentExpression, popResult: true);
+            }
+            else if (forStatement.Update.Type == Nodes.SequenceExpression)
+            {
+                CompileSequenceExpressionAssignmentsOrCall(frame, forStatement.Update as SequenceExpression);
+            }
+            else
+                ThrowCompilationError(forStatement.Update, CompilationMessages.Error_StatementExpressionOnly);
         }
 
         /// <summary>
@@ -556,11 +580,17 @@ namespace GTAdhocToolchain.Compiler
             foreach (var exp in sequenceExpression.Expressions)
             {
                 if (exp.Type == Nodes.AssignmentExpression)
+                {
                     CompileAssignmentExpression(frame, exp as AssignmentExpression, popResult: true);
+                }
                 else if (exp.Type == Nodes.UpdateExpression)
+                {
                     CompileUnaryExpression(frame, exp as UpdateExpression, popResult: true);
+                }
                 else if (exp.Type == Nodes.CallExpression)
+                {
                     CompileCall(frame, exp as CallExpression, popReturnValue: true);
+                }
                 else
                     ThrowCompilationError(exp, CompilationMessages.Error_StatementExpressionOnly);
             }
@@ -579,7 +609,7 @@ namespace GTAdhocToolchain.Compiler
                 Literal literal = whileStatement.Test as Literal;
                 if (literal is null || literal.TokenType != TokenType.BooleanLiteral || (literal.Value as bool?) == false)
                 {
-                    CompileExpression(frame, whileStatement.Test);
+                    CompileTestStatement(frame, whileStatement.Test);
                     frame.AddInstruction(jumpIfFalse, 0);
                 }
             }
@@ -617,7 +647,7 @@ namespace GTAdhocToolchain.Compiler
             CompileStatementWithScope(frame, doWhileStatement.Body);
 
             int testInsIndex = frame.GetLastInstructionIndex();
-            CompileExpression(frame, doWhileStatement.Test);
+            CompileTestStatement(frame, doWhileStatement.Test);
 
             // Reached bottom, proceed to do update
             // But first, process continue if any
@@ -713,7 +743,7 @@ namespace GTAdhocToolchain.Compiler
             for (int i = 0; i < switchStatement.Cases.Count; i++)
             {
                 SwitchCase swCase = switchStatement.Cases[i];
-                if (swCase.Test != null) // Actual case
+                if (swCase.Test is not null) // Actual case
                 {
                     // Get temp variable
                     InsertVariableEvalFromSymbol(frame, caseSymb);
@@ -755,7 +785,7 @@ namespace GTAdhocToolchain.Compiler
                 SwitchCase swCase = switchStatement.Cases[i];
 
                 // Update body jump location
-                if (swCase.Test != null)
+                if (swCase.Test is not null)
                     caseBodyJumps[swCase].JumpIndex = frame.GetLastInstructionIndex();
                 else
                     defaultJump.JumpInstructionIndex = frame.GetLastInstructionIndex();
@@ -926,14 +956,20 @@ namespace GTAdhocToolchain.Compiler
                 Expression? id = declarator.Id;
 
                 // We need to add the defined value first
-                if (initValue != null)
+                if (initValue is not null)
                 {
                     if (initValue.Type == Nodes.UpdateExpression)
-                        CompileUnaryExpression(frame, initValue as UpdateExpression, popResult: true);
+                    {
+                        CompileUnaryExpression(frame, initValue as UpdateExpression, popResult: false); // var a = ++b; - Do not discard b
+                    }
                     else if (initValue.Type == Nodes.AssignmentExpression)
-                        CompileAssignmentExpression(frame, initValue as AssignmentExpression, popResult: false); // var a = b = c; // Do not discard b
+                    {
+                        CompileAssignmentExpression(frame, initValue as AssignmentExpression, popResult: false); // var a = b = c; - Do not discard b
+                    }
                     else
+                    {
                         CompileExpression(frame, initValue);
+                    }
                 }
 
 
@@ -943,10 +979,10 @@ namespace GTAdhocToolchain.Compiler
 
                 if (id is Identifier idIdentifier) // var hello [= world];
                 {
-                    if (initValue != null || pushWhenNoInit)
+                    if (initValue is not null || pushWhenNoInit)
                     {
                         // Variable is being defined with a value.
-                        InsertVariablePush(frame, idIdentifier, true);
+                        InsertVariablePush(frame, idIdentifier, isVariableDeclaration: true);
 
                         // Perform assignment
                         InsertAssignPop(frame);
