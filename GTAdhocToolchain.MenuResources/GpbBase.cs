@@ -26,6 +26,7 @@ namespace GTAdhocToolchain.Menu.Resources
 
                 gpb = magic switch
                 {
+                    "2bpg" or "gpb2" => new GpbData2(),
                     "3bpg" or "gpb3" => new GpbData3(),
                     "4bpg" or "gpb4" => new GpbData4(),
                     _ => null,
@@ -48,7 +49,12 @@ namespace GTAdhocToolchain.Menu.Resources
             {
                 Console.WriteLine($"[:] GPB: Unpack -> {file.FileName}");
 
-                string path = file.FileName.Substring(1); // Ignore first '/'
+                string path;
+                if (this is GpbData2)
+                    path = file.FileName;
+                else
+                    path = file.FileName.Substring(1);
+
                 Directory.CreateDirectory(Path.Combine(outputFolder, Path.GetDirectoryName(path)));
                 File.WriteAllBytes(Path.Combine(outputFolder, path), file.FileData);
             }
