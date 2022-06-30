@@ -2,7 +2,9 @@
 ### `null` = `nil`
 Every dereferenced value is a `nil`, instead of a `null`.
 
-### Modules
+### Modules, Classes, Attributes and Statics
+
+##### Modules & Statics
 Modules have a completely different meaning in Adhoc. Think of them as your usual javascript classes.
 
 Classes also exist, but are only used to *define* types that inherit from the base Adhoc objects.
@@ -19,20 +21,41 @@ module MyModule
 }
 ```
 
-##### Class Constructors & Attributes
+For statics, the keyword `static` is used. They are accessed in a C++ namespace manner.
+```java
+module StaticModule
+{
+  static PI = 3.14;
+}
+
+// Access static field
+var pi = StaticModule::PI;
+
+// Navigating through engine modules to call a function
+pdistd::MPjson::Encode(/* ... */);
+```
+
+##### Attributes
 Properties are called `attributes` in adhoc. They are defined with the `attribute` keyword, just like how you would declare a `var` or `static`.
 
-Without value: 
-- `attribute myAttribute` - Will be defaulted to `nil`
-
-With value: 
-- `attribute myAttribute = []`
-Local attributes are accessed using the `self` keyword.
-
-Class constructors are defined with the `__init__` method identifier.
+* Without value: `attribute myAttribute` - Will be defaulted to `nil`
+* With value: `attribute myAttribute = []`
 
 ```java
-class Dog extends System::Object
+class Dog
+{
+   attribute name;
+}
+```
+
+Attributes can also be defined in modules.
+
+##### Class Constructors
+Class constructors are defined with the `__init__` method identifier.
+Local attributes are accessed using the `self` keyword.
+
+```java
+class Dog
 {
    attribute name;
    
@@ -45,10 +68,15 @@ class Dog extends System::Object
 var obj = MyObject("FooBar");
 ```
 
+To access an attrbibute:
+```java
+var name = obj.name;
+```
+
 ##### Class Inheritance
 
 ```java
-class BetterObject extends System::Object
+class BetterObject
 {
   ...
 }
@@ -58,11 +86,6 @@ class EvenBetterObject extends BetterObject
  ...
 }
 ```
-
-### Static Members
-Modules that are declared as static within another module are accessed in a C++ namespace manner.
-
-Example: `pdistd::MPjson::Encode(...)`.
 
 ### Strings & Interpolation
 There is only one type of string declaration, quotes.
@@ -74,28 +97,6 @@ var combinedStrings = "hello"
 var interpolated = "hello, %{name}!"; // Notice %, instead of $ in javascript.
 ```
 
-### Foreach
-Adhoc supports `foreach` clauses out of the box.
-```csharp
-var arr = ["one", "two", "three"];
-var combined;
-foreach (var i in arr)
-{
-  combined += i + " ";
-}
-
-// combined = "one two three "
-```
-
-Also works with maps.
-```js
-var map = ["Name":"Age"];
-foreach (var [name, age] in map) // Pair deconstruction
-{
-    // ...
-}
-```
-
 ### Map
 Maps are Key/Value collections, similar to javascript's map or C#'s dictionaries. Adhoc supports them natively.
 ```js
@@ -105,11 +106,31 @@ var myMapWithElements = ["MyKey":"MyValue", "MyKey2": "MyValue2"]; // Creation w
 
 myMap["hello"] = "world!";
 myMap.getMapCount(); // 1
-myMapWithElements.getMapCount(); // 1
+myMapWithElements.getMapCount(); // 2
+```
+
+### Foreach
+Adhoc supports `foreach` clauses out of the box.
+```csharp
+var arr = ["one", "two", "three"];
+var combined;
+foreach (var i in arr)
+  combined += i + " ";
+
+// combined = "one two three "
+```
+
+Also works with maps.
+```js
+var map = ["Name": "Bob", Age": 18];
+foreach (var [key, value] in map) // Pair deconstruction
+{
+    // ...
+}
 ```
 
 ### Macros
-Supported as C supports it.
+Supported as C supports it (Compiler does not yet have a pre-processor).
 ```c
 #define SET_INDEX(#INDEX) \
   arr[#INDEX] = #INDEX;
@@ -182,7 +203,7 @@ undef myFunction; // "myFunction" is undefined, now nil if called.
 ### Operator Overloading
 Adhoc supports fully overloading operators.
 ```java
-class OperatorOverloadClassTest extends System::Object
+class OperatorOverloadClassTest
 {
     attribute value = "";
     
@@ -201,7 +222,59 @@ obj += "hello world!";
 // obj.value is now "hello world!"
 ```
 
+### Static Scopes
+Static fields can be accessed from any module or class depth.
+
+```js
+module RootModule
+{
+  static sStaticField;
+
+  module ChildModule
+  {
+    function setParentField()
+    {
+      sStaticfield = "hello world!";
+    }
+  }
+}
+```
+
+### Async/Await (GT6 and above)
+NOTE: Most of the syntax was mostly made up due to unknowns surrounding the original syntax.
+
+```js
+async function myAsyncFunction() // Must mark as async
+{
+  var result = await () => getObject();
+}
+```
+
+### Finally Clauses
+NOTE: Most of the syntax was mostly made up due to unknowns surrounding the original syntax.
+
+```js
+function func(context) // Must mark as async
+{
+  CursorUtil::setCursor(context, "wait"); // Set cursor to waiting mode
+  finally() => { CursorUtil::setCursor(context, "cursor_chrome"); } // Restore cursor back to normal incase an exception is thrown
+}
+```
+
+### Yield Statements
+Mostly unknown, may be similar to unity's yield statement where the runtime waits for the next frame.
+
+```js
+function func(context)
+{
+  yield;
+}
+```
+
 ### Requires
+[TODO]
+
+### Pass by reference
 [TODO]
 
 ### Not supported
@@ -209,9 +282,7 @@ obj += "hello world!";
 * `let`, `const` keywords are not implemented.
 * `for..in` and `for..of` are replaced by the much more convenient `foreach`.
 * `===`, `!==` operators
-
-### Possibly supported (needs investigation)
-* Async/Await
+* Dynamic objects `var obj = {}`
 
 ### And more
 That have yet to be figured.
