@@ -277,10 +277,10 @@ namespace GTAdhocToolchain.Core
                     if (added)
                         lastScope.StaticScopeVariables.Add(symbol.Name, symbol);
                 }
-                else if (!isLocalDeclaration) // Reassignment to a static?
+                else if (!isLocalDeclaration) // Assigning to a symbol without a declaration, i.e 'hello = "world"'
                 {
-                    // Check if the symbol is a static reference, a direct reference to a module attribute, AND doesn't overlap with any locals
-                    if ((Stack.HasStaticVariable(symbol) || IsStaticModuleAttribute(symbol)) && !Stack.HasLocalVariable(symbol))
+                    // Check if the symbol is a static reference, a direct reference to a module attribute, and if it doesn't match, check if it doesn't overlap with any scope locals
+                    if (Stack.HasStaticVariable(symbol) || IsStaticModuleFieldOrAttribute(symbol) || !Stack.HasLocalVariable(symbol))
                     {
                         bool added = Stack.TryAddStaticVariable(symbol, out newVariable);
                         if (added)
@@ -288,6 +288,7 @@ namespace GTAdhocToolchain.Core
                     }
                     else
                     {
+                        // Assigning to a local that already exists
                         bool added = Stack.TryAddLocalVariable(symbol, out newVariable);
                         if (added)
                             lastScope.LocalScopeVariables.Add(symbol.Name, symbol);
@@ -354,7 +355,7 @@ namespace GTAdhocToolchain.Core
                 throw new Exception("Variable is not a local or static variable..?");
         }
 
-        public bool IsStaticModuleAttribute(AdhocSymbol symbol)
+        public bool IsStaticModuleFieldOrAttribute(AdhocSymbol symbol)
         {
             // Recursively check all modules
             bool HasStatic(AdhocSymbol symbol, AdhocModule module)
@@ -387,7 +388,7 @@ namespace GTAdhocToolchain.Core
             if (Stack.HasLocalVariable(symb))
                 return false; // Priorize local variables
 
-            if (IsStaticModuleAttribute(symb))
+            if (IsStaticModuleFieldOrAttribute(symb))
                 return true;
 
             return true;

@@ -816,6 +816,16 @@ namespace GTAdhocToolchain.Compiler
                 CompileSubroutine(frame, funcDecl, funcDecl.Body, funcDecl.Id, funcDecl.Params, isMethod: false);
         }
 
+        /// <summary>
+        /// Compiles a function/method.
+        /// </summary>
+        /// <param name="frame"></param>
+        /// <param name="parentNode"></param>
+        /// <param name="body"></param>
+        /// <param name="id"></param>
+        /// <param name="subParams"></param>
+        /// <param name="isMethod"></param>
+        /// <param name="isAsync"></param>
         public void CompileSubroutine(AdhocCodeFrame frame, Node parentNode, Node body, Identifier id, NodeList<Expression> subParams, bool isMethod = false, bool isAsync = false)
         {
             if (id is null)
@@ -836,62 +846,9 @@ namespace GTAdhocToolchain.Compiler
                     ThrowCompilationError(id, $"Method name '{subroutine.Name}' already defined in this scope.");
             }
 
+            EnterScope(subroutine.CodeFrame, parentNode);
             foreach (Expression param in subParams)
-            {
-                if (param.Type == Nodes.Identifier)
-                {
-                    var paramIdent = param as Identifier;
-
-                    AdhocSymbol paramSymb = SymbolMap.RegisterSymbol(paramIdent.Name);
-                    subroutine.CodeFrame.FunctionParameters.Add(paramSymb);
-
-                    // Function param is uninitialized, push nil
-                    frame.AddInstruction(new InsNilConst(), paramIdent.Location.Start.Line);
-                    
-                }
-                else if (param is AssignmentExpression assignmentExpression)
-                {
-                    if (assignmentExpression.Left.Type != Nodes.Identifier || assignmentExpression.Right.Type != Nodes.Literal)
-                        ThrowCompilationError(parentNode, CompilationMessages.Error_InvalidParameterValueAssignment);
-
-                    AdhocSymbol paramSymb = SymbolMap.RegisterSymbol((assignmentExpression.Left as Identifier).Name);
-                    subroutine.CodeFrame.FunctionParameters.Add(paramSymb);
-
-                    // Push default value
-                    CompileLiteral(frame, assignmentExpression.Right as Literal);
-                }
-                else if (param.Type == Nodes.AssignmentPattern)
-                {
-                    var pattern = param as AssignmentPattern;
-
-                    if (pattern.Right.Type != Nodes.Literal &&
-                        (pattern.Right.Type == Nodes.UnaryExpression && (pattern.Right as UnaryExpression).Argument.Type != Nodes.Literal) && // Stuff like -1
-                        pattern.Right.Type != Nodes.Identifier &&
-                        pattern.Right.Type != Nodes.MemberExpression &&
-                        pattern.Right.Type != Nodes.ArrayExpression &&
-                        pattern.Right.Type != Nodes.MapExpression)
-                        ThrowCompilationError(parentNode, "Subroutine default parameter value must be an identifier to a literal or other identifier.");
-
-                    AdhocSymbol paramSymb = SymbolMap.RegisterSymbol((pattern.Left as Identifier).Name);
-                    subroutine.CodeFrame.FunctionParameters.Add(paramSymb);
-
-                    // Push default value
-                    CompileExpression(frame, pattern.Right);
-                }
-                else if (param.Type == Nodes.RestElement) // params
-                {
-                    subroutine.CodeFrame.HasRestElement = true;
-
-                    Identifier paramIdent = (param as RestElement).Argument as Identifier;
-                    AdhocSymbol paramSymb = SymbolMap.RegisterSymbol(paramIdent.Name);
-                    subroutine.CodeFrame.FunctionParameters.Add(paramSymb);
-
-                    frame.AddInstruction(new InsNilConst(), paramIdent.Location.Start.Line);
-                }
-                else
-                    ThrowCompilationError(parentNode, "Subroutine definition parameters must all be identifier or assignment to a literal.");
-
-            }
+                CompileSubroutineParameter(frame, parentNode, subroutine, param);
 
             if (frame.CurrentScope.StaticScopeVariables.ContainsKey(subroutine.Name.Name))
                 ThrowCompilationError(parentNode, $"Static subroutine name {subroutine.Name} is already defined in this scope.");
@@ -900,13 +857,7 @@ namespace GTAdhocToolchain.Compiler
             frame.AddInstruction(subroutine, parentNode.Location.Start.Line);
 
             if (body is BlockStatement blockStatement)
-            {
-                EnterScope(subroutine.CodeFrame, parentNode);
-                foreach (var param in subroutine.CodeFrame.FunctionParameters)
-                    subroutine.CodeFrame.AddScopeVariable(param, isAssignment: true, isLocalDeclaration: true);
-                
                 CompileBlockStatement(subroutine.CodeFrame, blockStatement, openScope: false, insertLeaveInstruction: false);
-            }
             else
                 ThrowCompilationError(body, "Expected subroutine body to be frame statement.");
 
@@ -914,6 +865,73 @@ namespace GTAdhocToolchain.Compiler
 
             Logger.Debug($"Subroutine '{id.Name}' compiled ({subroutine.CodeFrame.Instructions.Count} ins, " +
                 $"Stack Size:{subroutine.CodeFrame.Stack.StackSize}, variable Storage Size: {subroutine.CodeFrame.Stack.LocalVariableStorageSize})");
+        }
+
+        /// <summary>
+        /// Compiles a subroutine parameter and it's default values if provided.
+        /// </summary>
+        /// <param name="frame"></param>
+        /// <param name="parentNode"></param>
+        /// <param name="subroutine"></param>
+        /// <param name="param"></param>
+        private void CompileSubroutineParameter(AdhocCodeFrame frame, Node parentNode, SubroutineBase subroutine, Expression param)
+        {
+            // Parameter with no default value
+            if (param.Type == Nodes.Identifier)
+            {
+                var paramIdent = param as Identifier;
+
+                AdhocSymbol paramSymb = SymbolMap.RegisterSymbol(paramIdent.Name);
+                subroutine.CodeFrame.FunctionParameters.Add(paramSymb);
+                subroutine.CodeFrame.AddScopeVariable(paramSymb, isAssignment: true, isLocalDeclaration: true);
+
+                // Subroutine param is uninitialized, push nil into current frame
+                frame.AddInstruction(new InsNilConst(), paramIdent.Location.Start.Line);
+            }
+            else if (param is AssignmentExpression assignmentExpression) // Parameter default value set to another variable or static value
+            {
+                if (assignmentExpression.Left.Type != Nodes.Identifier || assignmentExpression.Right.Type != Nodes.Literal)
+                    ThrowCompilationError(parentNode, CompilationMessages.Error_InvalidParameterValueAssignment);
+
+                AdhocSymbol paramSymb = SymbolMap.RegisterSymbol((assignmentExpression.Left as Identifier).Name);
+                subroutine.CodeFrame.FunctionParameters.Add(paramSymb);
+                subroutine.CodeFrame.AddScopeVariable(paramSymb, isAssignment: true, isLocalDeclaration: true);
+
+                // Push default value
+                CompileLiteral(frame, assignmentExpression.Right as Literal);
+            }
+            else if (param.Type == Nodes.AssignmentPattern)
+            {
+                var pattern = param as AssignmentPattern;
+
+                if (pattern.Right.Type != Nodes.Literal &&
+                    (pattern.Right.Type == Nodes.UnaryExpression && (pattern.Right as UnaryExpression).Argument.Type != Nodes.Literal) && // Stuff like -1
+                    pattern.Right.Type != Nodes.Identifier &&
+                    pattern.Right.Type != Nodes.MemberExpression &&
+                    pattern.Right.Type != Nodes.ArrayExpression &&
+                    pattern.Right.Type != Nodes.MapExpression)
+                    ThrowCompilationError(parentNode, "Subroutine default parameter value must be an identifier to a literal or other identifier.");
+
+                AdhocSymbol paramSymb = SymbolMap.RegisterSymbol((pattern.Left as Identifier).Name);
+                subroutine.CodeFrame.FunctionParameters.Add(paramSymb);
+                subroutine.CodeFrame.AddScopeVariable(paramSymb, isAssignment: true, isLocalDeclaration: true);
+
+                // Push default value
+                CompileExpression(frame, pattern.Right);
+            }
+            else if (param.Type == Nodes.RestElement) // Rest element (...params)
+            {
+                subroutine.CodeFrame.HasRestElement = true;
+
+                Identifier paramIdent = (param as RestElement).Argument as Identifier;
+                AdhocSymbol paramSymb = SymbolMap.RegisterSymbol(paramIdent.Name);
+                subroutine.CodeFrame.FunctionParameters.Add(paramSymb);
+                subroutine.CodeFrame.AddScopeVariable(paramSymb, isAssignment: true, isLocalDeclaration: true);
+
+                frame.AddInstruction(new InsNilConst(), paramIdent.Location.Start.Line);
+            }
+            else
+                ThrowCompilationError(parentNode, "Subroutine definition parameters must all be identifier or assignment to a literal.");
         }
 
         /// <summary>
@@ -1257,15 +1275,7 @@ namespace GTAdhocToolchain.Compiler
 
             EnterScope(subroutine.CodeFrame, parentNode);
             foreach (Expression param in funcParams)
-            {
-                if (param.Type != Nodes.Identifier)
-                    ThrowCompilationError(param, "Expected function parameter to be an identifier.");
-
-                Identifier paramIdent = param as Identifier;
-                AdhocSymbol paramSymbol = SymbolMap.RegisterSymbol(paramIdent.Name);
-                subroutine.CodeFrame.FunctionParameters.Add(paramSymbol);
-                subroutine.CodeFrame.AddScopeVariable(paramSymbol, isAssignment: true, isLocalDeclaration: true);
-            }
+                CompileSubroutineParameter(frame, parentNode, subroutine, param);
 
             if (body.Type == Nodes.BlockStatement)
             {
@@ -1281,9 +1291,6 @@ namespace GTAdhocToolchain.Compiler
             }
 
             LeaveScope(subroutine.CodeFrame, insertLeaveInstruction: false);
-
-            for (int i = 0; i < subroutine.CodeFrame.FunctionParameters.Count; i++)
-                frame.AddInstruction(new InsNilConst(), 0);
 
             // "Insert" by evaluating each captured variable
             foreach (var capturedVariable in subroutine.CodeFrame.CapturedCallbackVariables)
