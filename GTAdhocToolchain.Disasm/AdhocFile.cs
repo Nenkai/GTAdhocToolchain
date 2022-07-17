@@ -47,6 +47,7 @@ namespace GTAdhocToolchain.Disasm
             adhoc.SymbolTable = stream.Symbols;
 
             adhoc.TopLevelFrame = new AdhocCodeFrame();
+            adhoc.TopLevelFrame.Version = version;
             adhoc.TopLevelFrame.Read(stream);
 
             return adhoc;
