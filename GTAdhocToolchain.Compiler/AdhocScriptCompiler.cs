@@ -159,12 +159,31 @@ namespace GTAdhocToolchain.Compiler
                 case Nodes.SourceFileStatement:
                     CompileSourceFileStatement(frame, node as SourceFileStatement);
                     break;
+                case Nodes.ModuleConstructorStatement:
+                    CompileModuleConstructorStatement(frame, node as ModuleConstructorStatement);
+                    break;
                 case Nodes.EmptyStatement:
                     break;
                 default:
                     ThrowCompilationError(node, $"Unsupported statement: {node.Type}");
                     break;
             }
+        }
+
+        public void CompileModuleConstructorStatement(AdhocCodeFrame frame, ModuleConstructorStatement ctorStatement)
+        {
+            // Compile the target expression
+            CompileExpression(frame, ctorStatement.Id);
+
+            // Grab target, define a new ctor scope
+            frame.AddInstruction(new InsModuleConstructor(), 0);
+
+            // Build scope
+            CompileStatement(frame, ctorStatement.Body);
+
+            // Exit ctor
+            InsSetState state = new InsSetState(AdhocRunState.EXIT);
+            frame.AddInstruction(state, 0);
         }
 
         public void CompileSourceFileStatement(AdhocCodeFrame frame, SourceFileStatement srcFileStatement)

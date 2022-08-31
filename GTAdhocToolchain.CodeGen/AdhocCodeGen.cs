@@ -216,6 +216,7 @@ namespace GTAdhocToolchain.CodeGen
                 case AdhocInstructionType.THROW:
                 case AdhocInstructionType.ASSIGN:
                 case AdhocInstructionType.OBJECT_SELECTOR:
+                case AdhocInstructionType.MODULE_CONSTRUCTOR:
                     break;
                 default:
                     throw new NotImplementedException();

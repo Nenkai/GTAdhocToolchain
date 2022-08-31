@@ -132,7 +132,7 @@ namespace GTAdhocToolchain.Core
         public int GetLastLocalVariableIndex()
         {
             int highestTakenIndex = LocalVariableStorage.Count;
-            for (int i = LocalVariableStorage.Count - 1; i >= 1; i--)
+            for (int i = LocalVariableStorage.Count - 1; i >= 1; i--) // x -> 1 (0 is reserved by self)
             {
                 if (LocalVariableStorage[i] == null) // Free'd up space
                     highestTakenIndex = i;
@@ -140,7 +140,7 @@ namespace GTAdhocToolchain.Core
                     return highestTakenIndex;
             }
 
-            return LocalVariableStorage.Count;
+            return highestTakenIndex;
         }
 
         public void FreeLocalVariable(LocalVariable var)
