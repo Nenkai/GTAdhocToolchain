@@ -1691,11 +1691,15 @@ namespace GTAdhocToolchain.Compiler
                 }
                 else if (assignExpression.Left is ObjectSelectorMemberExpression objectSelector)
                 {
-                    throw new NotImplementedException("Implement object selector assignment expression");
+                    throw new NotImplementedException("Unimplemented object selector assignment expression");
+                }
+                else if (assignExpression.Left is UnaryExpression unaryExp && unaryExp.Operator == UnaryOperator.ReferenceOf)
+                {
+                    CompileReferenceOfUnaryExpression(frame, unaryExp);
                 }
                 else
                 {
-                    ThrowCompilationError(assignExpression, "Unimplemented");
+                    ThrowCompilationError(assignExpression, "Unimplemented or Invalid");
                 }
                     
                 if (assignExpression.Right.Type == Nodes.AssignmentExpression) // a += b += c?
