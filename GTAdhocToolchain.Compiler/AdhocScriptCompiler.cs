@@ -999,6 +999,10 @@ namespace GTAdhocToolchain.Compiler
                     {
                         CompileUnaryExpression(frame, initValue as UpdateExpression, popResult: false); // var a = ++b; - Do not discard b
                     }
+                    else if (initValue.Type == Nodes.UnaryExpression && (initValue as UnaryExpression).Operator == UnaryOperator.ReferenceOf)
+                    {
+                        CompileUnaryExpression(frame, initValue as UnaryExpression, popResult: false, isReference: true); // var a = &b;
+                    }
                     else if (initValue.Type == Nodes.AssignmentExpression)
                     {
                         CompileAssignmentExpression(frame, initValue as AssignmentExpression, popResult: false); // var a = b = c; - Do not discard b
@@ -1675,36 +1679,41 @@ namespace GTAdhocToolchain.Compiler
             }
             else if (IsAdhocAssignWithOperandOperator(assignExpression.Operator)) // += -= /= etc..
             {
-                // Assigning to self (+=)
-                if (assignExpression.Left is Identifier)
+                // Assigning to a reference
+                if (assignExpression.Left is UnaryExpression unaryExp && unaryExp.Operator == UnaryOperator.ReferenceOf)
                 {
-                    // Pushing to variable
-                    InsertVariablePush(frame, assignExpression.Left as Identifier, false); // Push current value first
-                }
-                else if (assignExpression.Left is AttributeMemberExpression attr)
-                {
-                    CompileAttributeMemberAssignmentPush(frame, attr);
-                }
-                else if (assignExpression.Left is ComputedMemberExpression compExpression)
-                {
-                    CompileComputedMemberExpressionAssignment(frame, compExpression);
-                }
-                else if (assignExpression.Left is ObjectSelectorMemberExpression objectSelector)
-                {
-                    throw new NotImplementedException("Unimplemented object selector assignment expression");
-                }
-                else if (assignExpression.Left is UnaryExpression unaryExp && unaryExp.Operator == UnaryOperator.ReferenceOf)
-                {
-                    CompileReferenceOfUnaryExpression(frame, unaryExp);
+                    // No need to push, eval
+                    CompileUnaryExpression(frame, unaryExp, isReference: false);
                 }
                 else
                 {
-                    ThrowCompilationError(assignExpression, "Unimplemented or Invalid");
+                    // Regular update of left-hand side
+                    // Left-hand side needs to be pushed first
+                    if (assignExpression.Left is Identifier)
+                    {
+                        InsertVariablePush(frame, assignExpression.Left as Identifier, isVariableDeclaration: false);
+                    }
+                    else if (assignExpression.Left is AttributeMemberExpression attr)
+                    {
+                        CompileAttributeMemberAssignmentPush(frame, attr);
+                    }
+                    else if (assignExpression.Left is ComputedMemberExpression compExpression)
+                    {
+                        CompileComputedMemberExpressionAssignmentPush(frame, compExpression);
+                    }
+                    else if (assignExpression.Left is ObjectSelectorMemberExpression objectSelector)
+                    {
+                        throw new NotImplementedException("Unimplemented object selector assignment expression");
+                    }
+                    else
+                    {
+                        ThrowCompilationError(assignExpression, "Unimplemented or Invalid");
+                    }
                 }
-                    
+
                 if (assignExpression.Right.Type == Nodes.AssignmentExpression) // a += b += c?
                 {
-                    // Do not discard result
+                    // Then do not immediately discard result for the next inline operation
                     CompileAssignmentExpression(frame, assignExpression.Right as AssignmentExpression, popResult: false);
                 }
                 else
@@ -1739,11 +1748,11 @@ namespace GTAdhocToolchain.Compiler
                 }
                 else if (expression is ComputedMemberExpression compExpression) // hello[world] = "foo"
                 {
-                    CompileComputedMemberExpressionAssignment(frame, compExpression);
+                    CompileComputedMemberExpressionAssignmentPush(frame, compExpression);
                 }
                 else if (expression is ObjectSelectorMemberExpression objSelectExpression)
                 {
-                    CompileObjectSelectorExpressionAssignment(frame, objSelectExpression);
+                    CompileObjectSelectorExpressionAssignmentPush(frame, objSelectExpression);
                 }
                 else if (expression is StaticMemberExpression staticMembExpression) // main::hello = hi
                 {
@@ -1760,7 +1769,10 @@ namespace GTAdhocToolchain.Compiler
             }
             else if (expression is UnaryExpression unaryExp && (unaryExp.Operator == UnaryOperator.Indirection || unaryExp.Operator == UnaryOperator.ReferenceOf)) // (*/&)hello = world
             {
-                if (unaryExp.Argument.Type == Nodes.Identifier || unaryExp.Argument is AttributeMemberExpression)
+                if (unaryExp.Argument.Type == Nodes.Identifier ||
+                    unaryExp.Argument is AttributeMemberExpression ||
+                    unaryExp.Argument is StaticMemberExpression ||
+                    unaryExp.Argument is ComputedMemberExpression)
                     CompileExpression(frame, unaryExp.Argument);
                 else
                     ThrowCompilationError(expression, "Unexpected assignment to unary argument. Only Indirection (*) or Reference (&) is allowed.");
@@ -1843,7 +1855,7 @@ namespace GTAdhocToolchain.Compiler
         /// <summary>
         /// Compiles array or map element assignment (ELEMENT_PUSH)
         /// </summary>
-        private void CompileComputedMemberExpressionAssignment(AdhocCodeFrame frame, ComputedMemberExpression computedMember)
+        private void CompileComputedMemberExpressionAssignmentPush(AdhocCodeFrame frame, ComputedMemberExpression computedMember)
         {
             CompileExpression(frame, computedMember.Object);
             CompileExpression(frame, computedMember.Property);
@@ -1860,7 +1872,7 @@ namespace GTAdhocToolchain.Compiler
             }
         }
 
-        private void CompileObjectSelectorExpressionAssignment(AdhocCodeFrame frame, ObjectSelectorMemberExpression objSelector)
+        private void CompileObjectSelectorExpressionAssignmentPush(AdhocCodeFrame frame, ObjectSelectorMemberExpression objSelector)
         {
             CompileExpression(frame, objSelector.Object);
             CompileExpression(frame, objSelector.Property);
@@ -1998,7 +2010,10 @@ namespace GTAdhocToolchain.Compiler
                     if (call.Arguments[i].Type == Nodes.SpreadElement) // Has more than 1
                         ThrowCompilationError(call.Arguments[i], "Only a spread element as an argument is allowed in a Variable function call (VA_CALL). There must not be more than one argument.");
 
-                    CompileExpression(frame, call.Arguments[i]);
+                    if (call.Arguments[i].Type == Nodes.UnaryExpression && (call.Arguments[i] as UnaryExpression).Operator == UnaryOperator.ReferenceOf)
+                        CompileUnaryExpression(frame, call.Arguments[i] as UnaryExpression, isReference: true); // We may be pushing it
+                    else
+                        CompileExpression(frame, call.Arguments[i]);
                 }
             }
 
@@ -2153,54 +2168,14 @@ namespace GTAdhocToolchain.Compiler
         /// </summary>
         /// <param name="frame"></param>
         /// <param name="unaryExp"></param>
-        private void CompileUnaryExpression(AdhocCodeFrame frame, UnaryExpression unaryExp, bool popResult = false, bool isReference = false)
+        private void CompileUnaryExpression(AdhocCodeFrame frame, UnaryExpression unaryExp, bool popResult = false, bool isReference = false, bool isRefDeclaration = false)
         {
-            if (unaryExp is UpdateExpression upd)
+            if (unaryExp is UpdateExpression upd) // ++var / --var etc
             {
                 if (!isReference)
                 {
                     // Assigning - we need to push
-                    if (unaryExp.Argument.Type == Nodes.Identifier)
-                    {
-                        InsertVariablePush(frame, unaryExp.Argument as Identifier, false);
-                    }
-                    else if (unaryExp.Argument.Type == Nodes.MemberExpression)
-                    {
-                        if (unaryExp.Argument is AttributeMemberExpression attr)
-                        {
-                            // ++myObj.property
-                            CompileAttributeMemberAssignmentPush(frame, attr);
-                        }
-                        else if (unaryExp.Argument is ComputedMemberExpression comp)
-                        {
-                            // --hello["world"];
-                            CompileComputedMemberExpressionAssignment(frame, comp);
-                        }
-                        else if (unaryExp.Argument is StaticMemberExpression staticMemberExpression)
-                        {
-                            // ++GameParameterUtil::loaded_time;
-                            CompileStaticMemberExpressionAssignment(frame, staticMemberExpression);
-                        }
-                        else
-                            ThrowCompilationError(unaryExp.Argument, CompilationMessages.Error_UnsupportedUnaryOprationOnMemberExpression);
-                    }
-                    else if (unaryExp.Argument.Type == Nodes.Literal)
-                    {
-                        // Special case: -1 -> int const + unary op
-                        CompileLiteral(frame, unaryExp.Argument as Literal);
-                    }
-                    else if (unaryExp.Argument.Type == Nodes.CallExpression)
-                    {
-                        // --doThing();
-                        CompileCall(frame, unaryExp.Argument as CallExpression);
-                    }
-                    else if (unaryExp.Argument.Type == Nodes.BinaryExpression)
-                    {
-                        // ++(1 + 1)
-                        CompileBinaryExpression(frame, unaryExp.Argument as BinaryExpression);
-                    }
-                    else
-                        ThrowCompilationError(unaryExp.Argument, $"Unsupported unary operation on type: {unaryExp.Argument.Type}");
+                    PushUnaryExpressionArgument(frame, unaryExp.Argument);
                 }
                 else
                 {
@@ -2224,34 +2199,38 @@ namespace GTAdhocToolchain.Compiler
                 InsUnaryAssignOperator unaryIns = new InsUnaryAssignOperator(symb);
                 frame.AddInstruction(unaryIns, unaryExp.Location.Start.Line);
             }
-            else
+            else if (unaryExp.Operator == UnaryOperator.Indirection) // *var - eval variable
             {
-                if (unaryExp.Operator == UnaryOperator.Indirection) // *
-                {
-                    CompileExpression(frame, unaryExp.Argument);
-                    frame.AddInstruction(InsEval.Default, 0);
-                }
-                else if (unaryExp.Operator == UnaryOperator.ReferenceOf) // &
-                {
-                    CompileReferenceOfUnaryExpression(frame, unaryExp);
-                }
-                else
-                {
-                    CompileExpression(frame, unaryExp.Argument);
-                    string op = unaryExp.Operator switch
-                    {
-                        UnaryOperator.LogicalNot => AdhocConstants.UNARY_OPERATOR_LOGICAL_NOT,
-                        UnaryOperator.Minus => AdhocConstants.UNARY_OPERATOR_MINUS,
-                        UnaryOperator.Plus => AdhocConstants.UNARY_OPERATOR_PLUS,
-                        UnaryOperator.BitwiseNot => AdhocConstants.UNARY_OPERATOR_BITWISE_INVERT,
-                        _ => throw new NotImplementedException("TODO"),
-                    };
+                CompileExpression(frame, unaryExp.Argument);
 
-                    bool opToSymbol = frame.Version >= 12;
-                    AdhocSymbol symb = SymbolMap.RegisterSymbol(op, opToSymbol);
-                    InsUnaryOperator unaryIns = new InsUnaryOperator(symb);
-                    frame.AddInstruction(unaryIns, unaryExp.Location.Start.Line);
-                }
+                // Eval said local
+                frame.AddInstruction(InsEval.Default, 0);
+            }
+            else if (unaryExp.Operator == UnaryOperator.ReferenceOf) // &var - get reference of variable
+            {
+                if (isReference)
+                    PushUnaryExpressionArgument(frame, unaryExp.Argument);
+                else if (unaryExp.Argument is UpdateExpression updArg)
+                    CompileUnaryExpression(frame, updArg, isReference: true);
+                else
+                    CompileExpression(frame, unaryExp.Argument);
+            }
+            else // -var / +var / ~var
+            {
+                CompileExpression(frame, unaryExp.Argument);
+                string op = unaryExp.Operator switch
+                {
+                    UnaryOperator.LogicalNot => AdhocConstants.UNARY_OPERATOR_LOGICAL_NOT,
+                    UnaryOperator.Minus => AdhocConstants.UNARY_OPERATOR_MINUS,
+                    UnaryOperator.Plus => AdhocConstants.UNARY_OPERATOR_PLUS,
+                    UnaryOperator.BitwiseNot => AdhocConstants.UNARY_OPERATOR_BITWISE_INVERT,
+                    _ => throw new NotImplementedException("TODO"),
+                };
+
+                bool opToSymbol = frame.Version >= 12;
+                AdhocSymbol symb = SymbolMap.RegisterSymbol(op, opToSymbol);
+                InsUnaryOperator unaryIns = new InsUnaryOperator(symb);
+                frame.AddInstruction(unaryIns, unaryExp.Location.Start.Line);
             }
 
             // If we aren't assigning, or not using the return value immediately, pop it
@@ -2262,33 +2241,49 @@ namespace GTAdhocToolchain.Compiler
                 InsertPop(frame);
         }
 
-        private void CompileReferenceOfUnaryExpression(AdhocCodeFrame frame, UnaryExpression unaryExp)
+        private void PushUnaryExpressionArgument(AdhocCodeFrame frame, Expression expression)
         {
-            if (unaryExp.Argument is AttributeMemberExpression attrMemberExp)
+            if (expression.Type == Nodes.Identifier)
             {
-                // We need to push the object's reference, instead of simply evaluating it
-                CompileAttributeMemberAssignmentPush(frame, attrMemberExp);
+                InsertVariablePush(frame, expression as Identifier, isVariableDeclaration: false);
             }
-            else if (unaryExp.Argument is StaticMemberExpression staticExpr)
+            else if (expression.Type == Nodes.MemberExpression)
             {
-                CompileStaticMemberExpressionAssignment(frame, staticExpr);
+                if (expression is AttributeMemberExpression attr)
+                {
+                    // ++myObj.property
+                    CompileAttributeMemberAssignmentPush(frame, attr);
+                }
+                else if (expression is ComputedMemberExpression comp)
+                {
+                    // --hello["world"];
+                    CompileComputedMemberExpressionAssignmentPush(frame, comp);
+                }
+                else if (expression is StaticMemberExpression staticMemberExpression)
+                {
+                    // ++GameParameterUtil::loaded_time;
+                    CompileStaticMemberExpressionAssignment(frame, staticMemberExpression);
+                }
+                else
+                    ThrowCompilationError(expression, CompilationMessages.Error_UnsupportedUnaryOprationOnMemberExpression);
             }
-            else if (unaryExp.Argument is ComputedMemberExpression computedMemberExpr)
+            else if (expression.Type == Nodes.Literal)
             {
-                CompileComputedMemberExpressionAssignment(frame, computedMemberExpr);
+                // Special case: -1 -> int const + unary op
+                CompileLiteral(frame, expression as Literal);
             }
-            else if (unaryExp.Argument is UpdateExpression upd)
+            else if (expression.Type == Nodes.CallExpression)
             {
-                CompileUnaryExpression(frame, upd, isReference: true);
+                // --doThing();
+                CompileCall(frame, expression as CallExpression);
             }
-            else if (unaryExp.Argument is Identifier identifier)
+            else if (expression.Type == Nodes.BinaryExpression)
             {
-                InsertVariablePush(frame, identifier, true);
+                // ++(1 + 1)
+                CompileBinaryExpression(frame, expression as BinaryExpression);
             }
             else
-            {
-                ThrowCompilationError(unaryExp.Argument, "Not implemented");
-            }
+                ThrowCompilationError(expression, $"Unsupported unary operation on type: {expression.Type}");
         }
 
         /// <summary>
