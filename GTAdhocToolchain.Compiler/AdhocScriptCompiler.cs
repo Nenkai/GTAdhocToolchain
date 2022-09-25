@@ -1367,8 +1367,11 @@ namespace GTAdhocToolchain.Compiler
                 InsStaticDefine staticDefine = new InsStaticDefine(idSymb);
                 frame.AddInstruction(staticDefine, staticExpression.Location.Start.Line);
 
+                // This was previously an error
+                // But it turns out that you can define statics within function scopes, so they actually can be redefined (GT6 garage project)
+                // Will leave it as a warning from now on
                 if (!frame.CurrentModule.DefineStatic(idSymb))
-                    ThrowCompilationError(staticExpression, $"Static member {idSymb.Name} was already declared in this module.");
+                    PrintCompilationWarning(staticExpression, $"Static member '{idSymb.Name}' was already declared in this module.");
 
                 frame.AddAttributeOrStaticMemberVariable(idSymb);
 
@@ -2561,6 +2564,11 @@ namespace GTAdhocToolchain.Compiler
             return false;
         }
 
+        private void PrintCompilationWarning(Node node, string message)
+        {
+            Logger.Warn(GetSourceNodeString(node, message));
+        }
+
         private void ThrowCompilationError(Node node, string message)
         {
             throw GetCompilationError(node, message);
@@ -2574,7 +2582,12 @@ namespace GTAdhocToolchain.Compiler
         /// <returns></returns>
         private AdhocCompilationException GetCompilationError(Node node, string message)
         {
-            return new AdhocCompilationException($"{message} at {node.Location.Source}:{node.Location.Start.Line}");
+            return new AdhocCompilationException(GetSourceNodeString(node, message));
+        }
+
+        private string GetSourceNodeString(Node node, string message)
+        {
+            return $"{message} at {node.Location.Source}:{node.Location.Start.Line}";
         }
 
         private LoopContext EnterLoop(AdhocCodeFrame frame, Statement loopStatement)
