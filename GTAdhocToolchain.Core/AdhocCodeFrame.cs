@@ -264,7 +264,10 @@ namespace GTAdhocToolchain.Core
             Stack.FreeStaticVariable(staticVarToRemove);
         }
 
-        public int AddScopeVariable(AdhocSymbol symbol, bool isAssignment = false, bool isStatic = false, bool isLocalDeclaration = false)
+        public int AddScopeVariable(AdhocSymbol symbol,
+            bool isAssignment = false, 
+            bool isStatic = false, 
+            bool isLocalDeclaration = false)
         {
             Variable newVariable;
             var lastScope = CurrentScope;
@@ -279,6 +282,11 @@ namespace GTAdhocToolchain.Core
                 }
                 else if (!isLocalDeclaration) // Assigning to a symbol without a declaration, i.e 'hello = "world"'
                 {
+                    if (IsVariableCapturedFromParentScope(symbol))
+                    {
+                        return AddCapturedVariableFromParentScope(symbol);
+                    }
+
                     // Check if the symbol is a static reference, a direct reference to a module attribute, and if it doesn't match, check if it doesn't overlap with any scope locals
                     if (Stack.HasStaticVariable(symbol) || IsStaticModuleFieldOrAttribute(symbol) || !Stack.HasLocalVariable(symbol))
                     {
@@ -306,20 +314,9 @@ namespace GTAdhocToolchain.Core
                 // Undeclared variable accesses
 
                 // Captured variable from parent function?
-                if (ContextAllowsVariableCaptureFromParentFrame && ParentFrame is not null
-                    && ParentFrame.Stack.HasLocalVariable(symbol) // Symbol exists in parent? If so, we are actually capturing
-                    && (!Stack.HasLocalVariable(symbol) && !FunctionParameters.Contains(symbol) || CapturedCallbackVariables.Contains(symbol))) // Do not conflict with locals/params
+                if (IsVariableCapturedFromParentScope(symbol))
                 {
-                    if (!CapturedCallbackVariables.Contains(symbol))
-                    {
-                        CapturedCallbackVariables.Add(symbol);
-
-                        // Add captured variable to current frame
-                        Stack.TryAddLocalVariable(symbol, out newVariable);
-                    }
-
-                    // Captured variables have backward indices
-                    return -(CapturedCallbackVariables.IndexOf(symbol) + 1); // 0 -> -1, 1 -> -2 etc
+                    return AddCapturedVariableFromParentScope(symbol);
                 }
 
                 if (isStatic || !Stack.HasLocalVariable(symbol))
@@ -353,6 +350,47 @@ namespace GTAdhocToolchain.Core
             }
             else
                 throw new Exception("Variable is not a local or static variable..?");
+        }
+
+        /// <summary>
+        /// Checks whether a certain symbol is a captured variable.
+        /// </summary>
+        /// <param name="symbol"></param>
+        /// <returns></returns>
+        private bool IsVariableCapturedFromParentScope(AdhocSymbol symbol)
+        {
+            if (!ContextAllowsVariableCaptureFromParentFrame)
+                return false;
+
+            if (ParentFrame is null) // No parent? Not capturing anything
+                return false;
+
+            if (!ParentFrame.Stack.HasLocalVariable(symbol)) // Does the symbol exist in parent? If not, not capturing anything
+                return false;
+
+            // Check conflicts with other locals or params
+            return (!Stack.HasLocalVariable(symbol) && !FunctionParameters.Contains(symbol) || CapturedCallbackVariables.Contains(symbol));
+        }
+
+
+        /// <summary>
+        /// Adds a captured symbol to the current frame.
+        /// </summary>
+        /// <param name="symbol"></param>
+        /// <param name="newVariable"></param>
+        /// <returns>Returns stack index of captured variable</returns>
+        private int AddCapturedVariableFromParentScope(AdhocSymbol symbol)
+        {
+            if (!CapturedCallbackVariables.Contains(symbol))
+            {
+                CapturedCallbackVariables.Add(symbol);
+
+                // Add captured variable to current frame
+                Stack.TryAddLocalVariable(symbol, out _);
+            }
+
+            // Captured variables have backward indices
+            return -(CapturedCallbackVariables.IndexOf(symbol) + 1); // 0 -> -1, 1 -> -2 etc
         }
 
         public bool IsStaticModuleFieldOrAttribute(AdhocSymbol symbol)
