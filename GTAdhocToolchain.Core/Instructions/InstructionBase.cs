@@ -16,6 +16,7 @@ namespace GTAdhocToolchain.Core.Instructions
         public uint InstructionOffset { get; set; }
 
         public abstract void Deserialize(AdhocStream stream);
+        public abstract string Disassemble(bool asCompareMode = false);
 
         public virtual bool IsFunctionOrMethod()
         {
@@ -97,6 +98,7 @@ namespace GTAdhocToolchain.Core.Instructions
                 AdhocInstructionType.UNK_69 => new Ins69(),
                 AdhocInstructionType.UNK_70 => new Ins70(),
                 AdhocInstructionType.UNK_71 => new Ins71(),
+                AdhocInstructionType.PRINT => new InsPrint(),
                 _ => throw new Exception($"Encountered unimplemented {type} instruction."),
             };
         }
@@ -104,6 +106,9 @@ namespace GTAdhocToolchain.Core.Instructions
 
     public enum AdhocInstructionType : byte
     {
+        /// <summary>
+        /// Also known as ARRAY_PUSH (not the new one)
+        /// </summary>
         ARRAY_CONST_OLD,
         ASSIGN_OLD,
         ATTRIBUTE_DEFINE,

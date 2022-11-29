@@ -43,5 +43,9 @@ namespace GTAdhocToolchain.Compiler
         public const string Error_VariableDeclarationIsNull = "Variable declaration for id is null.";
 
         public const string Error_UnsupportedUnaryOprationOnMemberExpression = "Unsupported unary operation on member expression";
+
+        public const string Error_ForeachUnsupported = "Foreach statements are not supported in Adhoc Versions below 12.";
+        public const string Error_MapUnsupported = "Map constants are not supported in Adhoc Versions lower than 11.";
+
     }
 }

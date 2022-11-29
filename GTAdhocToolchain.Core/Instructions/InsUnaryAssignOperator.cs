@@ -27,12 +27,17 @@ namespace GTAdhocToolchain.Core.Instructions
 
         }
 
+        public override string ToString()
+        {
+            return Disassemble(asCompareMode: false);
+        }
+
         public override void Deserialize(AdhocStream stream)
         {
             Operator = stream.ReadSymbol();
         }
 
-        public override string ToString()
+        public override string Disassemble(bool asCompareMode = false)
             => $"{InstructionType}: {Utils.OperatorNameToPunctuator(Operator.Name)} ({Operator.Name})";
 
     }

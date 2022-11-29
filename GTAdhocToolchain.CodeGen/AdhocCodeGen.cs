@@ -17,9 +17,6 @@ namespace GTAdhocToolchain.CodeGen
 
         public const string Magic = "ADCH";
 
-        public byte Version { get; set; } = 12;
-        public bool WriteDebugInformation { get; set; } = true;
-
         public AdhocCodeFrame MainBlock { get; set; }
         public AdhocSymbolMap SymbolMap { get; set; }
 
@@ -35,13 +32,13 @@ namespace GTAdhocToolchain.CodeGen
         {
             Logger.Info("Generating code...");
             var ms = new MemoryStream();
-            stream = new AdhocStream(ms, Version);
+            stream = new AdhocStream(ms, MainBlock.Version);
 
             stream.WriteString(Magic, StringCoding.Raw);
-            stream.WriteString(Version.ToString("D3"), StringCoding.Raw); // "012"
+            stream.WriteString(MainBlock.Version.ToString("D3"), StringCoding.Raw); // "012"
             stream.WriteByte(0);
 
-            if (Version >= 9)
+            if (MainBlock.Version >= 9)
                 SerializeSymbolTable();
 
             WriteCodeBlock(MainBlock);
@@ -57,29 +54,32 @@ namespace GTAdhocToolchain.CodeGen
 
         private void WriteCodeBlock(AdhocCodeFrame block)
         {
-            if (Version >= 8)
+            if (block.Version >= 8 && block.Version <= 12)
             {
-                stream.WriteBoolean(WriteDebugInformation);
-                stream.WriteByte(Version);
+                stream.WriteBoolean(block.HasDebuggingInformation);
+                stream.WriteByte((byte)block.Version);
+            }
 
-                if (Version > 9 && WriteDebugInformation)
-                {
-                    if (block.SourceFilePath != null)
-                        stream.WriteVarInt(block.SourceFilePath.Id);
-                    else
-                        stream.WriteVarInt(0);
-                }
+            if (block.SourceFilePath != null)
+                stream.WriteSymbol(block.SourceFilePath);
 
-                if (Version >= 12)
-                    stream.WriteBoolean(block.HasRestElement);
+            if (block.Version >= 12)
+                stream.WriteBoolean(block.HasRestElement); // Not sure for Version 14
 
+            if (block.Version > 3)
+            {
                 stream.WriteInt32(block.FunctionParameters.Count);
                 for (int i = 0; i < block.FunctionParameters.Count; i++)
                 {
                     stream.WriteSymbol(block.FunctionParameters[i]);
-                    stream.WriteInt32(1 + i); // TODO: Proper Index?
-                }
 
+                    if (block.Version >= 8)
+                        stream.WriteInt32(1 + i); // TODO: Proper Index?
+                }
+            }
+
+            if (block.Version >= 8)
+            {
                 stream.WriteInt32(block.CapturedCallbackVariables.Count);
                 for (int i = 0; i < block.CapturedCallbackVariables.Count; i++)
                 {
@@ -91,19 +91,20 @@ namespace GTAdhocToolchain.CodeGen
                 stream.WriteInt32(0); // Some stack variable index
             }
 
-            if (Version <= 10)
+
+            if (block.Version <= 10)
             {
-                stream.WriteInt32(block.Stack.StackSize);
-                stream.WriteInt32(block.Stack.LocalVariableStorageSize);
+                stream.WriteInt32(block.Stack.GetLocalVariableStorageSize());
+                stream.WriteInt32(block.Stack.GetStackSize());
             }
             else
             {
                 // Actual stack size
-                stream.WriteInt32(block.Stack.StackSize);
+                stream.WriteInt32(block.Stack.GetStackSize());
 
                 /* These two are combined to make the size of the storage for variables */
-                stream.WriteInt32(block.Stack.LocalVariableStorageSize);
-                stream.WriteInt32(block.Stack.StaticVariableStorageSize);
+                stream.WriteInt32(block.Stack.GetLocalVariableStorageSize());
+                stream.WriteInt32(block.Stack.GetStaticVariableStorageSize());
             }
 
             stream.WriteInt32(block.Instructions.Count);
@@ -158,6 +159,10 @@ namespace GTAdhocToolchain.CodeGen
                     WriteLogicalAnd(instruction as InsLogicalAnd); break;
                 case AdhocInstructionType.LOGICAL_OR:
                     WriteLogicalOr(instruction as InsLogicalOr); break;
+                case AdhocInstructionType.LOGICAL_AND_OLD:
+                    WriteLogicalAndOld(instruction as InsLogicalAndOld); break;
+                case AdhocInstructionType.LOGICAL_OR_OLD:
+                    WriteLogicalOrOld(instruction as InsLogicalOrOld); break;
                 case AdhocInstructionType.JUMP_IF_FALSE:
                     WriteJumpIfFalse(instruction as InsJumpIfFalse); break;
                 case AdhocInstructionType.JUMP_IF_TRUE:
@@ -184,12 +189,16 @@ namespace GTAdhocToolchain.CodeGen
                     WriteSymbolConst(instruction as InsSymbolConst); break;
                 case AdhocInstructionType.SET_STATE:
                     WriteSetState(instruction as InsSetState); break;
+                case AdhocInstructionType.SET_STATE_OLD:
+                    WriteSetStateOld(instruction as InsSetStateOld); break;
                 case AdhocInstructionType.LEAVE:
                     WriteLeave(instruction as InsLeaveScope); break;
                 case AdhocInstructionType.BOOL_CONST:
                     WriteBoolConst(instruction as InsBoolConst); break;
                 case AdhocInstructionType.ARRAY_CONST:
                     WriteArrayConst(instruction as InsArrayConst); break;
+                case AdhocInstructionType.ARRAY_CONST_OLD:
+                    WriteArrayConstOld(instruction as InsArrayConstOld); break;
                 case AdhocInstructionType.STATIC_DEFINE:
                     WriteStaticDefine(instruction as InsStaticDefine); break;
                 case AdhocInstructionType.SOURCE_FILE:
@@ -202,11 +211,15 @@ namespace GTAdhocToolchain.CodeGen
                     WriteUndef(instruction as InsUndef); break;
                 case AdhocInstructionType.VA_CALL:
                     WriteVariableCall(instruction as InsVaCall); break;
+                    // Nothing to write
                 case AdhocInstructionType.NIL_CONST:
                 case AdhocInstructionType.VOID_CONST:
                 case AdhocInstructionType.ASSIGN_POP:
+                case AdhocInstructionType.ASSIGN_OLD:
                 case AdhocInstructionType.ARRAY_PUSH:
                 case AdhocInstructionType.POP:
+                case AdhocInstructionType.POP_OLD:
+                case AdhocInstructionType.NOP:
                 case AdhocInstructionType.ELEMENT_EVAL:
                 case AdhocInstructionType.ELEMENT_PUSH:
                 case AdhocInstructionType.MAP_CONST:
@@ -255,6 +268,11 @@ namespace GTAdhocToolchain.CodeGen
         }
 
         private void WriteArrayConst(InsArrayConst arrayConst)
+        {
+            stream.WriteUInt32(arrayConst.ArraySize);
+        }
+
+        private void WriteArrayConstOld(InsArrayConstOld arrayConst)
         {
             stream.WriteUInt32(arrayConst.ArraySize);
         }
@@ -318,6 +336,11 @@ namespace GTAdhocToolchain.CodeGen
         }
 
         private void WriteSetState(InsSetState setState)
+        {
+            stream.WriteByte((byte)setState.State);
+        }
+
+        private void WriteSetStateOld(InsSetStateOld setState)
         {
             stream.WriteByte((byte)setState.State);
         }
@@ -393,6 +416,16 @@ namespace GTAdhocToolchain.CodeGen
         }
 
         private void WriteLogicalOr(InsLogicalOr logicalOr)
+        {
+            stream.WriteInt32(logicalOr.InstructionJumpIndex);
+        }
+
+        private void WriteLogicalAndOld(InsLogicalAndOld logicalAnd)
+        {
+            stream.WriteInt32(logicalAnd.InstructionJumpIndex);
+        }
+
+        private void WriteLogicalOrOld(InsLogicalOrOld logicalOr)
         {
             stream.WriteInt32(logicalOr.InstructionJumpIndex);
         }

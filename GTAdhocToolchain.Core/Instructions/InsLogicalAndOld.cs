@@ -25,8 +25,12 @@ namespace GTAdhocToolchain.Core.Instructions
             InstructionJumpIndex = stream.ReadInt32();
         }
 
-
         public override string ToString()
+        {
+            return Disassemble(asCompareMode: false);
+        }
+
+        public override string Disassemble(bool asCompareMode = false)
            => $"{InstructionType}: Jump={InstructionJumpIndex}";
     }
 }

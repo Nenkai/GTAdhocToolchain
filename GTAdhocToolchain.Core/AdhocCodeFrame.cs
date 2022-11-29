@@ -1,4 +1,5 @@
 ﻿using GTAdhocToolchain.Core.Instructions;
+using GTAdhocToolchain.Core.Stack;
 using GTAdhocToolchain.Core.Variables;
 
 using System.Text;
@@ -52,7 +53,7 @@ namespace GTAdhocToolchain.Core
         /// <summary>
         /// Current stack for the block.
         /// </summary>
-        public AdhocStack Stack { get; set; } = new();
+        public IAdhocStack Stack { get; set; }
 
         /// <summary>
         /// To keep track of the current loops, to compile continue and break statements at the end of one.
@@ -86,12 +87,20 @@ namespace GTAdhocToolchain.Core
         public LoopContext GetLastLoop() => CurrentLoops.Peek();
 
         public uint InstructionCountOffset { get; set; }
-        public bool HasDebuggingInformation { get; set; }
+        public bool HasDebuggingInformation { get; set; } = true;
 
         /// <summary>
         /// Version 12 only. Indicatesd a subroutine with a rest/params[] element/argument.
         /// </summary>
         public bool HasRestElement { get; set; }
+
+        public void SetupStack()
+        {
+            if (Version >= 12)
+                Stack = new AdhocStack();
+            else
+                Stack = new AdhocStackOld();
+        }
 
         public void SetSourcePath(AdhocSymbolMap symbolMap, string path)
         {
@@ -126,28 +135,37 @@ namespace GTAdhocToolchain.Core
                 case AdhocInstructionType.VARIABLE_EVAL:
                 case AdhocInstructionType.SYMBOL_CONST:
                 case AdhocInstructionType.VOID_CONST:
-                    Stack.StackStorageCounter++; break;
+                    Stack.IncrementStackCounter(); break;
                 case AdhocInstructionType.FUNCTION_DEFINE:
                     InsFunctionDefine func = ins as InsFunctionDefine;
-                    Stack.StackStorageCounter -= func.CodeFrame.FunctionParameters.Count; // Ver > 8
-                    Stack.StackStorageCounter -= func.CodeFrame.CapturedCallbackVariables.Count; // Ver > 7
+                    Stack.DecreaseStackCounter(func.CodeFrame.FunctionParameters.Count); // Ver > 8
+
+                    if (Version >= 8)
+                        Stack.DecreaseStackCounter(func.CodeFrame.CapturedCallbackVariables.Count);
                     break;
                 case AdhocInstructionType.METHOD_DEFINE:
                     InsMethodDefine method = ins as InsMethodDefine;
-                    Stack.StackStorageCounter -= method.CodeFrame.FunctionParameters.Count; // Ver > 8
-                    Stack.StackStorageCounter -= method.CodeFrame.CapturedCallbackVariables.Count; // Ver > 7
+                    Stack.DecreaseStackCounter(method.CodeFrame.FunctionParameters.Count); // Ver > 8
+
+                    if (Version >= 8)
+                        Stack.DecreaseStackCounter(method.CodeFrame.CapturedCallbackVariables.Count);
                     break;
                 case AdhocInstructionType.FUNCTION_CONST:
                     InsFunctionConst funcConst = ins as InsFunctionConst;
-                    Stack.StackStorageCounter -= funcConst.CodeFrame.FunctionParameters.Count; // Ver > 8
-                    Stack.StackStorageCounter -= funcConst.CodeFrame.CapturedCallbackVariables.Count; // Ver > 7
-                    Stack.StackStorageCounter++; // Function itself
+                    Stack.DecreaseStackCounter(funcConst.CodeFrame.FunctionParameters.Count); // Ver > 8
+
+                    if (Version >= 8)
+                        Stack.DecreaseStackCounter(funcConst.CodeFrame.CapturedCallbackVariables.Count);
+                    Stack.IncrementStackCounter(); // Function itself
                     break;
                 case AdhocInstructionType.METHOD_CONST:
                     InsMethodConst methodConst = ins as InsMethodConst;
-                    Stack.StackStorageCounter -= methodConst.CodeFrame.FunctionParameters.Count; // Ver > 8
-                    Stack.StackStorageCounter -= methodConst.CodeFrame.CapturedCallbackVariables.Count; // Ver > 7
-                    Stack.StackStorageCounter++; // method itself
+                    Stack.DecreaseStackCounter(methodConst.CodeFrame.FunctionParameters.Count); // Ver > 8
+
+                    if (Version >= 8)
+                        Stack.DecreaseStackCounter(methodConst.CodeFrame.CapturedCallbackVariables.Count);
+
+                    Stack.IncrementStackCounter(); // method itself
                     break;
                 case AdhocInstructionType.POP:
                 case AdhocInstructionType.POP_OLD:
@@ -159,19 +177,21 @@ namespace GTAdhocToolchain.Core
                 case AdhocInstructionType.MODULE_CONSTRUCTOR:
                 case AdhocInstructionType.THROW:
                 case AdhocInstructionType.ATTRIBUTE_DEFINE: // Note: Investigate check potential pop by attribute_define only if Version > 6
-                    Stack.StackStorageCounter--; break;
+                    Stack.DecrementStackCounter(); break;
                 case AdhocInstructionType.ASSIGN_POP:
                 case AdhocInstructionType.MAP_INSERT:
-                    Stack.StackStorageCounter -= 2;
+                    Stack.DecreaseStackCounter(2);
                     break;
                 case AdhocInstructionType.ATTRIBUTE_PUSH:
                 // Verify these two later
                 case AdhocInstructionType.LOGICAL_AND:
                 case AdhocInstructionType.LOGICAL_OR:
+                case AdhocInstructionType.LOGICAL_AND_OLD:
+                case AdhocInstructionType.LOGICAL_OR_OLD:
                 case AdhocInstructionType.UNARY_ASSIGN_OPERATOR:
                 case AdhocInstructionType.UNARY_OPERATOR:
-                    Stack.StackStorageCounter--;
-                    Stack.StackStorageCounter++;
+                    Stack.DecrementStackCounter();
+                    Stack.IncrementStackCounter();
                     break;
                 case AdhocInstructionType.ASSIGN_OLD:
                 case AdhocInstructionType.BINARY_ASSIGN_OPERATOR:
@@ -180,47 +200,53 @@ namespace GTAdhocToolchain.Core
                 case AdhocInstructionType.ELEMENT_PUSH:
                 case AdhocInstructionType.ELEMENT_EVAL:
                 case AdhocInstructionType.VA_CALL:
-                    Stack.StackStorageCounter -= 2;
-                    Stack.StackStorageCounter++;
+                    Stack.DecreaseStackCounter(2);
+                    Stack.IncrementStackCounter();
                     break;
                 case AdhocInstructionType.CALL:
                     InsCall call = ins as InsCall;
-                    Stack.StackStorageCounter--; // Function
-                    Stack.StackStorageCounter -= call.ArgumentCount;
-                    Stack.StackStorageCounter++; // Return value
+                    Stack.DecrementStackCounter(); // Function
+                    Stack.DecreaseStackCounter(call.ArgumentCount);
+                    Stack.IncrementStackCounter(); // Return value
                     break;
                 case AdhocInstructionType.LIST_ASSIGN_OLD:
                     // TODO
                     // Arg count remove
-                    Stack.StackStorageCounter++;
+                    Stack.IncrementStackCounter();
                     break;
                 case AdhocInstructionType.PRINT:
                     // TODO
                     // Arg count remove
-                    Stack.StackStorageCounter++;
+                    Stack.IncrementStackCounter();
                     break;
                 case AdhocInstructionType.MAP_CONST_OLD:
                     // TODO
                     // Arg count remove * 2
-                    Stack.StackStorageCounter++;
+                    Stack.IncrementStackCounter();
+                    break;
+                case AdhocInstructionType.ARRAY_CONST_OLD:
+                    var arrayConstOld = ins as InsArrayConstOld;
+                    Stack.DecreaseStackCounter((int)arrayConstOld.ArraySize);
+                    Stack.IncrementStackCounter();
                     break;
                 case AdhocInstructionType.STRING_PUSH:
                     InsStringPush push = ins as InsStringPush;
-                    Stack.StackStorageCounter -= push.StringCount;
-                    Stack.StackStorageCounter++;
+                    Stack.DecreaseStackCounter(push.StringCount);
+                    Stack.IncrementStackCounter();
                     break;
                 case AdhocInstructionType.LIST_ASSIGN:
                     InsListAssign listAssign = ins as InsListAssign;
-                    Stack.StackStorageCounter -= listAssign.VariableCount;
-                    Stack.StackStorageCounter--; // Array
-                    Stack.StackStorageCounter++;
+                    Stack.DecreaseStackCounter(listAssign.VariableCount);
+                    Stack.DecrementStackCounter(); // Array
+                    Stack.IncrementStackCounter();
                     break;
 
                 case AdhocInstructionType.SET_STATE:
                     InsSetState state = ins as InsSetState;
                     if (state.State == AdhocRunState.RETURN || state.State == AdhocRunState.YIELD)
-                        Stack.StackStorageCounter--;
+                        Stack.DecrementStackCounter();
                     break;
+
                 // These have no effect on stack
                 case AdhocInstructionType.CLASS_DEFINE:
                 case AdhocInstructionType.EVAL:
@@ -239,7 +265,7 @@ namespace GTAdhocToolchain.Core
                 case AdhocInstructionType.LEAVE: // FIX ME LATER
                     break;
                 default:
-                    throw new Exception("Not implemented");
+                    throw new Exception($"Unimplemented instruction handling for stack calculation: {ins.InstructionType}");
             }
 
 
@@ -454,34 +480,25 @@ namespace GTAdhocToolchain.Core
                 {
                     uint argCount = stream.ReadUInt32();
                     for (int i = 0; i < argCount; i++)
-                        CapturedCallbackVariables.Add(stream.ReadSymbol());
+                        FunctionParameters.Add(stream.ReadSymbol());
                 }
             }
             else
             {
-                if (Version >= 13)
+
+                HasDebuggingInformation = stream.ReadBoolean();
+                Version = stream.ReadByte();
+
+
+                if (Version != 8) // Why PDI? Changed your mind after 8?
                 {
-                    HasDebuggingInformation = true;
-
-                    SourceFilePath = stream.ReadSymbol();
-                    stream.ReadByte();
+                    if (HasDebuggingInformation)
+                        SourceFilePath = stream.ReadSymbol();
                 }
-                else
-                {
-                    HasDebuggingInformation = stream.ReadBoolean();
-                    Version = stream.ReadByte();
 
 
-                    if (Version != 8) // Why PDI? Changed your mind after 8?
-                    {
-                        if (HasDebuggingInformation)
-                            SourceFilePath = stream.ReadSymbol();
-                    }
-
-
-                    if (Version >= 12)
-                        HasRestElement = stream.ReadBoolean();
-                }
+                if (Version >= 12)
+                    HasRestElement = stream.ReadBoolean();
 
                 uint argCount = stream.ReadUInt32();
 
@@ -506,21 +523,20 @@ namespace GTAdhocToolchain.Core
                 }
 
                 uint unkVarHeapIndex = stream.ReadUInt32();
-                
             }
 
             if (Version <= 10)
             {
-                Stack.LocalVariableStorageSize = stream.ReadInt32();
-                Stack.StackSize = stream.ReadInt32();
-                Stack.StaticVariableStorageSize = Stack.LocalVariableStorageSize;
+                var stackOld = Stack as AdhocStackOld;
+                stackOld.VariableStorageSize = stream.ReadInt32();
+                stackOld.StackSize = stream.ReadInt32();
             }
             else
             {
-
-                Stack.StackSize = stream.ReadInt32();
-                Stack.LocalVariableStorageSize = stream.ReadInt32();
-                Stack.StaticVariableStorageSize = stream.ReadInt32();
+                var stack = Stack as AdhocStack;
+                stack.StackSize = stream.ReadInt32();
+                stack.LocalVariableStorageSize = stream.ReadInt32();
+                stack.StaticVariableStorageSize = stream.ReadInt32();
             }
 
             InstructionCountOffset = (uint)stream.Position;
@@ -552,7 +568,7 @@ namespace GTAdhocToolchain.Core
             }
         }
 
-        public string Dissasemble()
+        public string Dissasemble(bool asCompareMode = false)
         {
             StringBuilder sb = new StringBuilder();
             sb.Append("(");
@@ -583,8 +599,12 @@ namespace GTAdhocToolchain.Core
 
             sb.AppendLine();
 
-            sb.Append("  > Instruction Count: ").Append(Instructions.Count).Append(" (").Append(InstructionCountOffset.ToString("X2")).Append(')').AppendLine();
-            sb.Append($"  > Stack Size: {Stack.StackSize} - Variable Heap Size: {Stack.LocalVariableStorageSize} - Variable Heap Size Static: {(Version < 10 ? "=Variable Heap Size" : $"{Stack.StaticVariableStorageSize}")}");
+            sb.Append("  > Instruction Count: ").Append(Instructions.Count);
+            if (!asCompareMode)
+                sb.Append(" (").Append(InstructionCountOffset.ToString("X2")).Append(')');
+            sb.AppendLine();
+
+            sb.Append($"  > Stack Size: {Stack.GetStackSize()} - Variable Heap Size: {Stack.GetLocalVariableStorageSize()} - Variable Heap Size Static: {(Version <= 10 ? "=Variable Heap Size" : $"{Stack.GetStaticVariableStorageSize()}")}");
 
             return sb.ToString();
         }

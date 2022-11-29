@@ -3,42 +3,37 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-
-using GTAdhocToolchain.Core;
 using GTAdhocToolchain.Core.Variables;
 
-namespace GTAdhocToolchain.Core
+namespace GTAdhocToolchain.Core.Stack
 {
-    public class AdhocStack
+    /// <summary>
+    /// Adhoc version < 12
+    /// GT4
+    /// </summary>
+    public class AdhocStackOld : IAdhocStack
     {
         /// <summary>
-        /// Heap for all variables for the current block.
+        /// Storage for all variables for the current block.
         /// </summary>
-        public List<LocalVariable> LocalVariableStorage { get; set; } = new()
+        public List<Variable> VariableStorage { get; set; } = new()
         {
-            null, // Always an empty one
+            // Empty unlike new
         };
 
-        /// <summary>
-        /// Heap for all variables for the current block.
-        /// </summary>
-        public List<StaticVariable> StaticVariableStorage { get; set; } = new();
-
-        public int LocalVariableStorageSize { get; set; } = 1;
-
-        public int StaticVariableStorageSize { get; set; } = 0;
+        public int VariableStorageSize { get; set; } = 0;
 
         // Used for counting the stack size within a block
-        private int _stackStorageCounter;
-        public int StackStorageCounter
+        private int _stackSizeCounter;
+        public int StackSizeCounter
         {
-            get => _stackStorageCounter;
+            get => _stackSizeCounter;
             set
             {
                 if (value > StackSize)
                     StackSize = value;
 
-                _stackStorageCounter = value;
+                _stackSizeCounter = value;
             }
         }
 
@@ -47,9 +42,34 @@ namespace GTAdhocToolchain.Core
         /// </summary>
         public int StackSize { get; set; }
 
+        public void IncrementStackCounter()
+        {
+            StackSizeCounter++;
+        }
+
+        public void IncreaseStackCounter(int count)
+        {
+            StackSizeCounter += count;
+        }
+
+        public void DecrementStackCounter()
+        {
+            StackSizeCounter--;
+        }
+
+        public void DecreaseStackCounter(int count)
+        {
+            StackSizeCounter -= count;
+        }
+
+        public int GetStackSize()
+        {
+            return StackSize;
+        }
+
         public bool TryAddStaticVariable(AdhocSymbol symbol, out Variable variable)
         {
-            variable = StaticVariableStorage.Find(e => e?.Symbol == symbol);
+            variable = VariableStorage.Find(e => e?.Symbol == symbol && e is StaticVariable);
             if (variable is null)
             {
                 var newVar = new StaticVariable() { Symbol = symbol };
@@ -57,7 +77,7 @@ namespace GTAdhocToolchain.Core
 
                 variable = newVar;
                 return true;
-            }    
+            }
 
             return false;
         }
@@ -79,62 +99,62 @@ namespace GTAdhocToolchain.Core
 
         public void AddLocalVariable(LocalVariable variable)
         {
-            int freeIdx = LocalVariableStorage.IndexOf(null, 1);
+            int freeIdx = VariableStorage.IndexOf(null);
             if (freeIdx == -1) // No free space? If so grow storage
             {
-                LocalVariableStorage.Add(variable); // Expand
-                if (LocalVariableStorage.Count > LocalVariableStorageSize)
-                    LocalVariableStorageSize = LocalVariableStorage.Count;
+                VariableStorage.Add(variable); // Expand
+                if (VariableStorage.Count > VariableStorageSize)
+                    VariableStorageSize = VariableStorage.Count;
             }
             else
             {
-                LocalVariableStorage[freeIdx] = variable;
+                VariableStorage[freeIdx] = variable;
             }
         }
 
         public void AddStaticVariable(StaticVariable variable)
         {
-            StaticVariableStorage.Add(variable); // Expand
-            if (StaticVariableStorage.Count > StaticVariableStorageSize)
-                StaticVariableStorageSize = StaticVariableStorage.Count;
+            VariableStorage.Add(variable); // Expand
+            if (VariableStorage.Count > VariableStorageSize)
+                VariableStorageSize = VariableStorage.Count;
         }
 
         public bool HasStaticVariable(AdhocSymbol symbol)
         {
-            return StaticVariableStorage.Find(e => e?.Symbol == symbol) != null;
+            return VariableStorage.Find(e => e?.Symbol == symbol && e is StaticVariable) != null;
         }
 
         public bool HasLocalVariable(AdhocSymbol symbol)
         {
-            return LocalVariableStorage.Find(e => e?.Symbol == symbol) != null;
+            return VariableStorage.Find(e => e?.Symbol == symbol && e is LocalVariable) != null;
         }
 
         public LocalVariable GetLocalVariableBySymbol(AdhocSymbol symbol)
         {
-            return LocalVariableStorage.Find(e => e?.Symbol == symbol);
+            return VariableStorage.Find(e => e?.Symbol == symbol && e is LocalVariable) as LocalVariable;
         }
 
         public StaticVariable GetStaticVariableBySymbol(AdhocSymbol symbol)
         {
-            return StaticVariableStorage.Find(e => e?.Symbol == symbol);
+            return VariableStorage.Find(e => e?.Symbol == symbol && e is StaticVariable) as StaticVariable;
         }
 
         public int GetLocalVariableIndex(LocalVariable local)
         {
-            return LocalVariableStorage.IndexOf(local);
+            return VariableStorage.IndexOf(local);
         }
 
         public int GetStaticVariableIndex(StaticVariable local)
         {
-            return StaticVariableStorage.IndexOf(local);
+            return VariableStorage.IndexOf(local);
         }
 
         public int GetLastLocalVariableIndex()
         {
-            int highestTakenIndex = LocalVariableStorage.Count;
-            for (int i = LocalVariableStorage.Count - 1; i >= 1; i--) // x -> 1 (0 is reserved by self)
+            int highestTakenIndex = VariableStorage.Count;
+            for (int i = VariableStorage.Count - 1; i >= 1; i--) // x -> 1 (0 is reserved by self)
             {
-                if (LocalVariableStorage[i] == null) // Free'd up space
+                if (VariableStorage[i] == null) // Free'd up space
                     highestTakenIndex = i;
                 else
                     return highestTakenIndex;
@@ -147,14 +167,24 @@ namespace GTAdhocToolchain.Core
         {
             var idx = GetLocalVariableIndex(var);
             if (idx != -1)
-                LocalVariableStorage[idx] = null;
+                VariableStorage[idx] = null;
         }
 
         public void FreeStaticVariable(StaticVariable var)
         {
             var idx = GetStaticVariableIndex(var);
             if (idx != -1)
-                StaticVariableStorage[idx] = null;
+                VariableStorage[idx] = null;
+        }
+
+        public int GetLocalVariableStorageSize()
+        {
+            return VariableStorageSize;
+        }
+
+        public int GetStaticVariableStorageSize()
+        {
+            throw new NotSupportedException("Cannot get static storage size for old stack.");
         }
     }
 }

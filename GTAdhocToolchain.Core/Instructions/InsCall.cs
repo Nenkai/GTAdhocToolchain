@@ -32,8 +32,12 @@ namespace GTAdhocToolchain.Core.Instructions
             ArgumentCount = stream.ReadInt32();
         }
 
-
         public override string ToString()
+        {
+            return Disassemble(asCompareMode: false);
+        }
+
+        public override string Disassemble(bool asCompareMode = false)
             => $"{InstructionType}: ArgCount={ArgumentCount}";
     }
 }

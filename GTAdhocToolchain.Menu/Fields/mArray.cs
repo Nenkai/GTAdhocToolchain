@@ -12,12 +12,12 @@ namespace GTAdhocToolchain.Menu.Fields
     [DebuggerDisplay("mNodeArray: {Name} ({Length} elements)")]
     public class mArray : mTypeBase
     {
-        public byte Length { get; set; }
+        public int Length { get; set; }
         public List<mTypeBase> Elements { get; set; }
 
         public override void Read(MBinaryIO io)
         {
-            Length = io.Stream.Read1Byte();
+            Length = (int)io.Stream.DecodeBitsAndAdvance();
             Elements = new List<mTypeBase>(Length);
             for (int i = 0; i < Length; i++)
             {

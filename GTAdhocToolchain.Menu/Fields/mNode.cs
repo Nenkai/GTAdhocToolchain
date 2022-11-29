@@ -22,6 +22,9 @@ namespace GTAdhocToolchain.Menu
         // For old version reading
         public bool IsRoot { get; set; }
 
+        public static HashSet<string> mStrings = new HashSet<string>();
+
+
         public override void Read(MBinaryIO io)
         {
             if (io.Version == 0)
@@ -96,6 +99,18 @@ namespace GTAdhocToolchain.Menu
             else if (io.Version == 1)
             {
                 TypeName = io.Stream.Read7BitString();
+
+                // Grab roots
+                if (TypeName.StartsWith("ComponentsProject"))
+                {
+                    string[] spl = TypeName.Split("::");
+                    if (spl.Length == 2)
+                    {
+                        if (!mStrings.Contains(spl[^1]))
+                            mStrings.Add(spl[^1]);
+                    }
+                }
+
                 mTypeBase field = null;
                 do
                 {
@@ -104,7 +119,16 @@ namespace GTAdhocToolchain.Menu
                     {
                         io.CurrentKeyName = str.String;
                         field = io.ReadNext();
-                        
+
+                        // Grab roots
+                        if (TypeName == "RootWindow" && field is mString)
+                        {
+                            var rootName = ((mString)field).String.Substring(((mString)field).String.IndexOf("::") + 1).TrimStart(':');
+
+                            if (!rootName.StartsWith("alias_") && !mStrings.Contains(rootName))
+                                mStrings.Add(rootName);
+                        }
+
                         if (field is mString str2 && io.CurrentKeyName != "name")
                         {
                             // Specific types, kind of hardcoded

@@ -14,6 +14,7 @@ using GTAdhocToolchain.Disasm;
 using GTAdhocToolchain.Menu;
 using GTAdhocToolchain.Menu.Resources;
 using GTAdhocToolchain.Packaging;
+using GTAdhocToolchain.Core.Instructions;
 
 namespace GTAdhocToolchain.CLI
 {
@@ -29,21 +30,24 @@ namespace GTAdhocToolchain.CLI
             {
                 if (args[0].ToLower().EndsWith(".adc"))
                 {
-                    AdhocFile adc = null;
-                    bool withOffset = true;
+                    List<AdhocFile> scripts = null;
                     try
                     {
-                        adc = AdhocFile.ReadFromFile(args[0]);
+                        scripts = AdhocFile.ReadFromFile(args[0]);
                     }
                     catch (Exception e)
                     {
                         Console.WriteLine($"Errored while reading: {e.Message}");
                     }
 
-                    adc.Disassemble(Path.ChangeExtension(args[0], ".ad.diss"), withOffset);
+                    foreach (var adc in scripts)
+                    {
 
-                    if (adc.Version == 12)
-                        adc.PrintStrings(Path.ChangeExtension(args[0], ".strings"));
+                        adc.Disassemble(Path.ChangeExtension(args[0], ".ad.diss"));
+
+                        if (adc.Version == 12)
+                            adc.PrintStrings(Path.ChangeExtension(args[0], ".strings"));
+                    }
 
                     return;
                 }
@@ -64,7 +68,7 @@ namespace GTAdhocToolchain.CLI
                 }
             }
 
-            Parser.Default.ParseArguments<BuildVerbs, PackVerbs, UnpackVerbs, MProjectToBinVerbs, MProjectToTextVerbs>(args)
+            Parser.Default.ParseArguments<BuildVerbs, PackVerbs, UnpackVerbs, MProjectToBinVerbs, MProjectToTextVerbs, MProjectToGpbListVerbs>(args)
                 .WithParsed<BuildVerbs>(Build)
                 .WithParsed<PackVerbs>(Pack)
                 .WithParsed<UnpackVerbs>(Unpack)
@@ -106,7 +110,7 @@ namespace GTAdhocToolchain.CLI
             else if (Path.GetExtension(project.InputPath) == ".ad")
             {
                 string output = !string.IsNullOrEmpty(project.OutputPath) ? project.OutputPath : project.InputPath;
-                BuildScript(project.InputPath, Path.ChangeExtension(output, ".adc"));
+                BuildScript(project.InputPath, Path.ChangeExtension(output, ".adc"), project.Version);
             }
             else
             {
@@ -201,7 +205,7 @@ namespace GTAdhocToolchain.CLI
             Logger.Error("Project build failed.");
         }
 
-        private static void BuildScript(string inputPath, string output)
+        private static void BuildScript(string inputPath, string output, int version = 12)
         {
             var source = File.ReadAllText(inputPath);
 
@@ -214,6 +218,8 @@ namespace GTAdhocToolchain.CLI
 
                 var compiler = new AdhocScriptCompiler();
                 compiler.SetSourcePath(compiler.SymbolMap, inputPath);
+                compiler.SetVersion(version);
+                compiler.SetupStack();
                 compiler.CompileScript(program);
 
                 AdhocCodeGen codeGen = new AdhocCodeGen(compiler, compiler.SymbolMap);
@@ -307,6 +313,9 @@ namespace GTAdhocToolchain.CLI
 
         [Option('o', "output", Required = false, HelpText = "Output compiled scripts when compiling standalone scripts (not projects).")]
         public string OutputPath { get; set; }
+
+        [Option('v', "version", Required = false, Default = 12, HelpText = "Adhoc compile version (for files, not projects).")]
+        public int Version { get; set; }
     }
 
     [Verb("pack", HelpText = "Pack files like gpb's, or mpackage's.")]
@@ -344,7 +353,7 @@ namespace GTAdhocToolchain.CLI
         [Option('o', "output", Required = true, HelpText = "Output folder.")]
         public string OutputPath { get; set; }
 
-        [Option('v', "version", Default = 1, HelpText = "Version of the binary file. Default is 1. (0 is currently unsupported, used for GT5 and under. 1 is GT6 and above.")]
+        [Option('v', "version", HelpText = "Version of the binary file. Default is 1. (0 is currently unsupported, used for GT5 and under. 1 is GT6 and above.")]
         public int Version { get; set; }
     }
 

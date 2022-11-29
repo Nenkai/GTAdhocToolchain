@@ -6,17 +6,17 @@ using System.Threading.Tasks;
 
 namespace GTAdhocToolchain.Core.Instructions
 {
-    public class Ins69 : InstructionBase
+    public class InsPrint : InstructionBase
     {
-        public override AdhocInstructionType InstructionType => AdhocInstructionType.UNK_69;
+        public static readonly InsPrint Empty = new();
 
-        public override string InstructionName => "UNK_69";
+        public override AdhocInstructionType InstructionType => AdhocInstructionType.PRINT;
 
-        public AdhocSymbol Value { get; set; }
+        public override string InstructionName => "PRINT";
 
         public override void Deserialize(AdhocStream stream)
         {
-            Value = stream.ReadSymbol();
+            stream.ReadInt32();
         }
 
         public override string ToString()
@@ -25,6 +25,7 @@ namespace GTAdhocToolchain.Core.Instructions
         }
 
         public override string Disassemble(bool asCompareMode = false)
-            => $"{InstructionType}: {Value}";
+            => $"{InstructionType}";
+
     }
 }

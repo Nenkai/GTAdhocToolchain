@@ -38,10 +38,25 @@ namespace GTAdhocToolchain.Core.Instructions
 
         public override string ToString()
         {
-            if (IsStatic)
-                return $"{InstructionType}: {string.Join(',', VariableSymbols.Select(e => e.Name))}, Static:{VariableStorageIndex}";
+            return Disassemble(asCompareMode: false);
+        }
+
+        public override string Disassemble(bool asCompareMode = false)
+        {
+            if (asCompareMode)
+            {
+                if (IsStatic)
+                    return $"{InstructionType}: {string.Join(',', VariableSymbols.Select(e => e.Name.Split("#")[0]))}, Static:{VariableStorageIndex}";
+                else
+                    return $"{InstructionType}: {string.Join(',', VariableSymbols.Select(e => e.Name.Split("#")[0]))}, Local:{VariableStorageIndex}";
+            }
             else
-                return $"{InstructionType}: {string.Join(',', VariableSymbols.Select(e => e.Name))}, Local:{VariableStorageIndex}";
+            {
+                if (IsStatic)
+                    return $"{InstructionType}: {string.Join(',', VariableSymbols.Select(e => e.Name))}, Static:{VariableStorageIndex}";
+                else
+                    return $"{InstructionType}: {string.Join(',', VariableSymbols.Select(e => e.Name))}, Local:{VariableStorageIndex}";
+            }
         }
     }
 }

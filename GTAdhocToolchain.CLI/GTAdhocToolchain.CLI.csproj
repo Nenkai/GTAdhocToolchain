@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>disable</Nullable>
     <BaseOutputPath></BaseOutputPath>
-    <AssemblyName>GTAdhocToolchain</AssemblyName>
+    <AssemblyName>adhoc</AssemblyName>
     <SignAssembly>False</SignAssembly>
   </PropertyGroup>
 

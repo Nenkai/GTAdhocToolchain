@@ -18,7 +18,12 @@ namespace GTAdhocToolchain.Core.Instructions
         }
 
         public override string ToString()
-            => $"{InstructionType}";
+        {
+            return Disassemble(asCompareMode: false);
+        }
+
+        public override string Disassemble(bool asCompareMode = false)
+             => $"{InstructionType}";
 
     }
 }

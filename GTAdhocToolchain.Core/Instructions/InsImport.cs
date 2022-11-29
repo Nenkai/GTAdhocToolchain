@@ -31,6 +31,16 @@ namespace GTAdhocToolchain.Core.Instructions
         }
 
         public override string ToString()
-            => $"{InstructionType}: {ImportNamespaceParts[^1].Name}, Unk2={ModuleValue.Name}, Unk3={ImportAs.Name}";
+        {
+            return Disassemble(asCompareMode: false);
+        }
+
+        public override string Disassemble(bool asCompareMode = false)
+        {
+            string str = $"{InstructionType}: Path:{ImportNamespaceParts[^1].Name}, Property:{ModuleValue.Name}";
+            if (ImportAs is not null)
+                str += $", ImportAs:{ImportAs.Name}";
+            return str;
+        }
     }
 }

@@ -23,6 +23,11 @@ namespace GTAdhocToolchain.Core
             Version = version;
         }
 
+        public void Reset()
+        {
+            Symbols.Clear();
+        }
+
         public void ReadSymbolTable()
         {
             uint entryCount = (uint)DecodeBitsAndAdvance();
@@ -47,7 +52,7 @@ namespace GTAdhocToolchain.Core
         public void WriteSymbol(AdhocSymbol symbol)
         {
             if (Version <= 8)
-                WriteString(symbol.Name);
+                this.WriteString(symbol.Name, StringCoding.Int16CharCount);
             else
                 WriteVarInt(symbol.Id);
                     
@@ -60,8 +65,8 @@ namespace GTAdhocToolchain.Core
 
             for (int i = 0; i < symbCount; i++)
             {
-                AdhocSymbol symbol = ReadSymbol();
-                list.Add(symbol);
+                 AdhocSymbol symbol = ReadSymbol();
+                 list.Add(symbol);
             }
 
             return list;
@@ -69,15 +74,15 @@ namespace GTAdhocToolchain.Core
 
         public AdhocSymbol ReadSymbol()
         {
-            if (Version <= 8)
-            {
-                var symbStr = this.ReadString(StringCoding.Int16CharCount);
-                return new AdhocSymbol(symbStr);
-            }
-            else
+            if (Version >= 9)
             {
                 uint symbolTableIdx = (uint)DecodeBitsAndAdvance();
                 return Symbols[(int)symbolTableIdx];
+            }
+            else
+            {
+                var symbStr = this.ReadString(StringCoding.Int16CharCount);
+                return new AdhocSymbol(symbStr);
             }
         }
 

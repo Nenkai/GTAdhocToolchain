@@ -96,6 +96,8 @@ namespace GTAdhocToolchain.Project
             compiler.SetBaseIncludeFolder(Path.GetFullPath(Path.Combine(ProjectFilePath, BaseIncludeFolder)));
             compiler.SetProjectDirectory(FullProjectPath);
             compiler.SetSourcePath(compiler.SymbolMap, ProjectFolder + "/" + tmpFileName);
+            compiler.SetVersion(Version);
+            compiler.SetupStack();
             compiler.CompileScript(program);
 
             AdhocCodeGen codeGen = new AdhocCodeGen(compiler, compiler.SymbolMap);
@@ -124,9 +126,6 @@ namespace GTAdhocToolchain.Project
 
             if (string.IsNullOrEmpty(OutputName))
                 return (false, "Output Name is missing or empty.");
-
-            if (Version != 12)
-                return (false, "Only Project version 12 is supported.");
             
             if (FilesToCompile.Length == 0)
                 return (false, "No files to compile provided.");
