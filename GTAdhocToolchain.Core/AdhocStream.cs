@@ -81,7 +81,16 @@ namespace GTAdhocToolchain.Core
             }
             else
             {
-                var symbStr = this.ReadString(StringCoding.Int16CharCount);
+                // Reads more than it should with the following (bug):
+                // length: 0x0B
+                // - text: ¤°¤ï¤¢¤¢¤¢
+                // - bytes: A4 B0 A4 EF A4 A2 A4 A2 A4 A2
+                // var symbStr = this.ReadString(StringCoding.Int16CharCount);
+
+                // Read manually
+                short len = this.ReadInt16();
+                var symbStr = Encoding.GetString(ReadBytes(len));
+
                 return new AdhocSymbol(symbStr);
             }
         }

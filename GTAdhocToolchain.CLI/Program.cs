@@ -68,12 +68,11 @@ namespace GTAdhocToolchain.CLI
                 }
             }
 
-            Parser.Default.ParseArguments<BuildVerbs, PackVerbs, UnpackVerbs, MProjectToBinVerbs, MProjectToTextVerbs, MProjectToGpbListVerbs>(args)
+            Parser.Default.ParseArguments<BuildVerbs, PackVerbs, UnpackVerbs, MProjectToBinVerbs, MProjectToTextVerbs>(args)
                 .WithParsed<BuildVerbs>(Build)
                 .WithParsed<PackVerbs>(Pack)
                 .WithParsed<UnpackVerbs>(Unpack)
                 .WithParsed<MProjectToBinVerbs>(MProjectToBin)
-                .WithParsed<MProjectToTextVerbs>(MProjectToText)
                 .WithNotParsed(HandleNotParsedArgs);
         }
 
