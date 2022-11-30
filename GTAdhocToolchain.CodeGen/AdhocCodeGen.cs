@@ -205,6 +205,8 @@ namespace GTAdhocToolchain.CodeGen
                     WriteSourceFile(instruction as InsSourceFile); break;
                 case AdhocInstructionType.LIST_ASSIGN:
                     WriteListAssign(instruction as InsListAssign); break;
+                case AdhocInstructionType.LIST_ASSIGN_OLD:
+                    WriteListAssignOld(instruction as InsListAssignOld); break;
                 case AdhocInstructionType.TRY_CATCH:
                     WriteTryCatch(instruction as InsTryCatch); break;
                 case AdhocInstructionType.UNDEF:
@@ -230,6 +232,7 @@ namespace GTAdhocToolchain.CodeGen
                 case AdhocInstructionType.ASSIGN:
                 case AdhocInstructionType.OBJECT_SELECTOR:
                 case AdhocInstructionType.MODULE_CONSTRUCTOR:
+                case AdhocInstructionType.PRINT:
                     break;
                 default:
                     throw new NotImplementedException();
@@ -255,6 +258,11 @@ namespace GTAdhocToolchain.CodeGen
         {
             stream.WriteInt32(listAssign.VariableCount);
             stream.WriteBoolean(listAssign.Unk);
+        }
+
+        private void WriteListAssignOld(InsListAssignOld listAssignOld)
+        {
+            stream.WriteInt32(listAssignOld.VariableCount);
         }
 
         private void WriteSourceFile(InsSourceFile srcFile)

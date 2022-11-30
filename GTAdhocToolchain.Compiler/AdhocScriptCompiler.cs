@@ -167,12 +167,22 @@ namespace GTAdhocToolchain.Compiler
                 case Nodes.ModuleConstructorStatement:
                     CompileModuleConstructorStatement(frame, node as ModuleConstructorStatement);
                     break;
+                case Nodes.PrintStatement:
+                    CompilePrintStatement(frame, node as PrintStatement);
+                    break;
                 case Nodes.EmptyStatement:
                     break;
                 default:
                     ThrowCompilationError(node, $"Unsupported statement: {node.Type}");
                     break;
             }
+        }
+
+        public void CompilePrintStatement(AdhocCodeFrame frame, PrintStatement printStatement)
+        {
+            CompileExpression(frame, printStatement.Expression);
+
+            frame.AddInstruction(new InsPrint(), printStatement.Location.Start.Line);
         }
 
         public void CompileModuleConstructorStatement(AdhocCodeFrame frame, ModuleConstructorStatement ctorStatement)
@@ -1085,6 +1095,10 @@ namespace GTAdhocToolchain.Compiler
                             frame.AddScopeVariable(varSymb, isAssignment: true, isLocalDeclaration: true);
                         }
                     }
+                    else if (id is ArrayPattern arrayPattern) // var [hello, world] = helloworld; - deconstruct array
+                    {
+                        CompileArrayPatternPush(frame, arrayPattern, isDeclaration: true);
+                    }
                     else
                     {
                         ThrowCompilationError(varDeclaration, "Variable declaration for id is not an identifier.");
@@ -1137,8 +1151,17 @@ namespace GTAdhocToolchain.Compiler
                     ThrowCompilationError(exp, "Expected array pattern element to be an identifier or attribute member expression.");
             }
 
-            InsListAssign listAssign = new InsListAssign(arrayPattern.Elements.Count);
-            frame.AddInstruction(listAssign, arrayPattern.Location.Start.Line);
+            if (frame.Version >= 12)
+            {
+                InsListAssign listAssign = new InsListAssign(arrayPattern.Elements.Count);
+                frame.AddInstruction(listAssign, arrayPattern.Location.Start.Line);
+            }
+            else
+            {
+                InsListAssignOld listAssign = new InsListAssignOld(arrayPattern.Elements.Count);
+                frame.AddInstruction(listAssign, arrayPattern.Location.Start.Line);
+            }
+
             InsertPop(frame);
         }
 
@@ -1772,25 +1795,35 @@ namespace GTAdhocToolchain.Compiler
                 {
                     // Regular update of left-hand side
                     // Left-hand side needs to be pushed first
-                    if (assignExpression.Left is Identifier)
+
+                    // Assigning to a reference
+                    if (assignExpression.Left is UnaryExpression unaryExp && unaryExp.Operator == UnaryOperator.ReferenceOf)
                     {
-                        InsertVariablePush(frame, assignExpression.Left as Identifier, isVariableDeclaration: false);
-                    }
-                    else if (assignExpression.Left is AttributeMemberExpression attr)
-                    {
-                        CompileAttributeMemberAssignmentPush(frame, attr);
-                    }
-                    else if (assignExpression.Left is ComputedMemberExpression compExpression)
-                    {
-                        CompileComputedMemberExpressionAssignmentPush(frame, compExpression);
-                    }
-                    else if (assignExpression.Left is ObjectSelectorMemberExpression objectSelector)
-                    {
-                        throw new NotImplementedException("Unimplemented object selector assignment expression");
+                        // No need to push, eval
+                        CompileUnaryExpression(frame, unaryExp, isReference: false);
                     }
                     else
                     {
-                        ThrowCompilationError(assignExpression, "Unimplemented or Invalid");
+                        if (assignExpression.Left is Identifier)
+                        {
+                            InsertVariablePush(frame, assignExpression.Left as Identifier, isVariableDeclaration: false);
+                        }
+                        else if (assignExpression.Left is AttributeMemberExpression attr)
+                        {
+                            CompileAttributeMemberAssignmentPush(frame, attr);
+                        }
+                        else if (assignExpression.Left is ComputedMemberExpression compExpression)
+                        {
+                            CompileComputedMemberExpressionAssignmentPush(frame, compExpression);
+                        }
+                        else if (assignExpression.Left is ObjectSelectorMemberExpression objectSelector)
+                        {
+                            throw new NotImplementedException("Unimplemented object selector assignment expression");
+                        }
+                        else
+                        {
+                            ThrowCompilationError(assignExpression, "Unimplemented or Invalid");
+                        }
                     }
 
                     CompileExpression(frame, assignExpression.Right);
