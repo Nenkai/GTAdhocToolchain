@@ -41,7 +41,6 @@ namespace GTAdhocToolchain.Disasm
             byte version = (byte)int.Parse(magic.AsSpan(4, 3));
             stream.Version = version;
 
-
             var adhoc = new AdhocFile(version);
             if (version >= 9 && version <= 12)
             {

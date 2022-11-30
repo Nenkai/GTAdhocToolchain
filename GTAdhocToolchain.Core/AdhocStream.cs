@@ -8,6 +8,7 @@ using Syroot.BinaryData;
 using Syroot.BinaryData.Core;
 
 using GTAdhocToolchain.Core;
+using System.IO;
 
 namespace GTAdhocToolchain.Core
 {
@@ -17,10 +18,23 @@ namespace GTAdhocToolchain.Core
 
         public List<AdhocSymbol> Symbols { get; set; } = new();
 
+        static AdhocStream()
+        {
+            // Needed for EUC-JP encoding
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        }
+
         public AdhocStream(Stream baseStream, int version)
             : base(baseStream)
         {
             Version = version;
+
+            /* In GT4, the encoding for the compiler is set to EUC-JP
+             * "ぐわあああ\n" in boot/CheckRoot.ad
+             * 
+             * So set the encoding to it if it's earlier than EUC-JP */
+            if (Version < 10)
+                Encoding = Encoding.GetEncoding("EUC-JP");
         }
 
         public void Reset()

@@ -1680,7 +1680,7 @@ namespace GTAdhocToolchain.Compiler
                         }
                     }
                     else
-                        throw new Exception("aa");
+                        throw new Exception("Unsupported Tagged Template Node");
                 }
             }
 

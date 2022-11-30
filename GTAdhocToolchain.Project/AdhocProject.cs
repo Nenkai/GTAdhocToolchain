@@ -76,6 +76,12 @@ namespace GTAdhocToolchain.Project
             FullProjectPath = Path.GetFullPath(Path.Combine(ProjectFilePath, ProjectFolder));
             SourceProjectFolder = ProjectFolder.TrimStart('.', '/'); // Trim ../
 
+            if (!Directory.Exists(FullProjectPath))
+            {
+                Logger.Error($"Project directory does not exist ({FullProjectPath})");
+                return;
+            }
+
             string tmpFileName = $"_tmp_{OutputName}.ad";
             LinkFiles(tmpFileName);
 
