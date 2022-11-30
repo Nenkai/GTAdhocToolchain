@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 
 namespace GTAdhocToolchain.Core.Instructions
 {
+    /// <summary>
+    /// Pushes an unsigned long (QWORD) onto the stack.
+    /// </summary>
     public class InsULongConst : InstructionBase
     {
         public override AdhocInstructionType InstructionType => AdhocInstructionType.U_LONG_CONST;

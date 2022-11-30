@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 
 namespace GTAdhocToolchain.Core.Instructions
 {
+    /// <summary>
+    /// Does nothing.
+    /// </summary>
     public class InsNop : InstructionBase
     {
         public static readonly InsNop Empty = new();

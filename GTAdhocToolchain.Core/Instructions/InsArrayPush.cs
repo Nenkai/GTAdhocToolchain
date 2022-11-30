@@ -10,6 +10,7 @@ namespace GTAdhocToolchain.Core.Instructions
 {
     /// <summary>
     /// Pops two values from the stack, pushes the first value to the second one which should be an array.
+    /// Basically pushes a value into an array.
     /// </summary>
     public class InsArrayPush : InstructionBase
     {

@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace GTAdhocToolchain.Core.Instructions
 {
     /// <summary>
-    /// Represents a binary assignment operator instruction.
+    /// Applies a binary operation for the last two stack variables, and assigns the result to the last value.
     /// </summary>
     public class InsBinaryAssignOperator : InstructionBase
     {

@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 
 namespace GTAdhocToolchain.Core.Instructions
 {
+    /// <summary>
+    /// Adds a new module constructor for a variable.
+    /// </summary>
     public class InsModuleConstructor : InstructionBase
     {
         public override AdhocInstructionType InstructionType => AdhocInstructionType.MODULE_CONSTRUCTOR;

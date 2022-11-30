@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace GTAdhocToolchain.Core.Instructions
 {
     /// <summary>
-    /// Represents an evaluation for an iterator.
+    /// Represents an evaluation for an iterator, or for older versions, evaluates a result (used for CALLs, or variable evaluations for really old versions)
     /// </summary>
     public class InsEval : InstructionBase
     {

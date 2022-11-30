@@ -7,7 +7,8 @@ using System.Threading.Tasks;
 namespace GTAdhocToolchain.Core.Instructions
 {
     /// <summary>
-    /// Represents a jump to instruction if true instruction. Mostly used for switch cases.
+    /// Represents a jump to instruction if true instruction. 
+    /// Mostly used for switch cases.
     /// </summary>
     public class InsJumpIfTrue : InstructionBase
     {

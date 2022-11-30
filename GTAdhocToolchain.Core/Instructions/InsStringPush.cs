@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace GTAdhocToolchain.Core.Instructions
 {
     /// <summary>
-    /// Represents a string join/push instruction.
+    /// Pushes multiple strings together into one result.
     /// </summary>
     public class InsStringPush : InstructionBase
     {

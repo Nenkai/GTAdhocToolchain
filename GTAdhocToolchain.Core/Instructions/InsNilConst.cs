@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 
 namespace GTAdhocToolchain.Core.Instructions
 {
+    /// <summary>
+    /// Pushes a Nil pointer on the stack.
+    /// </summary>
     public class InsNilConst : InstructionBase
     {
         public override AdhocInstructionType InstructionType => AdhocInstructionType.NIL_CONST;

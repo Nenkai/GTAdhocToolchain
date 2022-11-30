@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace GTAdhocToolchain.Core.Instructions
 {
     /// <summary>
-    /// Defines a new function within the scope. Pops all the arguments before the definition.
+    /// Defines a new function within the scope. Pops all the variables as function parameters before the definition.
     /// </summary>
     public class InsFunctionDefine : SubroutineBase
     {

@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 
 namespace GTAdhocToolchain.Core.Instructions
 {
+    /// <summary>
+    /// Pushes a double onto the stack.
+    /// </summary>
     public class InsDoubleConst : InstructionBase
     {
         public override AdhocInstructionType InstructionType => AdhocInstructionType.DOUBLE_CONST;

@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 
 namespace GTAdhocToolchain.Core.Instructions
 {
+    /// <summary>
+    /// Pushes an unsigned integer onto the stack.
+    /// </summary>
     public class InsUIntConst : InstructionBase
     {
         public override AdhocInstructionType InstructionType => AdhocInstructionType.U_INT_CONST;

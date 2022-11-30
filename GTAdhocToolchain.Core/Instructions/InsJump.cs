@@ -8,6 +8,7 @@ namespace GTAdhocToolchain.Core.Instructions
 {
     /// <summary>
     /// Jump to instruction index instruction.
+    /// Mostly used for if statement consequents, or loops.
     /// </summary>
     public class InsJump : InstructionBase
     {

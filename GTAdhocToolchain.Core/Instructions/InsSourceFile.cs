@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace GTAdhocToolchain.Core.Instructions
 {
     /// <summary>
-    /// Current source file name update.
+    /// Sets the current file name for the thread, used for debugging for exceptions.
     /// </summary>
     public class InsSourceFile : InstructionBase
     {

@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace GTAdhocToolchain.Core.Instructions
 {
     /// <summary>
-    /// Represents a string const or string literal instruction.
+    /// Pushes string onto the stack.
     /// </summary>
     public class InsStringConst : InstructionBase
     {

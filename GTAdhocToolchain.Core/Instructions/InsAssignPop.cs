@@ -9,7 +9,7 @@ using Syroot.BinaryData;
 namespace GTAdhocToolchain.Core.Instructions
 {
     /// <summary>
-    /// Pops 2 pointers off the stack, and copies the second item to the first item
+    /// Pops 2 pointers off the stack, and copies the second item to the first item, and pops it
     /// </summary>
     public class InsAssignPop : InstructionBase
     {

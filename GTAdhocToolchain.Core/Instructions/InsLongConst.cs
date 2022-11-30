@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 
 namespace GTAdhocToolchain.Core.Instructions
 {
+    /// <summary>
+    /// Pushes a long onto the stack.
+    /// </summary>
     public class InsLongConst : InstructionBase
     {
         public override AdhocInstructionType InstructionType => AdhocInstructionType.LONG_CONST;

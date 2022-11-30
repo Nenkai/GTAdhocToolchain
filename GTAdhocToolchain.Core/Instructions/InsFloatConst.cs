@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 
 namespace GTAdhocToolchain.Core.Instructions
 {
+    /// <summary>
+    /// Pushes a float onto the stack.
+    /// </summary>
     public class InsFloatConst : InstructionBase
     {
         public override AdhocInstructionType InstructionType => AdhocInstructionType.FLOAT_CONST;

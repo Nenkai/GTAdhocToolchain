@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 
 namespace GTAdhocToolchain.Core.Instructions
 {
+    /// <summary>
+    /// Adds a boolean variable onto the stack.
+    /// </summary>
     public class InsBoolConst : InstructionBase
     {
         public static readonly InsBoolConst True = new(true);

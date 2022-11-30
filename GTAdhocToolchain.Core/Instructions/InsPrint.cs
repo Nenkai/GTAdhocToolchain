@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 
 namespace GTAdhocToolchain.Core.Instructions
 {
+    /// <summary>
+    /// Prints text onto the game's console. Debug stripped.
+    /// </summary>
     public class InsPrint : InstructionBase
     {
         public static readonly InsPrint Empty = new();

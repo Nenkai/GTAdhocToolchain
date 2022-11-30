@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 
 namespace GTAdhocToolchain.Core.Instructions
 {
+    /// <summary>
+    /// Defines a new class within the current scope.
+    /// </summary>
     public class InsClassDefine : InstructionBase
     {
         public override AdhocInstructionType InstructionType => AdhocInstructionType.CLASS_DEFINE;

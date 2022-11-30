@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 
 namespace GTAdhocToolchain.Core.Instructions
 {
+    /// <summary>
+    /// Defines a static variable within the current scope.
+    /// </summary>
     public class InsStaticDefine : InstructionBase
     {
         public override AdhocInstructionType InstructionType => AdhocInstructionType.STATIC_DEFINE;

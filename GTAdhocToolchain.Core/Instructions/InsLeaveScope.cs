@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace GTAdhocToolchain.Core.Instructions
 {
     /// <summary>
-    /// Signals scope leaving to rewind the stack to prior context.
+    /// Signals scope leaving to rewind the stack to prior context. Normally used when exiting scopes.
     /// </summary>
     public class InsLeaveScope : InstructionBase
     {

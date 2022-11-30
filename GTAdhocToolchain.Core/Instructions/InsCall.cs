@@ -8,6 +8,7 @@ namespace GTAdhocToolchain.Core.Instructions
 {
     /// <summary>
     /// Represents a function or method call. Will pop the amount of provided arguments from the stack, plus the function object itself. (Arg Count + 1).
+    /// Will always return a value regardless of void returns.
     /// </summary>
     public class InsCall : InstructionBase
     {

@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 
 namespace GTAdhocToolchain.Core.Instructions
 {
+    /// <summary>
+    /// Pushes a void onto the stack.
+    /// </summary>
     public class InsVoidConst : InstructionBase
     {
         public override AdhocInstructionType InstructionType => AdhocInstructionType.VOID_CONST;

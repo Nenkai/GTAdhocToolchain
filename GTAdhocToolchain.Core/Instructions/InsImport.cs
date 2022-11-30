@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 
 namespace GTAdhocToolchain.Core.Instructions
 {
+    /// <summary>
+    /// Imports (copies) a symbol (or all with wildcard) onto the current scope.
+    /// </summary>
     public class InsImport : InstructionBase
     {
         public override AdhocInstructionType InstructionType => AdhocInstructionType.IMPORT;

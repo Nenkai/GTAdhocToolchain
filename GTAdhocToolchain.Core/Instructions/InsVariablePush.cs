@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace GTAdhocToolchain.Core.Instructions
 {
     /// <summary>
-    /// Pushes a new variable into the variable storage. Value will be pushed on the stack.
+    /// Pushes a value into a certain symbol. Value will be pushed on the stack.
     /// </summary>
     public class InsVariablePush : InstructionBase
     {

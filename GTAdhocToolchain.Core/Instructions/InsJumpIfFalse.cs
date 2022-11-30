@@ -8,6 +8,7 @@ namespace GTAdhocToolchain.Core.Instructions
 {
     /// <summary>
     /// Represents a jump to instruction if false instruction. Pops the bool from the stack.
+    /// Mostly used for if statements.
     /// </summary>
     public class InsJumpIfFalse : InstructionBase
     {

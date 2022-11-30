@@ -8,6 +8,9 @@ using GTAdhocToolchain.Core;
 
 namespace GTAdhocToolchain.Core.Instructions
 {
+    /// <summary>
+    /// Sets the current frame's state.
+    /// </summary>
     public class InsSetState : InstructionBase
     {
         public override AdhocInstructionType InstructionType => AdhocInstructionType.SET_STATE;
