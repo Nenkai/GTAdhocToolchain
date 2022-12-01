@@ -180,9 +180,11 @@ namespace GTAdhocToolchain.Compiler
 
         public void CompilePrintStatement(AdhocCodeFrame frame, PrintStatement printStatement)
         {
-            CompileExpression(frame, printStatement.Expression);
+            foreach (var exp in printStatement.Expressions)
+                CompileExpression(frame, exp);
 
-            frame.AddInstruction(new InsPrint(), printStatement.Location.Start.Line);
+            frame.AddInstruction(new InsPrint(printStatement.Expressions.Count), printStatement.Location.Start.Line);
+            InsertPop(frame);
         }
 
         public void CompileModuleConstructorStatement(AdhocCodeFrame frame, ModuleConstructorStatement ctorStatement)
@@ -428,10 +430,15 @@ namespace GTAdhocToolchain.Compiler
                 }
                 else
                 {
-                    // Not provided, inherits from base object (System::Object)
-                    @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol(AdhocConstants.SYSTEM));
-                    @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol(AdhocConstants.OBJECT));
-                    @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol($"{AdhocConstants.SYSTEM}{AdhocConstants.OPERATOR_STATIC}{AdhocConstants.OBJECT}"));
+                    // Not provided, inherits from base object (System::Object, or Object if old)
+                    if (frame.Version >= 10)
+                    {
+                        @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol(AdhocConstants.SYSTEM));
+                        @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol(AdhocConstants.OBJECT));
+                        @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol($"{AdhocConstants.SYSTEM}{AdhocConstants.OPERATOR_STATIC}{AdhocConstants.OBJECT}"));
+                    }
+                    else
+                        @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol(AdhocConstants.OBJECT));
                 }
 
                 frame.AddInstruction(@class, id.Location.Start.Line);
@@ -894,6 +901,13 @@ namespace GTAdhocToolchain.Compiler
             foreach (Expression param in subParams)
                 CompileSubroutineParameter(frame, parentNode, subroutine, param);
 
+            if (isMethod && frame.Version <= 10)
+            {
+                // Methods always reserve a variable slot for 'self' (the keyword doesn't exist) in older versions
+                // It's also after parameters
+                subroutine.CodeFrame.Stack.AddLocalVariable(null);
+            }
+
             if (frame.CurrentScope.StaticScopeVariables.ContainsKey(subroutine.Name.Name))
                 ThrowCompilationError(parentNode, $"Static subroutine name {subroutine.Name} is already defined in this scope.");
 
@@ -1124,7 +1138,16 @@ namespace GTAdhocToolchain.Compiler
                         }
 
                         // Perform assignment
-                        InsertAssignPop(frame);
+                        if (id is ArrayPattern arrayPattern)
+                        {
+                            InsListAssignOld listAssign = new InsListAssignOld(arrayPattern.Elements.Count);
+                            frame.AddInstruction(listAssign, arrayPattern.Location.Start.Line);
+                            InsertPop(frame);
+                        }
+                        else
+                        {
+                            InsertAssignPop(frame);
+                        }
                     }
                 }
                 
@@ -1155,14 +1178,12 @@ namespace GTAdhocToolchain.Compiler
             {
                 InsListAssign listAssign = new InsListAssign(arrayPattern.Elements.Count);
                 frame.AddInstruction(listAssign, arrayPattern.Location.Start.Line);
+                InsertPop(frame);
             }
             else
             {
-                InsListAssignOld listAssign = new InsListAssignOld(arrayPattern.Elements.Count);
-                frame.AddInstruction(listAssign, arrayPattern.Location.Start.Line);
+                return; // Needs to be after the value evaluation
             }
-
-            InsertPop(frame);
         }
 
         /// <summary>
@@ -1317,6 +1338,9 @@ namespace GTAdhocToolchain.Compiler
         /// <param name="spreadElement"></param>
         private void CompileSelfExpression(AdhocCodeFrame frame, SelfExpression selfExpression)
         {
+            if (frame.Version < 10)
+                ThrowCompilationError(selfExpression, CompilationMessages.Error_SelfUnsupported);
+
             AdhocSymbol symb = SymbolMap.RegisterSymbol(AdhocConstants.SELF);
             int idx = 0; // Always 0 when refering to self
             var varEval = new InsVariableEvaluation(idx);
@@ -1826,7 +1850,14 @@ namespace GTAdhocToolchain.Compiler
                         }
                     }
 
-                    CompileExpression(frame, assignExpression.Right);
+                    if (assignExpression.Right.Type == Nodes.UnaryExpression && (assignExpression.Right as UnaryExpression).Operator == UnaryOperator.ReferenceOf)
+                    {
+                        CompileUnaryExpression(frame, assignExpression.Right as UnaryExpression, popResult: false, isReference: true); // a = &b;
+                    }
+                    else
+                    {
+                        CompileExpression(frame, assignExpression.Right);
+                    }
 
                     if (popResult)
                         InsertAssignPop(frame);
@@ -1873,7 +1904,7 @@ namespace GTAdhocToolchain.Compiler
                     // Then do not immediately discard result for the next inline operation
                     CompileAssignmentExpression(frame, assignExpression.Right as AssignmentExpression, popResult: false);
                 }
-                else
+                else 
                     CompileExpression(frame, assignExpression.Right);
 
                 InsertBinaryAssignOperator(frame, assignExpression, assignExpression.Operator, assignExpression.Location.Start.Line);
@@ -1947,7 +1978,7 @@ namespace GTAdhocToolchain.Compiler
         }
 
         /// <summary>
-        /// test ? consequent : alternate;
+        /// Or ternary for short - test ? consequent : alternate;
         /// </summary>
         /// <param name="condExpression"></param>
         private void CompileConditionalExpression(AdhocCodeFrame frame, ConditionalExpression condExpression)
@@ -1963,7 +1994,9 @@ namespace GTAdhocToolchain.Compiler
             // This jump will skip the alternate statement if the consequent path is taken
             InsJump altSkipJump = new InsJump();
             frame.AddInstruction(altSkipJump, 0);
-            InsertPop(frame);
+
+            if (frame.Version >= 12)
+                InsertPop(frame);
 
             // Update alternate jump index now that we've compiled the consequent
             alternateJump.JumpIndex = frame.GetLastInstructionIndex();
@@ -2670,12 +2703,13 @@ namespace GTAdhocToolchain.Compiler
             bool opToSymbol = frame.Version >= 12;
             var symb = SymbolMap.RegisterSymbol(opStr, opToSymbol);
 
-            if (frame.Version >= 12)
+            if (frame.Version >= 5)
             {
                 frame.AddInstruction(new InsBinaryAssignOperator(symb), lineNumber);
             }
             else
             {
+                // FIXME: Not sure about this, and the version
                 frame.AddInstruction(new InsBinaryOperator(symb), lineNumber);
                 frame.AddInstruction(new InsAssign(), lineNumber);
             }

@@ -90,7 +90,7 @@ namespace GTAdhocToolchain.Core.Instructions
                 AdhocInstructionType.U_INT_CONST => new InsUIntConst(),
                 AdhocInstructionType.REQUIRE => new InsRequire(),
                 AdhocInstructionType.U_LONG_CONST => new InsULongConst(),
-                //AdhocInstructionType.PRINT => new OpPrint(),
+                AdhocInstructionType.PRINT => new InsPrint(),
                 AdhocInstructionType.MODULE_CONSTRUCTOR => new InsModuleConstructor(),
                 AdhocInstructionType.VA_CALL => new InsVaCall(),
                 AdhocInstructionType.NOP => new InsNop(),
@@ -98,7 +98,6 @@ namespace GTAdhocToolchain.Core.Instructions
                 AdhocInstructionType.UNK_69 => new Ins69(),
                 AdhocInstructionType.UNK_70 => new Ins70(),
                 AdhocInstructionType.UNK_71 => new Ins71(),
-                AdhocInstructionType.PRINT => new InsPrint(),
                 _ => throw new Exception($"Encountered unimplemented {type} instruction."),
             };
         }

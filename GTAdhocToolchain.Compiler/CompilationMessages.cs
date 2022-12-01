@@ -46,6 +46,8 @@ namespace GTAdhocToolchain.Compiler
 
         public const string Error_ForeachUnsupported = "Foreach statements are not supported in Adhoc Versions below 12.";
         public const string Error_MapUnsupported = "Map constants are not supported in Adhoc Versions lower than 11.";
+        public const string Error_SelfUnsupported = "'self is not supported in Adhoc Versions lower than 10.";
+
 
     }
 }

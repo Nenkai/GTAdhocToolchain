@@ -11,15 +11,25 @@ namespace GTAdhocToolchain.Core.Instructions
     /// </summary>
     public class InsPrint : InstructionBase
     {
-        public static readonly InsPrint Empty = new();
-
         public override AdhocInstructionType InstructionType => AdhocInstructionType.PRINT;
 
         public override string InstructionName => "PRINT";
 
+        public int ArgCount { get; set; }
+
+        public InsPrint()
+        {
+
+        }
+
+        public InsPrint(int argCount)
+        {
+            ArgCount = argCount;
+        }
+
         public override void Deserialize(AdhocStream stream)
         {
-            stream.ReadInt32();
+            ArgCount = stream.ReadInt32();
         }
 
         public override string ToString()
@@ -28,7 +38,7 @@ namespace GTAdhocToolchain.Core.Instructions
         }
 
         public override string Disassemble(bool asCompareMode = false)
-            => $"{InstructionType}";
+            => $"{InstructionType}: ArgCount={ArgCount}";
 
     }
 }

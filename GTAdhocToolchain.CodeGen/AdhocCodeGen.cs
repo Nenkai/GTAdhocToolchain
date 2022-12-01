@@ -213,7 +213,9 @@ namespace GTAdhocToolchain.CodeGen
                     WriteUndef(instruction as InsUndef); break;
                 case AdhocInstructionType.VA_CALL:
                     WriteVariableCall(instruction as InsVaCall); break;
-                    // Nothing to write
+                // Nothing to write
+                case AdhocInstructionType.PRINT:
+                    WritePrint(instruction as InsPrint); break;
                 case AdhocInstructionType.NIL_CONST:
                 case AdhocInstructionType.VOID_CONST:
                 case AdhocInstructionType.ASSIGN_POP:
@@ -232,11 +234,15 @@ namespace GTAdhocToolchain.CodeGen
                 case AdhocInstructionType.ASSIGN:
                 case AdhocInstructionType.OBJECT_SELECTOR:
                 case AdhocInstructionType.MODULE_CONSTRUCTOR:
-                case AdhocInstructionType.PRINT:
                     break;
                 default:
                     throw new NotImplementedException();
             }
+        }
+
+        private void WritePrint(InsPrint print)
+        {
+            stream.WriteInt32(print.ArgCount);
         }
 
         private void WriteVariableCall(InsVaCall vaCall)

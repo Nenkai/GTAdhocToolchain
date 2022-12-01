@@ -66,7 +66,10 @@ namespace GTAdhocToolchain.Core
         public void WriteSymbol(AdhocSymbol symbol)
         {
             if (Version <= 8)
-                this.WriteString(symbol.Name, StringCoding.Int16CharCount);
+            {
+                WriteInt16((short)Encoding.GetByteCount(symbol.Name));
+                WriteBytes(Encoding.GetBytes(symbol.Name));
+            }
             else
                 WriteVarInt(symbol.Id);
                     
