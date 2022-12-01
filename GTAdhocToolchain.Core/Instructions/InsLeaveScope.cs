@@ -27,6 +27,12 @@ namespace GTAdhocToolchain.Core.Instructions
         /// </summary>
         public int VariableStorageRewindIndex { get; set; }
 
+        public override void Serialize(AdhocStream stream)
+        {
+            stream.WriteInt32(ModuleOrClassDepthRewindIndex);
+            stream.WriteInt32(VariableStorageRewindIndex);
+        }
+
         public override void Deserialize(AdhocStream stream)
         {
             ModuleOrClassDepthRewindIndex = stream.ReadInt32();

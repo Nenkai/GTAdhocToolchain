@@ -17,6 +17,11 @@ namespace GTAdhocToolchain.Core.Instructions
 
         public List<AdhocSymbol> Symbols { get; set; } = new();
 
+        public override void Serialize(AdhocStream stream)
+        {
+            stream.WriteSymbols(Symbols);
+        }
+
         public override void Deserialize(AdhocStream stream)
         {
             Symbols = stream.ReadSymbols();

@@ -20,6 +20,11 @@ namespace GTAdhocToolchain.Core.Instructions
         /// </summary>
         public int InstructionJumpIndex { get; set; }
 
+        public override void Serialize(AdhocStream stream)
+        {
+            stream.WriteInt32(InstructionJumpIndex);
+        }
+
         public override void Deserialize(AdhocStream stream)
         {
             InstructionJumpIndex = stream.ReadInt32();

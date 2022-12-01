@@ -17,6 +17,18 @@ namespace GTAdhocToolchain.Core.Instructions
 
         public List<AdhocSymbol> AttributeSymbols { get; set; } = new();
 
+        public override void Serialize(AdhocStream stream)
+        {
+            if (stream.Version <= 5)
+            {
+                stream.WriteSymbol(AttributeSymbols[0]);
+            }
+            else
+            {
+                stream.WriteSymbols(AttributeSymbols);
+            }
+        }
+
         public override void Deserialize(AdhocStream stream)
         {
             if (stream.Version <= 5)

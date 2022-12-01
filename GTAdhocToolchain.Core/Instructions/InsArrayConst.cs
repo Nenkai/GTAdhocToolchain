@@ -6,6 +6,8 @@ using System.Threading.Tasks;
 
 using GTAdhocToolchain.Core;
 
+using Syroot.BinaryData;
+
 namespace GTAdhocToolchain.Core.Instructions
 {
     /// <summary>
@@ -27,6 +29,11 @@ namespace GTAdhocToolchain.Core.Instructions
         public InsArrayConst()
         {
 
+        }
+
+        public override void Serialize(AdhocStream stream)
+        {
+            stream.WriteUInt32(ArraySize);
         }
 
         public override void Deserialize(AdhocStream stream)

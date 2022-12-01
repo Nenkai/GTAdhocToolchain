@@ -19,6 +19,11 @@ namespace GTAdhocToolchain.Core.Instructions
 
         public override string InstructionName => "ASSIGN";
 
+        public override void Serialize(AdhocStream stream)
+        {
+
+        }
+
         public override void Deserialize(AdhocStream strema)
         {
 

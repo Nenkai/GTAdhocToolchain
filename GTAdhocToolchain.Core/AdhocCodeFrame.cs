@@ -469,6 +469,70 @@ namespace GTAdhocToolchain.Core
             return null;
         }
 
+        public void Write(AdhocStream stream)
+        {
+            if (Version >= 8 && Version <= 12)
+            {
+                stream.WriteBoolean(HasDebuggingInformation);
+                stream.WriteByte((byte)Version);
+            }
+
+            if (SourceFilePath != null)
+                stream.WriteSymbol(SourceFilePath);
+
+            if (Version >= 12)
+                stream.WriteBoolean(HasRestElement); // Not sure for Version 14
+
+            if (Version > 3)
+            {
+                stream.WriteInt32(FunctionParameters.Count);
+                for (int i = 0; i < FunctionParameters.Count; i++)
+                {
+                    stream.WriteSymbol(FunctionParameters[i]);
+
+                    if (Version >= 8)
+                        stream.WriteInt32(1 + i); // TODO: Proper Index?
+                }
+            }
+
+            if (Version >= 8)
+            {
+                stream.WriteInt32(CapturedCallbackVariables.Count);
+                for (int i = 0; i < CapturedCallbackVariables.Count; i++)
+                {
+                    AdhocSymbol capturedVariable = CapturedCallbackVariables[i];
+                    stream.WriteSymbol(capturedVariable);
+                    stream.WriteInt32(-(i + 1));
+                }
+
+                stream.WriteInt32(0); // Some stack variable index
+            }
+
+
+            if (Version <= 10)
+            {
+                stream.WriteInt32(Stack.GetLocalVariableStorageSize());
+                stream.WriteInt32(Stack.GetStackSize());
+            }
+            else
+            {
+                // Actual stack size
+                stream.WriteInt32(Stack.GetStackSize());
+
+                /* These two are combined to make the size of the storage for variables */
+                stream.WriteInt32(Stack.GetLocalVariableStorageSize());
+                stream.WriteInt32(Stack.GetStaticVariableStorageSize());
+            }
+
+            stream.WriteInt32(Instructions.Count);
+            foreach (var instruction in Instructions)
+            {
+                stream.WriteUInt32(instruction.LineNumber);
+                stream.WriteByte((byte)instruction.InstructionType);
+                instruction.Serialize(stream);
+            }
+        }
+
         public void Read(AdhocStream stream)
         {
             if (Version < 8)

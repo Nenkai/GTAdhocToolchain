@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 
 namespace GTAdhocToolchain.Core.Instructions
 {
@@ -24,6 +25,11 @@ namespace GTAdhocToolchain.Core.Instructions
         public InsSourceFile()
         {
 
+        }
+
+        public override void Serialize(AdhocStream stream)
+        {
+            stream.WriteSymbol(FileName);
         }
 
         public override void Deserialize(AdhocStream stream)

@@ -24,6 +24,15 @@ namespace GTAdhocToolchain.Core.Instructions
             
         }
 
+        public override void Serialize(AdhocStream stream)
+        {
+            stream.WriteSymbols(ImportNamespaceParts);
+            stream.WriteSymbol(ModuleValue);
+
+            if (stream.Version > 9)
+                stream.WriteSymbol(ImportAs);
+        }
+
         public override void Deserialize(AdhocStream stream)
         {
             ImportNamespaceParts = stream.ReadSymbols();

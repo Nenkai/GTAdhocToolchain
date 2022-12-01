@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Syroot.BinaryData;
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -25,6 +27,11 @@ namespace GTAdhocToolchain.Core.Instructions
         public InsPrint(int argCount)
         {
             ArgCount = argCount;
+        }
+
+        public override void Serialize(AdhocStream stream)
+        {
+            stream.WriteInt32(ArgCount);
         }
 
         public override void Deserialize(AdhocStream stream)

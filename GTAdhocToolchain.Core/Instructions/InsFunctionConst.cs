@@ -15,6 +15,11 @@ namespace GTAdhocToolchain.Core.Instructions
 
         public override string InstructionName => "FUNCTION_CONST";
 
+        public override void Serialize(AdhocStream stream)
+        {
+            CodeFrame.Write(stream);
+        }
+
         public override void Deserialize(AdhocStream stream)
         {
             CodeFrame.Version = stream.Version;

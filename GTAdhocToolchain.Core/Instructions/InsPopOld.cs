@@ -17,6 +17,11 @@ namespace GTAdhocToolchain.Core.Instructions
 
         public override string InstructionName => "POP_OLD";
 
+        public override void Serialize(AdhocStream stream)
+        {
+
+        }
+
         public override void Deserialize(AdhocStream stream)
         {
             

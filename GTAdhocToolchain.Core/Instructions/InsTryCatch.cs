@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Syroot.BinaryData;
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -13,6 +15,11 @@ namespace GTAdhocToolchain.Core.Instructions
         public override string InstructionName => "TRY_CATCH";
 
         public int InstructionIndex { get; set; }
+
+        public override void Serialize(AdhocStream stream)
+        {
+            stream.WriteInt32(InstructionIndex);
+        }
 
         public override void Deserialize(AdhocStream stream)
         {

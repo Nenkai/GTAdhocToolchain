@@ -27,6 +27,11 @@ namespace GTAdhocToolchain.Core.Instructions
 
         }
 
+        public override void Serialize(AdhocStream stream)
+        {
+            stream.WriteInt32(StringCount);
+        }
+
         public override void Deserialize(AdhocStream stream)
         {
             StringCount = stream.ReadInt32();

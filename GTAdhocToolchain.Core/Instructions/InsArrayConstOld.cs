@@ -29,6 +29,11 @@ namespace GTAdhocToolchain.Core.Instructions
 
         }
 
+        public override void Serialize(AdhocStream stream)
+        {
+            stream.WriteUInt32(ArraySize);
+        }
+
         public override void Deserialize(AdhocStream stream)
         {
             ArraySize = stream.ReadUInt32();

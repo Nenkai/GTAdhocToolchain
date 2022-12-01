@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Syroot.BinaryData;
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -19,6 +21,11 @@ namespace GTAdhocToolchain.Core.Instructions
         /// Should always be two. (function object + unique & single spread expression)
         /// </summary>
         public uint PopObjectCount { get; set; }
+
+        public override void Serialize(AdhocStream stream)
+        {
+            stream.WriteUInt32(PopObjectCount);
+        }
 
         public override void Deserialize(AdhocStream stream)
         {

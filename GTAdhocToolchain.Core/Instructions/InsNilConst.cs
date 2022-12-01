@@ -15,6 +15,11 @@ namespace GTAdhocToolchain.Core.Instructions
 
         public override string InstructionName => "NIL_CONST";
 
+        public override void Serialize(AdhocStream stream)
+        {
+
+        }
+
         public override void Deserialize(AdhocStream stream)
         {
             

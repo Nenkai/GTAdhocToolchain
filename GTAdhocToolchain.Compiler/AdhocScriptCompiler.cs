@@ -1217,6 +1217,7 @@ namespace GTAdhocToolchain.Compiler
 
             importIns.ImportNamespaceParts.Add(namespaceSymbol);
             importIns.ModuleValue = value;
+            importIns.ImportAs = nilSymbol;
 
             /* Imports actually copies the static members from the target */
             if (import.Target.Name == AdhocConstants.OPERATOR_IMPORT_ALL)

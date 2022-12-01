@@ -26,6 +26,11 @@ namespace GTAdhocToolchain.Core.Instructions
 
         }
 
+        public override void Serialize(AdhocStream stream)
+        {
+            stream.WriteSymbol(Name);
+        }
+
         public override void Deserialize(AdhocStream stream)
         {
             Name = stream.ReadSymbol();

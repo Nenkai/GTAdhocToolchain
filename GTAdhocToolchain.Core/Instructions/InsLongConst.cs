@@ -27,6 +27,11 @@ namespace GTAdhocToolchain.Core.Instructions
 
         }
 
+        public override void Serialize(AdhocStream stream)
+        {
+            stream.WriteInt64(Value);
+        }
+
         public override void Deserialize(AdhocStream stream)
         {
             Value = stream.ReadInt64();

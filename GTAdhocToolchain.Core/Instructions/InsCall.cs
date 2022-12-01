@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Syroot.BinaryData;
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -26,6 +28,11 @@ namespace GTAdhocToolchain.Core.Instructions
         public InsCall()
         {
 
+        }
+
+        public override void Serialize(AdhocStream stream)
+        {
+            stream.WriteInt32(ArgumentCount);
         }
 
         public override void Deserialize(AdhocStream stream)

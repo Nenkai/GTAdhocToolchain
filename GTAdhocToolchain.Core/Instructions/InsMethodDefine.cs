@@ -15,6 +15,12 @@ namespace GTAdhocToolchain.Core.Instructions
 
         public override string InstructionName => "METHOD_DEFINE";
 
+        public override void Serialize(AdhocStream stream)
+        {
+            stream.WriteSymbol(Name);
+            CodeFrame.Write(stream);
+        }
+
         public override void Deserialize(AdhocStream stream)
         {
             Name = stream.ReadSymbol();

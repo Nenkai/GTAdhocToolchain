@@ -27,6 +27,11 @@ namespace GTAdhocToolchain.Core.Instructions
 
         }
 
+        public override void Serialize(AdhocStream stream)
+        {
+            stream.WriteDouble(Value);
+        }
+
         public override void Deserialize(AdhocStream stream)
         {
             Value = stream.ReadDouble();

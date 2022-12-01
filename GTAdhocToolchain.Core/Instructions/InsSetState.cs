@@ -29,6 +29,11 @@ namespace GTAdhocToolchain.Core.Instructions
 
         }
 
+        public override void Serialize(AdhocStream stream)
+        {
+            stream.WriteByte((byte)State);
+        }
+
         public override void Deserialize(AdhocStream stream)
         {
             State = (AdhocRunState)stream.ReadByte();

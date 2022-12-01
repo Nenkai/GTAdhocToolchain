@@ -4,6 +4,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
+using Syroot.BinaryData;
+
 namespace GTAdhocToolchain.Core.Instructions
 {
     /// <summary>
@@ -27,6 +29,11 @@ namespace GTAdhocToolchain.Core.Instructions
         public InsBoolConst()
         {
 
+        }
+
+        public override void Serialize(AdhocStream stream)
+        {
+            stream.WriteBoolean(Value, BooleanCoding.Byte);
         }
 
         public override void Deserialize(AdhocStream stream)

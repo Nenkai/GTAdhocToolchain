@@ -27,14 +27,19 @@ namespace GTAdhocToolchain.Core.Instructions
 
         }
 
-        public override string ToString()
+        public override void Serialize(AdhocStream stream)
         {
-            return Disassemble(asCompareMode: false);
+            stream.WriteSymbol(Operator);
         }
 
         public override void Deserialize(AdhocStream stream)
         {
             Operator = stream.ReadSymbol();
+        }
+
+        public override string ToString()
+        {
+            return Disassemble(asCompareMode: false);
         }
 
         public override string Disassemble(bool asCompareMode = false)

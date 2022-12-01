@@ -30,6 +30,12 @@ namespace GTAdhocToolchain.Core.Instructions
 
         }
 
+        public override void Serialize(AdhocStream stream)
+        {
+            stream.WriteSymbols(VariableSymbols);
+            stream.WriteInt32(VariableStorageIndex);
+        }
+
         public override void Deserialize(AdhocStream stream)
         {
             VariableSymbols = stream.ReadSymbols();

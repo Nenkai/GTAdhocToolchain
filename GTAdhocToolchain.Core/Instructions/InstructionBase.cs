@@ -15,6 +15,7 @@ namespace GTAdhocToolchain.Core.Instructions
 
         public uint InstructionOffset { get; set; }
 
+        public abstract void Serialize(AdhocStream stream);
         public abstract void Deserialize(AdhocStream stream);
         public abstract string Disassemble(bool asCompareMode = false);
 
