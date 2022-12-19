@@ -317,7 +317,7 @@ namespace GTAdhocToolchain.Compiler
             }
                 
 
-            Logger.Info($"Linking include file {include.Path} for {frame.SourceFilePath}.");
+            Logger.Info($"Linking include file {include.Path} for {frame.SourceFilePath.Name}.");
 
             string file = File.ReadAllText(pathToIncludeFile);
 
