@@ -70,7 +70,7 @@ namespace GTAdhocToolchain.Project
             Logger.Info($"Output File: {OutputName}");
         }
 
-        public void Build()
+        public bool Build()
         {
             // Convert project folder into full path
             FullProjectPath = Path.GetFullPath(Path.Combine(ProjectFilePath, ProjectFolder));
@@ -79,44 +79,63 @@ namespace GTAdhocToolchain.Project
             if (!Directory.Exists(FullProjectPath))
             {
                 Logger.Error($"Project directory does not exist ({FullProjectPath})");
-                return;
+                return false;
             }
 
-            string tmpFileName = $"_tmp_{OutputName}.ad";
-            LinkFiles(tmpFileName);
+            string tmpFilePath = string.Empty;
 
-            string tmpFilePath = Path.Combine(FullProjectPath, tmpFileName);
-            if (!File.Exists(tmpFilePath))
+            try
             {
-                Logger.Error($"Temp project file is missing at {tmpFilePath}.");
-                return;
+                string tmpFileName = $"_tmp_{OutputName}.ad";
+                if (!LinkFiles(tmpFileName))
+                    return false;
+
+                tmpFilePath = Path.Combine(FullProjectPath, tmpFileName);
+                if (!File.Exists(tmpFilePath))
+                {
+                    Logger.Error($"Temp project file is missing at {tmpFilePath}.");
+                    return false;
+                }
+
+                // Begin compilation
+                string source = File.ReadAllText(Path.Combine(FullProjectPath, tmpFileName));
+
+                var parser = new AdhocAbstractSyntaxTree(source);
+                var program = parser.ParseScript();
+
+                var compiler = new AdhocScriptCompiler();
+                compiler.SetBaseIncludeFolder(Path.GetFullPath(Path.Combine(ProjectFilePath, BaseIncludeFolder)));
+                compiler.SetProjectDirectory(FullProjectPath);
+                compiler.SetSourcePath(compiler.SymbolMap, ProjectFolder + "/" + tmpFileName);
+                compiler.SetVersion(Version);
+                compiler.SetupStack();
+                compiler.CompileScript(program);
+
+                AdhocCodeGen codeGen = new AdhocCodeGen(compiler, compiler.SymbolMap);
+                codeGen.Generate();
+                codeGen.SaveTo(Path.Combine(FullProjectPath, OutputName + ".adc"));
+
+                return true;
             }
-
-            // Begin compilation
-            string source = File.ReadAllText(Path.Combine(FullProjectPath, tmpFileName));
-
-            var parser = new AdhocAbstractSyntaxTree(source);
-            var program = parser.ParseScript();
-
-            var compiler = new AdhocScriptCompiler();
-            compiler.SetBaseIncludeFolder(Path.GetFullPath(Path.Combine(ProjectFilePath, BaseIncludeFolder)));
-            compiler.SetProjectDirectory(FullProjectPath);
-            compiler.SetSourcePath(compiler.SymbolMap, ProjectFolder + "/" + tmpFileName);
-            compiler.SetVersion(Version);
-            compiler.SetupStack();
-            compiler.CompileScript(program);
-
-            AdhocCodeGen codeGen = new AdhocCodeGen(compiler, compiler.SymbolMap);
-            codeGen.Generate();
-            codeGen.SaveTo(Path.Combine(FullProjectPath, OutputName + ".adc"));
-
-            Logger.Info("Project build successful.");
-
-            if (File.Exists(tmpFilePath))
+            catch (ParserException parseException)
             {
-                File.Delete(tmpFilePath);
-                return;
+                Logger.Fatal($"Syntax error: {parseException.Description} at {parseException.SourceText}:{parseException.LineNumber}");
             }
+            catch (AdhocCompilationException compileException)
+            {
+                Logger.Fatal($"Compilation error: {compileException.Message}");
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "Internal error in compilation");
+            }
+            finally
+            {
+                if (!string.IsNullOrEmpty(tmpFilePath) && File.Exists(tmpFilePath))
+                    File.Delete(tmpFilePath);
+            }
+
+            return false;
         }
 
         public (bool Result, string ErrorMessage) VerifyProjectFile()
@@ -139,7 +158,7 @@ namespace GTAdhocToolchain.Project
             return (true, string.Empty);
         }
 
-        private void LinkFiles(string tmpFileName)
+        private bool LinkFiles(string tmpFileName)
         {
             // Merge files together
             // This is how the game actually does it
@@ -158,7 +177,10 @@ namespace GTAdhocToolchain.Project
                 string srcPath = SourceProjectFolder + "/" + srcFile.Name;
                 mergedFile.WriteLine($"#source " + "\"" + srcPath + "\"");
                 if (!File.Exists(srcFilePath))
-                    throw new FileNotFoundException($"Source file {srcFile.Name} for linking was not found.");
+                {
+                    Logger.Error($"Source file {srcFile.Name} for linking was not found.");
+                    return false;
+                }
 
                 Logger.Info($"Merging: {srcFile.Name}");
                 using var fileReader = new StreamReader(srcFilePath);
@@ -173,6 +195,8 @@ namespace GTAdhocToolchain.Project
                     mergedFile.WriteLine("}");
                 }
             }
+
+            return true;
         }
     }
 }

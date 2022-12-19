@@ -322,6 +322,7 @@ namespace GTAdhocToolchain.Compiler
             string file = File.ReadAllText(pathToIncludeFile);
 
             var parser = new AdhocAbstractSyntaxTree(file);
+            parser.SetFileName(include.Path);
             Script includeScript = parser.ParseScript();
 
             // Alert interpreter that the current source file has changed for debugging

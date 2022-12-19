@@ -182,26 +182,12 @@ namespace GTAdhocToolchain.CLI
             Logger.Info($"Project file: {inputPath}");
             prj.PrintInfo();
 
-            try
-            {
-                Logger.Info("Started project build.");
-                prj.Build();
-                return;
-            }
-            catch (ParserException parseException)
-            {
-                Logger.Fatal($"Syntax error: {parseException.Description} at {parseException.SourceText}:{parseException.LineNumber}");
-            }
-            catch (AdhocCompilationException compileException)
-            {
-                Logger.Fatal($"Compilation error: {compileException.Message}");
-            }
-            catch (Exception e)
-            {
-                Logger.Error(e, "Internal error in compilation");
-            }
 
-            Logger.Error("Project build failed.");
+            Logger.Info("Started project build.");
+            if (!prj.Build())
+                Logger.Error("Project build failed.");
+            else
+                Logger.Info("Project build successful.");
         }
 
         private static void BuildScript(string inputPath, string output, int version = 12)
