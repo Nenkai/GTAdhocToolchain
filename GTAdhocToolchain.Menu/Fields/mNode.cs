@@ -68,16 +68,7 @@ namespace GTAdhocToolchain.Menu
                     {
                         string customFieldType = Encoding.UTF8.GetString(typeName);
 
-                        field = customFieldType switch
-                        {
-                            "rectangle" => new mRectangle(),
-                            "RGBA" => new mColor(),
-                            "color_name" => new mColorName(),
-                            "vector" => new mVector(),
-                            "vector3" => new mVector3(),
-                            "region" => new mRegion(),
-                            _ => null,
-                        };
+                        field = mTypeBase.FromTypeName(customFieldType);
 
                         if (field is null)
                         {
@@ -276,18 +267,7 @@ namespace GTAdhocToolchain.Menu
                     }
                     else
                     {
-                        field = fieldType switch
-                        {
-                            "RGBA" => new mColor(),
-                            "color_name" => new mColorName(),
-                            "string" => new mString(),
-                            "region" => new mRegion(),
-                            "vector" => new mVector(),
-                            "vector3" => new mVector3(),
-                            "rectangle" => new mRectangle(),
-                            _ => new mNode(),
-                        };
-
+                        field = mTypeBase.FromTypeName(fieldType);
                     }
 
                     if (field is mNode)
@@ -302,6 +282,7 @@ namespace GTAdhocToolchain.Menu
                 Child.Add(field);
             }
         }
+
 
         public override void Write(MBinaryWriter writer)
         {

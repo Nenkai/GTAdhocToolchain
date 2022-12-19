@@ -73,6 +73,7 @@ namespace GTAdhocToolchain.CLI
                 .WithParsed<PackVerbs>(Pack)
                 .WithParsed<UnpackVerbs>(Unpack)
                 .WithParsed<MProjectToBinVerbs>(MProjectToBin)
+                .WithParsed<MProjectToTextVerbs>(MProjectToText)
                 .WithNotParsed(HandleNotParsedArgs);
         }
 

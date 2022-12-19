@@ -43,13 +43,13 @@ namespace GTAdhocToolchain.CodeGen
 
             MainBlock.Write(stream);
 
-            Logger.Info($"Code generated (Size: {stream.Length} bytes, {MainBlock.Instructions.Count} main instructions)");
+            Logger.Debug($"Code generated (Size: {stream.Length} bytes, {MainBlock.Instructions.Count} main instructions)");
         }
 
         public void SaveTo(string path)
         {
-            Logger.Info($"Saving compiled script to {path}");
             File.WriteAllBytes(path, (stream.BaseStream as MemoryStream).ToArray());
+            Logger.Info($"Compiled script -> '{path}'");
         }
 
         private void SerializeSymbolTable()

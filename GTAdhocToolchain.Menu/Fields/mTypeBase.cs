@@ -21,5 +21,20 @@ namespace GTAdhocToolchain.Menu.Fields
 
         public abstract void WriteText(MTextWriter writer);
 
+        public static mTypeBase FromTypeName(string fieldType)
+        {
+            return fieldType switch
+            {
+                "RGBA" => new mColor(),
+                "color_name" => new mColorName(),
+                "string" => new mString(),
+                "region" => new mRegion(),
+                "vector" => new mVector(),
+                "vector3" => new mVector3(),
+                "rectangle" => new mRectangle(),
+                "ExternalRef" => new mExternalRef(),
+                _ => new mNode(),
+            };
+        }
     }
 }

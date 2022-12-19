@@ -24,7 +24,7 @@ namespace GTAdhocToolchain.Menu
         {
             string currentPath = System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName;
             string currentDir = Path.GetDirectoryName(currentPath);
-            var txt = File.ReadAllLines(Path.Combine(currentDir, "GTAdhocToolchain.Menu/UIWidgetDefinitions.txt"));
+            var txt = File.ReadAllLines(Path.Combine(currentDir, "UIWidgetDefinitions.txt"));
             foreach (var line in txt)
             {
                 if (string.IsNullOrEmpty(line) || line.StartsWith("//"))
@@ -41,7 +41,7 @@ namespace GTAdhocToolchain.Menu
                 }
             }
 
-            txt = File.ReadAllLines(Path.Combine(currentDir, "GTAdhocToolchain.Menu/UIWidgetDefinitionsTypeOverride.txt"));
+            txt = File.ReadAllLines(Path.Combine(currentDir, "UIWidgetDefinitionsTypeOverride.txt"));
             foreach (var line in txt)
             {
                 if (string.IsNullOrEmpty(line) || line.StartsWith("//"))

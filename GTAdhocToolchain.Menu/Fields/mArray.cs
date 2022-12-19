@@ -50,17 +50,7 @@ namespace GTAdhocToolchain.Menu.Fields
                     else
                     {
                         string customFieldType = Encoding.UTF8.GetString(typeName);
-
-                        element = customFieldType switch
-                        {
-                            "rectangle" => new mRectangle(),
-                            "RGBA" => new mColor(),
-                            "color_name" => new mColorName(),
-                            "vector" => new mVector(),
-                            "vector3" => new mVector3(),
-                            "region" => new mRegion(),
-                            _ => null,
-                        };
+                        element = mTypeBase.FromTypeName(customFieldType);
 
                         if (element is null)
                         {
@@ -189,17 +179,7 @@ namespace GTAdhocToolchain.Menu.Fields
                 }
                 else
                 {
-                    element = token switch
-                    {
-                        "RGBA" => new mColor(),
-                        "color_name" => new mColorName(),
-                        "string" => new mString(),
-                        "region" => new mRegion(),
-                        "vector" => new mVector(),
-                        "vector3" => new mVector3(),
-                        "rectangle" => new mRectangle(),
-                        _ => new mNode(),
-                    };
+                    element = mTypeBase.FromTypeName(token);
 
                     if (element is mNode)
                     {

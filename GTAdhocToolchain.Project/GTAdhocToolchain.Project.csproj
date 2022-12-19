@@ -15,6 +15,8 @@
     <ProjectReference Include="..\GTAdhocToolchain.Core\GTAdhocToolchain.Core.csproj" />
     <ProjectReference Include="..\GTAdhocToolchain.Compiler\GTAdhocToolchain.Compiler.csproj" />
     <ProjectReference Include="..\GTAdhocToolchain.CodeGen\GTAdhocToolchain.CodeGen.csproj" />
+    <ProjectReference Include="..\GTAdhocToolchain.Menu\GTAdhocToolchain.Menu.csproj" />
+    <ProjectReference Include="..\GTAdhocToolchain.Packaging\GTAdhocToolchain.Packaging.csproj" />
   </ItemGroup>
 
 </Project>

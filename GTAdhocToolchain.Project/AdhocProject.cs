@@ -12,6 +12,8 @@ using Esprima.Ast;
 
 using GTAdhocToolchain.Compiler;
 using GTAdhocToolchain.CodeGen;
+using GTAdhocToolchain.Packaging;
+using GTAdhocToolchain.Menu;
 
 namespace GTAdhocToolchain.Project
 {
@@ -42,6 +44,22 @@ namespace GTAdhocToolchain.Project
         public string ProjectFilePath { get; set; }
 
         public string BaseIncludeFolder { get; set; }
+
+        /// <summary>
+        /// Whether to build an .mpackage
+        /// </summary>
+        public bool BuildPackage { get; set; }
+
+        /// <summary>
+        /// Whether to serialize project components (.mwidget/.mproject) to binary
+        /// </summary>
+        public bool SerializeComponents { get; set; }
+
+
+        /// <summary>
+        /// Version to serialize the components to
+        /// </summary>
+        public int SerializeComponentsVersion { get; set; }
 
         public static AdhocProject Read(string path)
         {
@@ -82,10 +100,18 @@ namespace GTAdhocToolchain.Project
                 return false;
             }
 
+
             string tmpFilePath = string.Empty;
+            string pkgPath = Path.Combine(FullProjectPath, "pkg_tmp");
 
             try
             {
+                if (BuildPackage)
+                    BuildPackageFile();
+
+                string mergedScriptName = OutputName + ".adc";
+                Logger.Info($"Building merged script '{mergedScriptName}'");
+
                 string tmpFileName = $"_tmp_{OutputName}.ad";
                 if (!LinkFiles(tmpFileName))
                     return false;
@@ -131,11 +157,82 @@ namespace GTAdhocToolchain.Project
             }
             finally
             {
+                // Cleanup temp files
                 if (!string.IsNullOrEmpty(tmpFilePath) && File.Exists(tmpFilePath))
                     File.Delete(tmpFilePath);
+
+                if (Directory.Exists(pkgPath))
+                    Directory.Delete(pkgPath, recursive: true);
             }
 
             return false;
+        }
+
+        private void BuildPackageFile()
+        {
+            string pkgName = $"{OutputName}.mpackage";
+            Logger.Info($"Started building package file '{pkgName}'");
+
+            string pkgPath = Path.Combine(FullProjectPath, "pkg_tmp");
+
+            if (Directory.Exists(pkgPath))
+                Directory.Delete(pkgPath, recursive: true);
+
+            string pkgContentPath = Path.Combine(pkgPath, SourceProjectFolder);
+            Directory.CreateDirectory(pkgContentPath);
+
+            int logPadLen = FilesToCompile.Length.ToString().Length;
+            for (int i = 0; i < FilesToCompile.Length; i++)
+            {
+                AdhocProjectFile srcFile = FilesToCompile[i];
+                Logger.Info($"[{(i + 1).ToString().PadLeft(logPadLen)}/{FilesToCompile.Length}] Compiling: {srcFile.Name}");
+
+                string scriptPath = Path.Combine(FullProjectPath, srcFile.Name);
+                string source = File.ReadAllText(scriptPath);
+
+                var parser = new AdhocAbstractSyntaxTree(source);
+                var program = parser.ParseScript();
+
+                var compiler = new AdhocScriptCompiler();
+                compiler.SetBaseIncludeFolder(Path.GetFullPath(Path.Combine(ProjectFilePath, BaseIncludeFolder)));
+                compiler.SetProjectDirectory(FullProjectPath);
+                compiler.SetSourcePath(compiler.SymbolMap, ProjectFolder + "/" + srcFile.Name);
+                compiler.SetVersion(Version);
+                compiler.SetupStack();
+                compiler.CompileScript(program);
+
+                AdhocCodeGen codeGen = new AdhocCodeGen(compiler, compiler.SymbolMap);
+                codeGen.Generate();
+                codeGen.SaveTo(Path.Combine(pkgContentPath, Path.ChangeExtension(srcFile.Name, ".adc")));
+
+                string componentName = Path.ChangeExtension(scriptPath, srcFile.IsMain ? ".mproject" : ".mwidget");
+                if (File.Exists(componentName))
+                {
+                    Logger.Info($"Adding linked component '{Path.GetFileName(componentName)}'");
+
+                    string outTmpComponentFile = Path.Combine(pkgContentPath, Path.GetFileName(componentName));
+                    File.Copy(componentName, outTmpComponentFile);
+
+                    if (SerializeComponents)
+                    {
+                        Logger.Info($"Serializing '{Path.GetFileName(componentName)}' to binary");
+                        MTextIO io = new MTextIO(componentName);
+                        var root = io.Read();
+
+                        MBinaryWriter writer = new MBinaryWriter(outTmpComponentFile);
+                        writer.Version = SerializeComponentsVersion;
+                        writer.WriteNode(root);
+                    }
+                }
+                else
+                {
+                    Logger.Warn($"File '{srcFile.Name}' does not have a linked UI definition file '{Path.GetFileName(componentName)}' (this warning can be ignored if this is not a root)");
+                }
+            }
+
+            Logger.Info($"Packaging...");
+            AdhocPackage.PackFromFolder(pkgPath, Path.Combine(FullProjectPath, pkgName));
+            Logger.Info($"Packaging successful -> {pkgName}");
         }
 
         public (bool Result, string ErrorMessage) VerifyProjectFile()
@@ -154,6 +251,9 @@ namespace GTAdhocToolchain.Project
             
             if (FilesToCompile.Length == 0)
                 return (false, "No files to compile provided.");
+
+            if (SerializeComponents && SerializeComponentsVersion > 1)
+                return (false, "Serialize component version must be 0 or 1.");
 
             return (true, string.Empty);
         }
