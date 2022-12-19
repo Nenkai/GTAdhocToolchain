@@ -4,17 +4,18 @@ A toolchain for the Gran Turismo scripting language, Adhoc, from C#.
 Adhoc is a scripting language that is used for roughly 99% of the entire games's logic, the native code serving mostly solely as the engine.
 
 The toolchain contains the following:
-* **Adhoc Script Compiler** (`.ad` -> `.adc` for Adhoc Version 12, GT PSP to GT Sport)
+* **Adhoc Script Compiler** (`.ad` -> `.adc` for Adhoc Version 12, GT PSP to GT Sport) - Ongoing expetimental support for Version 7 (GT4 Online)
 * Adhoc Project Builder
 * VS Code Extension (syntax highlighting mostly)
 * Script Disassembler (`.adc` to assembly-like syntax)
 * Menu Layout Reader/Serializer (`mproject/mwidget`)
 * Script and Menu Layout Packager (GT6 `.mpackage`)
 * Asset Packager (`.gpb`)
+* Compare scripts for dissasembly matching
 
 ## Current State
 
-The toolchain is capable of compiling fully working projects from original reverse-engineered compiled scripts.
+The toolchain is capable of compiling fully working projects from original reverse-engineered compiled scripts from GT5 and 6.
 
 ## Adhoc Language Specifications
 
@@ -25,7 +26,6 @@ Adhoc is very similar to javascript but with a few changes and additions. Refer 
 * Improve syntatic analysis during compilation.
 * Local Variable Storage improvements, such as recycling variable slots when prior variables are no longer used within a scope.
 * Further document the language and instructions themselves.
-* Implement async/await
 * Examples
 * Possibly tests
 * API Documentation
