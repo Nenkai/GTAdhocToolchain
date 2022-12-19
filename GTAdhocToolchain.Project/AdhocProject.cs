@@ -93,7 +93,7 @@ namespace GTAdhocToolchain.Project
                 tmpFilePath = Path.Combine(FullProjectPath, tmpFileName);
                 if (!File.Exists(tmpFilePath))
                 {
-                    Logger.Error($"Temp project file is missing at {tmpFilePath}.");
+                    Logger.Error($"Temp project file is missing at '{tmpFilePath}'.");
                     return false;
                 }
 

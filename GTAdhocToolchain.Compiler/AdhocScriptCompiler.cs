@@ -313,11 +313,11 @@ namespace GTAdhocToolchain.Compiler
                 // Try project folder
                 pathToIncludeFile = Path.Combine(ProjectDirectory, include.Path);
                 if (!File.Exists(pathToIncludeFile))
-                    ThrowCompilationError(include, $"Include file does not exist: {pathToIncludeFile}.");
+                    ThrowCompilationError(include, $"Include file does not exist: '{pathToIncludeFile}'");
             }
                 
 
-            Logger.Info($"Linking include file {include.Path} for {frame.SourceFilePath.Name}.");
+            Logger.Info($"Linking include file '{include.Path}' for '{frame.SourceFilePath.Name}'.");
 
             string file = File.ReadAllText(pathToIncludeFile);
 
@@ -910,7 +910,7 @@ namespace GTAdhocToolchain.Compiler
             }
 
             if (frame.CurrentScope.StaticScopeVariables.ContainsKey(subroutine.Name.Name))
-                ThrowCompilationError(parentNode, $"Static subroutine name {subroutine.Name} is already defined in this scope.");
+                ThrowCompilationError(parentNode, $"Static subroutine name '{subroutine.Name.Name}' is already defined in this scope.");
 
             frame.AddAttributeOrStaticMemberVariable(subroutine.Name);
             frame.AddInstruction(subroutine, parentNode.Location.Start.Line);
