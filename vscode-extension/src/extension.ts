@@ -12,7 +12,7 @@ export function activate(context: vscode.ExtensionContext) {
             if (currentlyOpenTabfilePath == undefined)
                 return undefined;
 
-            var execution = new vscode.ShellExecution(`GTAdhocToolchain build -i ${currentlyOpenTabfilePath}`);
+            var execution = new vscode.ShellExecution(`adhoc build -i ${currentlyOpenTabfilePath}`);
             return [
                 new vscode.Task({type: type}, vscode.TaskScope.Workspace,
                     "Build Adhoc Script", "Adhoc", execution, undefined)

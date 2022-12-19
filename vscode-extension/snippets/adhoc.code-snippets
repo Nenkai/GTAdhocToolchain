@@ -210,7 +210,7 @@
 	{
 		"prefix": "sleep",
 		"body": [
-			"Thread::Sleep(${1:time});"
+			"Thread::Sleep(${1:time})"
 		],
 		"description": "Sleep for X seconds"
 	},
@@ -218,21 +218,21 @@
 	{
 		"prefix": "translate",
 		"body": [
-			"manager.translate(${1:page}, ${2:key});"
+			"manager.translate(${1:page}, ${2:key})"
 		],
 		"description": "Localize String"
 	},
 	"Shows OK prompt": {
 		"prefix": "showok",
 		"body": [
-			"DialogUtil::openConfirmDialog(context, DialogUtil::OK, $1);"
+			"DialogUtil::openConfirmDialog(context, DialogUtil::OK, $1)"
 		],
 		"description": "Opens a 'OK' dialog"
 	},
 	"Shows YES/NO prompt": {
 		"prefix": "showyesno",
 		"body": [
-			"var res = DialogUtil::openConfirmDialog(context, DialogUtil::YESNO, $1);"
+			"var res = DialogUtil::openConfirmDialog(context, DialogUtil::YESNO, $1)"
 		],
 		"description": "Opens a 'YES/NO' dialog"
 	},
@@ -248,7 +248,7 @@
 	"Shows an error prompt": {
 		"prefix": "showerror",
 		"body": [
-			"DialogUtil::openConfirmDialog(context, DialogUtil::ERROR, $1);"
+			"DialogUtil::openConfirmDialog(context, DialogUtil::ERROR, $1)"
 		],
 		"description": "Opens a 'ERROR' dialog"
 	},

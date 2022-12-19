@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.2.32602.215
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdhocLanguage", "src\AdhocLanguage.csproj", "{5576E347-B799-456B-9692-058CF7E26457}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{3E5CE64A-7125-403E-A817-319B128DF45F}"
+	ProjectSection(SolutionItems) = preProject
+		appveyor.yml = appveyor.yml
+		README.md = README.md
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{5576E347-B799-456B-9692-058CF7E26457}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5576E347-B799-456B-9692-058CF7E26457}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5576E347-B799-456B-9692-058CF7E26457}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5576E347-B799-456B-9692-058CF7E26457}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {505FD998-2DF2-42F0-9279-B1849A6DACC3}
+	EndGlobalSection
+EndGlobal

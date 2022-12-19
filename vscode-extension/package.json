@@ -4,7 +4,7 @@
 	"description": "%description%",
 	"publisher": "Nenkai",
 	"icon": "images/adhoc_icon.png",
-	"version": "1.0.2",
+	"version": "1.0.3",
 	"repository": "https://github.com/Nenkai/GTAdhocToolchain",
 	"engines": {
 		"vscode": "^1.64.0"
