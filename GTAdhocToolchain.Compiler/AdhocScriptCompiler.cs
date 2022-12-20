@@ -325,6 +325,10 @@ namespace GTAdhocToolchain.Compiler
             parser.SetFileName(include.Path);
             Script includeScript = parser.ParseScript();
 
+            // Set frame file name to our include file's
+            string oldPath = frame.SourceFilePath.Name;
+            frame.SetSourcePath(SymbolMap, include.Path);
+
             // Alert interpreter that the current source file has changed for debugging
             InsSourceFile srcFileIns = new InsSourceFile(SymbolMap.RegisterSymbol(include.Path, false));
             frame.AddInstruction(srcFileIns, include.Location.Start.Line);
@@ -335,6 +339,8 @@ namespace GTAdhocToolchain.Compiler
             // Resume
             InsSourceFile ogSrcFileIns = new InsSourceFile(frame.SourceFilePath);
             frame.AddInstruction(ogSrcFileIns, include.Location.Start.Line);
+
+            frame.SetSourcePath(SymbolMap, oldPath);
         }
 
         public void CompileRequireStatement(AdhocCodeFrame frame, RequireStatement require)
@@ -1049,9 +1055,9 @@ namespace GTAdhocToolchain.Compiler
                         {
                             CompileUnaryExpression(frame, initValue as UpdateExpression, popResult: false); // var a = ++b; - Do not discard b
                         }
-                        else if (initValue.Type == Nodes.UnaryExpression && (initValue as UnaryExpression).Operator == UnaryOperator.ReferenceOf)
+                        else if (IsUnaryReferenceOfExpression(initValue))
                         {
-                            CompileUnaryExpression(frame, initValue as UnaryExpression, popResult: false, isReference: true); // var a = &b;
+                            CompileUnaryExpression(frame, initValue as UnaryExpression, popResult: false, asReference: true); // var a = &b;
                         }
                         else if (initValue.Type == Nodes.AssignmentExpression)
                         {
@@ -1125,9 +1131,9 @@ namespace GTAdhocToolchain.Compiler
                         {
                             CompileUnaryExpression(frame, initValue as UpdateExpression, popResult: false); // var a = ++b; - Do not discard b
                         }
-                        else if (initValue.Type == Nodes.UnaryExpression && (initValue as UnaryExpression).Operator == UnaryOperator.ReferenceOf)
+                        else if (IsUnaryReferenceOfExpression(initValue))
                         {
-                            CompileUnaryExpression(frame, initValue as UnaryExpression, popResult: false, isReference: true); // var a = &b;
+                            CompileUnaryExpression(frame, initValue as UnaryExpression, popResult: false, asReference: true); // var a = &b;
                         }
                         else if (initValue.Type == Nodes.AssignmentExpression)
                         {
@@ -1823,10 +1829,10 @@ namespace GTAdhocToolchain.Compiler
                     // Left-hand side needs to be pushed first
 
                     // Assigning to a reference
-                    if (assignExpression.Left is UnaryExpression unaryExp && unaryExp.Operator == UnaryOperator.ReferenceOf)
+                    if (IsUnaryReferenceOfExpression(assignExpression.Left))
                     {
                         // No need to push, eval
-                        CompileUnaryExpression(frame, unaryExp, isReference: false);
+                        CompileUnaryExpression(frame, assignExpression.Left as UnaryExpression, asReference: false);
                     }
                     else
                     {
@@ -1852,9 +1858,9 @@ namespace GTAdhocToolchain.Compiler
                         }
                     }
 
-                    if (assignExpression.Right.Type == Nodes.UnaryExpression && (assignExpression.Right as UnaryExpression).Operator == UnaryOperator.ReferenceOf)
+                    if (IsUnaryReferenceOfExpression(assignExpression.Right))
                     {
-                        CompileUnaryExpression(frame, assignExpression.Right as UnaryExpression, popResult: false, isReference: true); // a = &b;
+                        CompileUnaryExpression(frame, assignExpression.Right as UnaryExpression, popResult: false, asReference: true); // a = &b;
                     }
                     else
                     {
@@ -1870,10 +1876,10 @@ namespace GTAdhocToolchain.Compiler
             else if (IsAdhocAssignWithOperandOperator(assignExpression.Operator)) // += -= /= etc..
             {
                 // Assigning to a reference
-                if (assignExpression.Left is UnaryExpression unaryExp && unaryExp.Operator == UnaryOperator.ReferenceOf)
+                if (IsUnaryReferenceOfExpression(assignExpression.Left))
                 {
                     // No need to push, eval
-                    CompileUnaryExpression(frame, unaryExp, isReference: false);
+                    CompileUnaryExpression(frame, assignExpression.Left as UnaryExpression, asReference: false);
                 }
                 else
                 {
@@ -1991,7 +1997,10 @@ namespace GTAdhocToolchain.Compiler
             InsJumpIfFalse alternateJump = new InsJumpIfFalse();
             frame.AddInstruction(alternateJump, 0);
 
-            CompileExpression(frame, condExpression.Consequent);
+            if (IsUnaryReferenceOfExpression(condExpression.Consequent))
+                CompileUnaryExpression(frame, condExpression.Consequent as UnaryExpression, popResult: false, asReference: true);
+            else
+                CompileExpression(frame, condExpression.Consequent);
 
             // This jump will skip the alternate statement if the consequent path is taken
             InsJump altSkipJump = new InsJump();
@@ -2004,7 +2013,10 @@ namespace GTAdhocToolchain.Compiler
             alternateJump.JumpIndex = frame.GetLastInstructionIndex();
 
             // Proceed to compile alternate/no match statement
-            CompileExpression(frame, condExpression.Alternate);
+            if (IsUnaryReferenceOfExpression(condExpression.Alternate))
+                CompileUnaryExpression(frame, condExpression.Alternate as UnaryExpression, popResult: false, asReference: true);
+            else
+                CompileExpression(frame, condExpression.Alternate);
 
             // Done completely, update alt skip jump to end of condition instruction frame
             altSkipJump.JumpInstructionIndex = frame.GetLastInstructionIndex();
@@ -2200,8 +2212,8 @@ namespace GTAdhocToolchain.Compiler
                     if (call.Arguments[i].Type == Nodes.SpreadElement) // Has more than 1
                         ThrowCompilationError(call.Arguments[i], "Only a spread element as an argument is allowed in a Variable function call (VA_CALL). There must not be more than one argument.");
 
-                    if (call.Arguments[i].Type == Nodes.UnaryExpression && (call.Arguments[i] as UnaryExpression).Operator == UnaryOperator.ReferenceOf)
-                        CompileUnaryExpression(frame, call.Arguments[i] as UnaryExpression, isReference: true); // We may be pushing it
+                    if (IsUnaryReferenceOfExpression(call.Arguments[i]))
+                        CompileUnaryExpression(frame, call.Arguments[i] as UnaryExpression, asReference: true); // We may be pushing it
                     else
                         CompileExpression(frame, call.Arguments[i]);
                 }
@@ -2379,20 +2391,23 @@ namespace GTAdhocToolchain.Compiler
         /// <summary>
         /// Compiles an unary expression.
         /// </summary>
-        /// <param name="frame"></param>
-        /// <param name="unaryExp"></param>
-        private void CompileUnaryExpression(AdhocCodeFrame frame, UnaryExpression unaryExp, bool popResult = false, bool isReference = false, bool isRefDeclaration = false)
+        /// <param name="frame">Current frame.</param>
+        /// <param name="unaryExp">Target expression.</param>
+        /// <param name="popResult">Whether to pop after the expression to not reuse the result.</param>
+        /// <param name="asReference">Whether to treat the expression as a reference, result may or may not be pushed to the reference variable.</param>
+        /// <exception cref="NotImplementedException"></exception>
+        private void CompileUnaryExpression(AdhocCodeFrame frame, UnaryExpression unaryExp, bool popResult = false, bool asReference = false)
         {
             if (unaryExp is UpdateExpression upd) // ++var / --var etc
             {
-                if (!isReference)
+                if (!asReference)
                 {
-                    // Assigning - we need to push
+                    // Assigning to a variable - we need to push
                     PushUnaryExpressionArgument(frame, unaryExp.Argument);
                 }
                 else
                 {
-                    // Reference objects can just be eval'd
+                    // Reference objects can just be eval'd when doing something like '&myObj--'
                     CompileExpression(frame, upd.Argument);
                 }
 
@@ -2421,10 +2436,10 @@ namespace GTAdhocToolchain.Compiler
             }
             else if (unaryExp.Operator == UnaryOperator.ReferenceOf) // &var - get reference of variable
             {
-                if (isReference)
+                if (asReference)
                     PushUnaryExpressionArgument(frame, unaryExp.Argument);
                 else if (unaryExp.Argument is UpdateExpression updArg)
-                    CompileUnaryExpression(frame, updArg, isReference: true);
+                    CompileUnaryExpression(frame, updArg, asReference: true);
                 else
                     CompileExpression(frame, unaryExp.Argument);
             }
@@ -2580,45 +2595,6 @@ namespace GTAdhocToolchain.Compiler
             }
         }
 
-        /// <summary>
-        /// Inserts an attribute eval instruction to access an attribute of a certain object.
-        /// </summary>
-        /// <param name="frame"></param>
-        /// <param name="identifier"></param>
-        /// <returns></returns>
-        private AdhocSymbol InsertAttributeEval(AdhocCodeFrame frame, Identifier identifier)
-        {
-            AdhocSymbol symb = SymbolMap.RegisterSymbol(identifier.Name);
-            var attrEval = new InsAttributeEvaluation();
-            attrEval.AttributeSymbols.Add(symb); // Only one
-            frame.AddInstruction(attrEval, identifier.Location.Start.Line);
-
-            return symb;
-        }
-
-        /// <summary>
-        /// Inserts a variable evaluation instruction.
-        /// </summary>
-        /// <param name="frame"></param>
-        /// <param name="identifier"></param>
-        /// <returns></returns>
-        private void InsertVariableEval(AdhocCodeFrame frame, Identifier identifier)
-        {
-            if (ProcessStringDefine(frame, identifier))
-                return;
-
-            AdhocSymbol symb = SymbolMap.RegisterSymbol(identifier.Name);
-            int idx = frame.AddScopeVariable(symb, isAssignment: false);
-            var varEval = new InsVariableEvaluation(idx);
-            varEval.VariableSymbols.Add(symb); // Only one
-            frame.AddInstruction(varEval, identifier.Location.Start.Line);
-
-            // Static references or pushes always have double their own symbol
-            // If its a static reference, do not add it as a declared variable within this scope
-            if (frame.IsStaticVariable(symb))
-                varEval.VariableSymbols.Add(symb); // Static, two symbols
-        }
-
         public bool ProcessStringDefine(AdhocCodeFrame frame, Identifier identifier)
         {
             if (identifier.Name == "__LINE__")
@@ -2688,125 +2664,8 @@ namespace GTAdhocToolchain.Compiler
             frame.AddInstruction(attrPush, propIdent.Location.Start.Line);
         }
 
-        /// <summary>
-        /// Inserts a binary assign operator.
-        /// </summary>
-        /// <param name="frame"></param>
-        /// <param name="parentNode"></param>
-        /// <param name="assignOperator"></param>
-        /// <param name="lineNumber"></param>
-        /// <returns></returns>
-        private AdhocSymbol InsertBinaryAssignOperator(AdhocCodeFrame frame, Node parentNode, AssignmentOperator assignOperator, int lineNumber)
-        {
-            string opStr = AssignOperatorToString(assignOperator);
-            if (string.IsNullOrEmpty(opStr))
-                ThrowCompilationError(parentNode, $"Unrecognized operator '{opStr}'");
 
-            bool opToSymbol = frame.Version >= 12;
-            var symb = SymbolMap.RegisterSymbol(opStr, opToSymbol);
-
-            if (frame.Version >= 5)
-            {
-                frame.AddInstruction(new InsBinaryAssignOperator(symb), lineNumber);
-            }
-            else
-            {
-                // FIXME: Not sure about this, and the version
-                frame.AddInstruction(new InsBinaryOperator(symb), lineNumber);
-                frame.AddInstruction(new InsAssign(), lineNumber);
-            }
-            
-
-            return symb;
-        }
-
-        /// <summary>
-        /// Inserts an empty return instruction if the frame wasn't explicitly exited with a return statement.
-        /// </summary>
-        /// <param name="frame"></param>
-        private void InsertFrameExitIfNeeded(AdhocCodeFrame frame, Node bodyNode)
-        {
-            // Was a return explicitly specified?
-            if (!frame.HasTopLevelReturnValue)
-            {
-                if (frame.Version >= 12)
-                {
-                    // All functions return a value internally in newer adhoc, even if they don't in the code.
-                    // So, add one.
-                    InsertVoid(frame);
-                }
-
-                InsertSetState(frame, AdhocRunState.RETURN);
-            }
-        }
-
-        private static string AssignOperatorToString(AssignmentOperator op)
-        {
-            return op switch
-            {
-                AssignmentOperator.PlusAssign => AdhocConstants.OPERATOR_ADD,
-                AssignmentOperator.MinusAssign => AdhocConstants.OPERATOR_SUBTRACT,
-                AssignmentOperator.TimesAssign => AdhocConstants.OPERATOR_MULTIPLY,
-                AssignmentOperator.DivideAssign => AdhocConstants.OPERATOR_DIVIDE,
-                AssignmentOperator.ModuloAssign => AdhocConstants.OPERATOR_MODULO,
-                AssignmentOperator.BitwiseAndAssign => AdhocConstants.OPERATOR_BITWISE_AND,
-                AssignmentOperator.BitwiseOrAssign => AdhocConstants.OPERATOR_BITWISE_OR,
-                AssignmentOperator.BitwiseXOrAssign => AdhocConstants.OPERATOR_BITWISE_XOR,
-                AssignmentOperator.ExponentiationAssign => AdhocConstants.OPERATOR_POWER,
-                AssignmentOperator.RightShiftAssign => AdhocConstants.OPERATOR_RIGHT_SHIFT,
-                AssignmentOperator.LeftShiftAssign => AdhocConstants.OPERATOR_LEFT_SHIFT,
-                _ => null
-            };
-        }
-
-
-        private static bool IsAdhocAssignWithOperandOperator(AssignmentOperator op)
-        {
-            switch (op)
-            {
-                case AssignmentOperator.PlusAssign:
-                case AssignmentOperator.MinusAssign:
-                case AssignmentOperator.TimesAssign:
-                case AssignmentOperator.DivideAssign:
-                case AssignmentOperator.ModuloAssign:
-                case AssignmentOperator.BitwiseAndAssign:
-                case AssignmentOperator.BitwiseOrAssign:
-                case AssignmentOperator.BitwiseXOrAssign:
-                case AssignmentOperator.ExponentiationAssign:
-                case AssignmentOperator.RightShiftAssign:
-                case AssignmentOperator.LeftShiftAssign:
-                    return true;
-            }
-
-            return false;
-        }
-
-        private void PrintCompilationWarning(Node node, string message)
-        {
-            Logger.Warn(GetSourceNodeString(node, message));
-        }
-
-        private void ThrowCompilationError(Node node, string message)
-        {
-            throw GetCompilationError(node, message);
-        }
-
-        /// <summary>
-        /// Gets a new compilation exception.
-        /// </summary>
-        /// <param name="node"></param>
-        /// <param name="message"></param>
-        /// <returns></returns>
-        private AdhocCompilationException GetCompilationError(Node node, string message)
-        {
-            return new AdhocCompilationException(GetSourceNodeString(node, message));
-        }
-
-        private string GetSourceNodeString(Node node, string message)
-        {
-            return $"{message} at {node.Location.Source}:{node.Location.Start.Line}";
-        }
-
+        #region Scope/Loop Handling
         private LoopContext EnterLoop(AdhocCodeFrame frame, Statement loopStatement)
         {
             LoopContext loopCtx = new LoopContext(loopStatement);
@@ -2910,6 +2769,7 @@ namespace GTAdhocToolchain.Compiler
             ModuleStack.Pop();
             frame.CurrentModule = ModuleStack.Peek();
         }
+        #endregion
 
         /// <summary>
         /// Compiles a statement and opens a new scope (unless it is a continue or break statement.).
@@ -2936,82 +2796,45 @@ namespace GTAdhocToolchain.Compiler
             }
         }
 
-        private void BuildStaticPath(StaticMemberExpression exp, ref List<string> pathParts)
-        {
-            if (exp.Object is StaticMemberExpression obj)
-            {
-                BuildStaticPath(obj, ref pathParts);
-            }
-            else if (exp.Object is Identifier identifier)
-            {
-                pathParts.Add(identifier.Name);
-            }
 
-            if (exp.Property is Identifier propIdentifier)
-            {
-                pathParts.Add(propIdentifier.Name);
-                return;
-            }
-        }
-
-        private void InsertAssignPop(AdhocCodeFrame frame)
-        {
-            if (frame.Version >= 11)
-            {
-                frame.AddInstruction(InsAssignPop.Default, 0);
-            }
-            else
-            {
-                if (frame.Version >= 10)
-                    frame.AddInstruction(InsAssign.Default, 0);
-                else // Assume under 10 that its the traditional assign + pop old
-                    frame.AddInstruction(InsAssignOld.Default, 0);
-
-                InsertPop(frame);
-            }
-        }
-
-        private void InsertPop(AdhocCodeFrame frame)
-        {
-            if (frame.Version >= 10)
-                frame.AddInstruction(InsPop.Default, 0);
-            else // Assume under 10 that its the traditional assign + pop old
-                frame.AddInstruction(InsPopOld.Default, 0);
-        }
-
-        private void InsertSetState(AdhocCodeFrame frame, AdhocRunState state)
-        {
-            if (frame.Version >= 10)
-                frame.AddInstruction(new InsSetState(state), 0);
-            else
-                frame.AddInstruction(new InsSetStateOld(state), 0);
-        }
-
-        private void InsertVoid(AdhocCodeFrame frame)
-        {
-            if (frame.Version > 10)
-                frame.AddInstruction(new InsVoidConst(), 0);
-            else
-                frame.AddInstruction(InsNop.Empty, 0);
-        }
-
-
+        #region Instruction insert methods
         /// <summary>
-        /// Inserts a new variable eval from a symbol.
+        /// Inserts an attribute eval instruction to access an attribute of a certain object.
         /// </summary>
         /// <param name="frame"></param>
-        /// <param name="symbol"></param>
+        /// <param name="identifier"></param>
         /// <returns></returns>
-        // Mostly used for temp variables produced by the compiler
-        private void InsertVariableEvalFromSymbol(AdhocCodeFrame frame, AdhocSymbol symbol, Location location = default)
+        private AdhocSymbol InsertAttributeEval(AdhocCodeFrame frame, Identifier identifier)
         {
-            LocalVariable taskVariable = frame.Stack.GetLocalVariableBySymbol(symbol);
-            int taskVariableStoreIdx = frame.Stack.GetLocalVariableIndex(taskVariable);
+            AdhocSymbol symb = SymbolMap.RegisterSymbol(identifier.Name);
+            var attrEval = new InsAttributeEvaluation();
+            attrEval.AttributeSymbols.Add(symb); // Only one
+            frame.AddInstruction(attrEval, identifier.Location.Start.Line);
 
-            var insVarEval = new InsVariableEvaluation();
-            insVarEval.VariableSymbols.Add(symbol);
-            insVarEval.VariableStorageIndex = taskVariableStoreIdx;
-            frame.AddInstruction(insVarEval, location.Start.Line);
+            return symb;
+        }
+
+        /// <summary>
+        /// Inserts a variable evaluation instruction.
+        /// </summary>
+        /// <param name="frame"></param>
+        /// <param name="identifier"></param>
+        /// <returns></returns>
+        private void InsertVariableEval(AdhocCodeFrame frame, Identifier identifier)
+        {
+            if (ProcessStringDefine(frame, identifier))
+                return;
+
+            AdhocSymbol symb = SymbolMap.RegisterSymbol(identifier.Name);
+            int idx = frame.AddScopeVariable(symb, isAssignment: false);
+            var varEval = new InsVariableEvaluation(idx);
+            varEval.VariableSymbols.Add(symb); // Only one
+            frame.AddInstruction(varEval, identifier.Location.Start.Line);
+
+            // Static references or pushes always have double their own symbol
+            // If its a static reference, do not add it as a declared variable within this scope
+            if (frame.IsStaticVariable(symb))
+                varEval.VariableSymbols.Add(symb); // Static, two symbols
         }
 
         /// <summary>
@@ -3042,6 +2865,207 @@ namespace GTAdhocToolchain.Compiler
             }
         }
 
+        /// <summary>
+        /// Inserts a new variable eval from a symbol.
+        /// </summary>
+        /// <param name="frame"></param>
+        /// <param name="symbol"></param>
+        /// <returns></returns>
+        // Mostly used for temp variables produced by the compiler
+        private void InsertVariableEvalFromSymbol(AdhocCodeFrame frame, AdhocSymbol symbol, Location location = default)
+        {
+            LocalVariable taskVariable = frame.Stack.GetLocalVariableBySymbol(symbol);
+            int taskVariableStoreIdx = frame.Stack.GetLocalVariableIndex(taskVariable);
+
+            var insVarEval = new InsVariableEvaluation();
+            insVarEval.VariableSymbols.Add(symbol);
+            insVarEval.VariableStorageIndex = taskVariableStoreIdx;
+            frame.AddInstruction(insVarEval, location.Start.Line);
+        }
+
+        /// <summary>
+        /// Inserts a version-aware assign pop
+        /// </summary>
+        /// <param name="frame"></param>
+        private void InsertAssignPop(AdhocCodeFrame frame)
+        {
+            if (frame.Version >= 11)
+            {
+                frame.AddInstruction(InsAssignPop.Default, 0);
+            }
+            else
+            {
+                if (frame.Version >= 10)
+                    frame.AddInstruction(InsAssign.Default, 0);
+                else // Assume under 10 that its the traditional assign + pop old
+                    frame.AddInstruction(InsAssignOld.Default, 0);
+
+                InsertPop(frame);
+            }
+        }
+
+        /// <summary>
+        /// Inserts a version-aware pop
+        /// </summary>
+        /// <param name="frame"></param>
+        private void InsertPop(AdhocCodeFrame frame)
+        {
+            if (frame.Version >= 10)
+                frame.AddInstruction(InsPop.Default, 0);
+            else // Assume under 10 that its the traditional assign + pop old
+                frame.AddInstruction(InsPopOld.Default, 0);
+        }
+
+        /// <summary>
+        /// Inserts a version-aware set state
+        /// </summary>
+        /// <param name="frame"></param>
+        private void InsertSetState(AdhocCodeFrame frame, AdhocRunState state)
+        {
+            if (frame.Version >= 10)
+                frame.AddInstruction(new InsSetState(state), 0);
+            else
+                frame.AddInstruction(new InsSetStateOld(state), 0);
+        }
+
+        /// <summary>
+        /// Inserts a version-aware void
+        /// </summary>
+        /// <param name="frame"></param>
+        private void InsertVoid(AdhocCodeFrame frame)
+        {
+            if (frame.Version > 10)
+                frame.AddInstruction(new InsVoidConst(), 0);
+            else
+                frame.AddInstruction(InsNop.Empty, 0);
+        }
+
+        /// <summary>
+        /// Inserts a binary assign operator.
+        /// </summary>
+        /// <param name="frame"></param>
+        /// <param name="parentNode"></param>
+        /// <param name="assignOperator"></param>
+        /// <param name="lineNumber"></param>
+        /// <returns></returns>
+        private AdhocSymbol InsertBinaryAssignOperator(AdhocCodeFrame frame, Node parentNode, AssignmentOperator assignOperator, int lineNumber)
+        {
+            string opStr = AssignOperatorToString(assignOperator);
+            if (string.IsNullOrEmpty(opStr))
+                ThrowCompilationError(parentNode, $"Unrecognized operator '{opStr}'");
+
+            bool opToSymbol = frame.Version >= 12;
+            var symb = SymbolMap.RegisterSymbol(opStr, opToSymbol);
+
+            if (frame.Version >= 5)
+            {
+                frame.AddInstruction(new InsBinaryAssignOperator(symb), lineNumber);
+            }
+            else
+            {
+                // FIXME: Not sure about this, and the version
+                frame.AddInstruction(new InsBinaryOperator(symb), lineNumber);
+                frame.AddInstruction(new InsAssign(), lineNumber);
+            }
+
+
+            return symb;
+        }
+
+        /// <summary>
+        /// Inserts an empty return instruction if the frame wasn't explicitly exited with a return statement.
+        /// </summary>
+        /// <param name="frame"></param>
+        private void InsertFrameExitIfNeeded(AdhocCodeFrame frame, Node bodyNode)
+        {
+            // Was a return explicitly specified?
+            if (!frame.HasTopLevelReturnValue)
+            {
+                if (frame.Version >= 12)
+                {
+                    // All functions return a value internally in newer adhoc, even if they don't in the code.
+                    // So, add one.
+                    InsertVoid(frame);
+                }
+
+                InsertSetState(frame, AdhocRunState.RETURN);
+            }
+        }
+        #endregion
+
+        #region Utils
+
+        private static string AssignOperatorToString(AssignmentOperator op)
+        {
+            return op switch
+            {
+                AssignmentOperator.PlusAssign => AdhocConstants.OPERATOR_ADD,
+                AssignmentOperator.MinusAssign => AdhocConstants.OPERATOR_SUBTRACT,
+                AssignmentOperator.TimesAssign => AdhocConstants.OPERATOR_MULTIPLY,
+                AssignmentOperator.DivideAssign => AdhocConstants.OPERATOR_DIVIDE,
+                AssignmentOperator.ModuloAssign => AdhocConstants.OPERATOR_MODULO,
+                AssignmentOperator.BitwiseAndAssign => AdhocConstants.OPERATOR_BITWISE_AND,
+                AssignmentOperator.BitwiseOrAssign => AdhocConstants.OPERATOR_BITWISE_OR,
+                AssignmentOperator.BitwiseXOrAssign => AdhocConstants.OPERATOR_BITWISE_XOR,
+                AssignmentOperator.ExponentiationAssign => AdhocConstants.OPERATOR_POWER,
+                AssignmentOperator.RightShiftAssign => AdhocConstants.OPERATOR_RIGHT_SHIFT,
+                AssignmentOperator.LeftShiftAssign => AdhocConstants.OPERATOR_LEFT_SHIFT,
+                _ => null
+            };
+        }
+
+
+        private static bool IsAdhocAssignWithOperandOperator(AssignmentOperator op)
+        {
+            switch (op)
+            {
+                case AssignmentOperator.PlusAssign:
+                case AssignmentOperator.MinusAssign:
+                case AssignmentOperator.TimesAssign:
+                case AssignmentOperator.DivideAssign:
+                case AssignmentOperator.ModuloAssign:
+                case AssignmentOperator.BitwiseAndAssign:
+                case AssignmentOperator.BitwiseOrAssign:
+                case AssignmentOperator.BitwiseXOrAssign:
+                case AssignmentOperator.ExponentiationAssign:
+                case AssignmentOperator.RightShiftAssign:
+                case AssignmentOperator.LeftShiftAssign:
+                    return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Returns whether the provided expression is an unary reference of expression (i.e &myObj).
+        /// </summary>
+        /// <param name="exp"></param>
+        /// <returns></returns>
+        private static bool IsUnaryReferenceOfExpression(Expression exp)
+        {
+            return exp is UnaryExpression unaryExp && unaryExp.Operator == UnaryOperator.ReferenceOf;
+        }
+
+        private void BuildStaticPath(StaticMemberExpression exp, ref List<string> pathParts)
+        {
+            if (exp.Object is StaticMemberExpression obj)
+            {
+                BuildStaticPath(obj, ref pathParts);
+            }
+            else if (exp.Object is Identifier identifier)
+            {
+                pathParts.Add(identifier.Name);
+            }
+
+            if (exp.Property is Identifier propIdentifier)
+            {
+                pathParts.Add(propIdentifier.Name);
+                return;
+            }
+        }
+        #endregion
+
+        #region Warning/Error Handling Methods
         private void PrintPostCompilationWarnings()
         {
             foreach (var warn in PostCompilationWarnings)
@@ -3053,5 +3077,32 @@ namespace GTAdhocToolchain.Compiler
             if (!PostCompilationWarnings.Contains(warningCode))
                 PostCompilationWarnings.Add(warningCode);
         }
+
+        private void PrintCompilationWarning(Node node, string message)
+        {
+            Logger.Warn(GetSourceNodeString(node, message));
+        }
+
+        private void ThrowCompilationError(Node node, string message)
+        {
+            throw GetCompilationError(node, message);
+        }
+
+        /// <summary>
+        /// Gets a new compilation exception.
+        /// </summary>
+        /// <param name="node"></param>
+        /// <param name="message"></param>
+        /// <returns></returns>
+        private AdhocCompilationException GetCompilationError(Node node, string message)
+        {
+            return new AdhocCompilationException(GetSourceNodeString(node, message));
+        }
+
+        private string GetSourceNodeString(Node node, string message)
+        {
+            return $"{message} at {node.Location.Source}:{node.Location.Start.Line}";
+        }
+        #endregion
     }
 }

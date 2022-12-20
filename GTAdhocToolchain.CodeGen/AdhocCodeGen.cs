@@ -15,8 +15,6 @@ namespace GTAdhocToolchain.CodeGen
     {
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
-        public const string Magic = "ADCH";
-
         public AdhocCodeFrame MainBlock { get; set; }
         public AdhocSymbolMap SymbolMap { get; set; }
 
@@ -34,9 +32,8 @@ namespace GTAdhocToolchain.CodeGen
             var ms = new MemoryStream();
             stream = new AdhocStream(ms, MainBlock.Version);
 
-            stream.WriteString(Magic, StringCoding.Raw);
-            stream.WriteString(MainBlock.Version.ToString("D3"), StringCoding.Raw); // "012"
-            stream.WriteByte(0);
+            // ADhoc Compiled Header?
+            stream.WriteString($"ADCH{MainBlock.Version:D3}", StringCoding.ZeroTerminated); // ADCH012
 
             if (MainBlock.Version >= 9)
                 SerializeSymbolTable();
