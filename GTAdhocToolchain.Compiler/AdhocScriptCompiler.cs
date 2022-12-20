@@ -1438,7 +1438,7 @@ namespace GTAdhocToolchain.Compiler
                 CompileExpression(subroutine.CodeFrame, body as Expression);
 
                 // Add implicit return
-                InsertSetState(frame, AdhocRunState.RETURN);
+                InsertSetState(subroutine.CodeFrame, AdhocRunState.RETURN);
             }
 
             LeaveScope(subroutine.CodeFrame, insertLeaveInstruction: false);
