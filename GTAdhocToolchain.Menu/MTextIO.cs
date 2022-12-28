@@ -47,6 +47,15 @@ namespace GTAdhocToolchain.Menu
             using var file = File.Open(FileName, FileMode.Open);
             Stream = new StreamReader(file);
 
+            byte[] magic = new byte[4];
+            file.Read(magic);
+            if (Encoding.ASCII.GetString(magic) == "MPRJ")
+            {
+                throw new Exception("Attempted to read Binary MPRJ with MTextIO.");
+            }
+
+            Stream.BaseStream.Position = 0;
+
             var rootNode = new mNode();
             rootNode.IsRoot = true;
             rootNode.Read(this);
