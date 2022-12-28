@@ -172,7 +172,6 @@ namespace GTAdhocToolchain.CLI
             try
             {
                 prj = AdhocProject.Read(inputPath);
-                prj.ProjectFilePath = inputPath;
             }
             catch (Exception e)
             {

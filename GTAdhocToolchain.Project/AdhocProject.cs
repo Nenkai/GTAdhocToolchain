@@ -39,7 +39,7 @@ namespace GTAdhocToolchain.Project
         /// </summary>
         public string SourceProjectFolder { get; set; }
 
-        public string FullProjectPath { get; set; }
+        public string ProjectDir { get; set; }
 
         public string ProjectFilePath { get; set; }
 
@@ -78,6 +78,18 @@ namespace GTAdhocToolchain.Project
                 return null;
             }
 
+            // Convert project folder into full path
+            prj.ProjectFilePath = path;
+            prj.ProjectDir = Path.GetFullPath(Path.Combine(prj.ProjectFilePath, prj.ProjectFolder)).Replace('\\', '/');
+            prj.BaseIncludeFolder = Path.GetFullPath(Path.Combine(prj.ProjectFilePath, prj.BaseIncludeFolder)).Replace('\\', '/'); // Convert relative include folder to full path
+            prj.SourceProjectFolder = prj.ProjectDir.Substring(prj.BaseIncludeFolder.Length).Replace('\\', '/'); // Get the relative path to our source from base include
+
+            foreach (var fileToCompile in prj.FilesToCompile)
+            {
+                fileToCompile.FullPath = Path.GetFullPath(Path.Combine(prj.ProjectDir, fileToCompile.Name));
+                fileToCompile.SourcePath = Path.Combine(prj.SourceProjectFolder, fileToCompile.Name).Replace('\\', '/');
+            }
+
             return prj;
         }
 
@@ -90,19 +102,15 @@ namespace GTAdhocToolchain.Project
 
         public bool Build()
         {
-            // Convert project folder into full path
-            FullProjectPath = Path.GetFullPath(Path.Combine(ProjectFilePath, ProjectFolder));
-            SourceProjectFolder = ProjectFolder.TrimStart('.', '/'); // Trim ../
-
-            if (!Directory.Exists(FullProjectPath))
+            if (!Directory.Exists(ProjectDir))
             {
-                Logger.Error($"Project directory does not exist ({FullProjectPath})");
+                Logger.Error($"Project directory does not exist ({ProjectDir})");
                 return false;
             }
 
 
             string tmpFilePath = string.Empty;
-            string pkgPath = Path.Combine(FullProjectPath, "pkg_tmp");
+            string pkgPath = Path.Combine(ProjectDir, "pkg_tmp");
 
             try
             {
@@ -116,7 +124,7 @@ namespace GTAdhocToolchain.Project
                 if (!LinkFiles(tmpFileName))
                     return false;
 
-                tmpFilePath = Path.Combine(FullProjectPath, tmpFileName);
+                tmpFilePath = Path.Combine(ProjectDir, tmpFileName);
                 if (!File.Exists(tmpFilePath))
                 {
                     Logger.Error($"Temp project file is missing at '{tmpFilePath}'.");
@@ -124,14 +132,14 @@ namespace GTAdhocToolchain.Project
                 }
 
                 // Begin compilation
-                string source = File.ReadAllText(Path.Combine(FullProjectPath, tmpFileName));
+                string source = File.ReadAllText(Path.Combine(ProjectDir, tmpFileName));
 
                 var parser = new AdhocAbstractSyntaxTree(source);
                 var program = parser.ParseScript();
 
                 var compiler = new AdhocScriptCompiler();
-                compiler.SetBaseIncludeFolder(Path.GetFullPath(Path.Combine(ProjectFilePath, BaseIncludeFolder)));
-                compiler.SetProjectDirectory(FullProjectPath);
+                compiler.SetBaseIncludeFolder(BaseIncludeFolder);
+                compiler.SetProjectDirectory(ProjectDir);
                 compiler.SetSourcePath(compiler.SymbolMap, ProjectFolder + "/" + tmpFileName);
                 compiler.SetVersion(Version);
                 compiler.SetupStack();
@@ -139,7 +147,7 @@ namespace GTAdhocToolchain.Project
 
                 AdhocCodeGen codeGen = new AdhocCodeGen(compiler, compiler.SymbolMap);
                 codeGen.Generate();
-                codeGen.SaveTo(Path.Combine(FullProjectPath, OutputName + ".adc"));
+                codeGen.SaveTo(Path.Combine(ProjectDir, OutputName + ".adc"));
 
                 return true;
             }
@@ -173,7 +181,7 @@ namespace GTAdhocToolchain.Project
             string pkgName = $"{OutputName}.mpackage";
             Logger.Info($"Started building package file '{pkgName}'");
 
-            string pkgPath = Path.Combine(FullProjectPath, "pkg_tmp");
+            string pkgPath = Path.Combine(ProjectDir, "pkg_tmp");
 
             if (Directory.Exists(pkgPath))
                 Directory.Delete(pkgPath, recursive: true);
@@ -187,16 +195,15 @@ namespace GTAdhocToolchain.Project
                 AdhocProjectFile srcFile = FilesToCompile[i];
                 Logger.Info($"[{(i + 1).ToString().PadLeft(logPadLen)}/{FilesToCompile.Length}] Compiling: {srcFile.Name}");
 
-                string scriptPath = Path.Combine(FullProjectPath, srcFile.Name);
-                string source = File.ReadAllText(scriptPath);
+                string source = File.ReadAllText(srcFile.FullPath);
 
                 var parser = new AdhocAbstractSyntaxTree(source);
                 var program = parser.ParseScript();
 
                 var compiler = new AdhocScriptCompiler();
-                compiler.SetBaseIncludeFolder(Path.GetFullPath(Path.Combine(ProjectFilePath, BaseIncludeFolder)));
-                compiler.SetProjectDirectory(FullProjectPath);
-                compiler.SetSourcePath(compiler.SymbolMap, ProjectFolder + "/" + srcFile.Name);
+                compiler.SetBaseIncludeFolder(BaseIncludeFolder);
+                compiler.SetProjectDirectory(ProjectDir);
+                compiler.SetSourcePath(compiler.SymbolMap, srcFile.SourcePath);
                 compiler.SetVersion(Version);
                 compiler.SetupStack();
                 compiler.CompileScript(program);
@@ -205,7 +212,7 @@ namespace GTAdhocToolchain.Project
                 codeGen.Generate();
                 codeGen.SaveTo(Path.Combine(pkgContentPath, Path.ChangeExtension(srcFile.Name, ".adc")));
 
-                string componentName = Path.ChangeExtension(scriptPath, srcFile.IsMain ? ".mproject" : ".mwidget");
+                string componentName = Path.ChangeExtension(srcFile.FullPath, srcFile.IsMain ? ".mproject" : ".mwidget");
                 if (File.Exists(componentName))
                 {
                     Logger.Info($"Adding linked component '{Path.GetFileName(componentName)}'");
@@ -231,7 +238,7 @@ namespace GTAdhocToolchain.Project
             }
 
             Logger.Info($"Packaging...");
-            AdhocPackage.PackFromFolder(pkgPath, Path.Combine(FullProjectPath, pkgName));
+            AdhocPackage.PackFromFolder(pkgPath, Path.Combine(ProjectDir, pkgName));
             Logger.Info($"Packaging successful -> {pkgName}");
         }
 
@@ -263,10 +270,10 @@ namespace GTAdhocToolchain.Project
             // Merge files together
             // This is how the game actually does it
             Logger.Info($"Merging ({FilesToCompile.Length}) files: [{string.Join(", ", FilesToCompile.Select(e => e.Name))}]");
-            using StreamWriter mergedFile = new StreamWriter(Path.Combine(FullProjectPath, tmpFileName));
+            using StreamWriter mergedFile = new StreamWriter(Path.Combine(ProjectDir, tmpFileName));
             foreach (AdhocProjectFile srcFile in FilesToCompile)
             {
-                string srcFilePath = Path.Combine(FullProjectPath, srcFile.Name);
+                string srcFilePath = Path.Combine(ProjectDir, srcFile.Name);
 
                 if (!srcFile.IsMain)
                 {
@@ -274,8 +281,7 @@ namespace GTAdhocToolchain.Project
                     mergedFile.WriteLine("{");
                 }
 
-                string srcPath = SourceProjectFolder + "/" + srcFile.Name;
-                mergedFile.WriteLine($"#source " + "\"" + srcPath + "\"");
+                mergedFile.WriteLine($"#source " + "\"" + srcFile.SourcePath + "\"");
                 if (!File.Exists(srcFilePath))
                 {
                     Logger.Error($"Source file {srcFile.Name} for linking was not found.");

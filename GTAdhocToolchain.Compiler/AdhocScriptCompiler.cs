@@ -311,9 +311,14 @@ namespace GTAdhocToolchain.Compiler
             if (!File.Exists(pathToIncludeFile))
             {
                 // Try project folder
-                pathToIncludeFile = Path.Combine(ProjectDirectory, include.Path);
-                if (!File.Exists(pathToIncludeFile))
-                    ThrowCompilationError(include, $"Include file does not exist: '{pathToIncludeFile}'");
+                if (!string.IsNullOrEmpty(ProjectDirectory))
+                {
+                    pathToIncludeFile = Path.Combine(ProjectDirectory, include.Path);
+                    if (!File.Exists(pathToIncludeFile))
+                        ThrowCompilationError(include, $"Include file does not exist: '{pathToIncludeFile}'");
+                }
+                else
+                    ThrowCompilationError(include, $"Include file does not exist: '{include.Path}'");
             }
                 
 
