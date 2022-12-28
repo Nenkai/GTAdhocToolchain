@@ -15,7 +15,7 @@ The toolchain contains the following:
 
 ## Current State
 
-The toolchain is capable of compiling fully working projects from original reverse-engineered compiled scripts from GT5 and 6.
+The toolchain is capable of compiling fully working original and custom projects (see [OpenAdhoc](https://github.com/Nenkai/OpenAdhoc)).
 
 ## Adhoc Language Specifications
 
