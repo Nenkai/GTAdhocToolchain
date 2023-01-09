@@ -152,7 +152,7 @@ namespace GTAdhocToolchain.CLI
                 if (string.IsNullOrEmpty(unpackVerbs.OutputPath))
                     unpackVerbs.OutputPath = Path.GetDirectoryName(unpackVerbs.InputPath);
 
-                gpb.Unpack(Path.GetFileNameWithoutExtension(unpackVerbs.InputPath), unpackVerbs.OutputPath);
+                gpb.Unpack(Path.GetFileNameWithoutExtension(unpackVerbs.InputPath), unpackVerbs.OutputPath, unpackVerbs.ConvertGPBFiles);
             }
             else if (unpackVerbs.InputPath.EndsWith("mpackage"))
             {
@@ -331,6 +331,9 @@ namespace GTAdhocToolchain.CLI
 
         [Option('o', "output", HelpText = "Output folder for unpacked files.")]
         public string OutputPath { get; set; }
+
+        [Option("convert-gpb-files", HelpText = "Whether to convert GPB texture files to their original formats (png, dds).")]
+        public bool ConvertGPBFiles { get; set; } = true;
     }
 
     [Verb("mproject-to-bin", HelpText = "Read mwidget/mproject and outputs it to a binary version of it.")]
