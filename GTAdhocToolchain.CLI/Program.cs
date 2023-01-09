@@ -15,6 +15,7 @@ using GTAdhocToolchain.Menu;
 using GTAdhocToolchain.Menu.Resources;
 using GTAdhocToolchain.Packaging;
 using GTAdhocToolchain.Core.Instructions;
+using GTAdhocToolchain.Menu.Fields;
 
 namespace GTAdhocToolchain.CLI
 {
@@ -147,6 +148,9 @@ namespace GTAdhocToolchain.CLI
                     Console.WriteLine("Could not parse GPB Header.");
                     return;
                 }
+
+                if (string.IsNullOrEmpty(unpackVerbs.OutputPath))
+                    unpackVerbs.OutputPath = Path.GetDirectoryName(unpackVerbs.InputPath);
 
                 gpb.Unpack(Path.GetFileNameWithoutExtension(unpackVerbs.InputPath), unpackVerbs.OutputPath);
             }

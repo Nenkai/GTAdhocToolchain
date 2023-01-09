@@ -7,6 +7,8 @@ using System.Threading.Tasks;
 using Syroot.BinaryData;
 
 using GTAdhocToolchain.Core;
+using PDTools.Files.Textures;
+using System.Buffers.Binary;
 
 namespace GTAdhocToolchain.Menu.Resources
 {
@@ -40,23 +42,48 @@ namespace GTAdhocToolchain.Menu.Resources
             return gpb;
         }
 
-        public void Unpack(string fileName, string outputFolder)
+        public void Unpack(string gpbName, string outputFolder, bool convertImages = true)
         {
-            if (outputFolder is null)
-                outputFolder = fileName;
-
             foreach (var file in Files)
             {
                 Console.WriteLine($"[:] GPB: Unpack -> {file.FileName}");
 
                 string path;
                 if (this is GpbData2)
-                    path = file.FileName;
+                    path = Path.Combine(gpbName, file.FileName);
                 else
-                    path = file.FileName.Substring(1);
+                    path = Path.Combine(gpbName, file.FileName.Substring(1));
 
-                Directory.CreateDirectory(Path.Combine(outputFolder, Path.GetDirectoryName(path)));
-                File.WriteAllBytes(Path.Combine(outputFolder, path), file.FileData);
+                string outputFile = Path.Combine(outputFolder, path);
+                Directory.CreateDirectory(Path.GetDirectoryName(outputFile));
+
+                if (convertImages && this is GpbData4 && BinaryPrimitives.ReadUInt32LittleEndian(file.FileData) == 0x30504449) // Is GTS/7 gpb, is PDI0 (GT7), and allow converting to png
+                {
+                    using var ms = new MemoryStream(file.FileData);
+                    PDITexture pdiTexture = new PDITexture();
+                    pdiTexture.FromStream(ms);
+
+                    if (Path.GetExtension(outputFile) == ".psd")
+                        outputFile += ".png"; // We obviously don't support converting to... psd
+
+                    Console.WriteLine($"[:] GPB: 0PDI to {Path.GetExtension(outputFile)} -> {file.FileName}");
+
+                    pdiTexture.TextureSet.ConvertToStandardFormat(outputFile);
+                }
+                else if (convertImages && this is GpbData3 && BinaryPrimitives.ReadUInt32LittleEndian(file.FileData) == 0x33535854)
+                {
+                    Console.WriteLine($"[:] GPB: Converting TXS to {Path.GetExtension(file.FileName)}");
+
+                    using var ms = new MemoryStream(file.FileData);
+                    TextureSet3 texSet = new TextureSet3();
+                    texSet.FromStream(ms, TextureSet3.TextureConsoleType.PS3);
+                    texSet.ConvertToStandardFormat(Path.ChangeExtension(outputFile, ".png"));
+                }
+                else
+                {
+                    Directory.CreateDirectory(Path.Combine(outputFolder, Path.GetDirectoryName(path)));
+                    File.WriteAllBytes(outputFile, file.FileData);
+                }
             }
         }
 

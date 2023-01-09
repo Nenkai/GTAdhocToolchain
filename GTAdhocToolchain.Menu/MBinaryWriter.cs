@@ -8,6 +8,7 @@ using System.IO;
 using Syroot.BinaryData;
 
 using GTAdhocToolchain.Core;
+using GTAdhocToolchain.Menu.Fields;
 
 namespace GTAdhocToolchain.Menu
 {

@@ -6,6 +6,8 @@ using System.Threading.Tasks;
 using System.IO;
 using System.Globalization;
 
+using GTAdhocToolchain.Menu.Fields;
+
 namespace GTAdhocToolchain.Menu
 {
     public class MTextIO

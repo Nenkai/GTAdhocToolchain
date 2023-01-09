@@ -4,11 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Diagnostics;
-
-using GTAdhocToolchain.Menu.Fields;
 using GTAdhocToolchain.Core;
 
-namespace GTAdhocToolchain.Menu
+namespace GTAdhocToolchain.Menu.Fields
 {
     [DebuggerDisplay("mNode: {Name} ({TypeName})")]
     public class mNode : mTypeBase
@@ -68,7 +66,7 @@ namespace GTAdhocToolchain.Menu
                     {
                         string customFieldType = Encoding.UTF8.GetString(typeName);
 
-                        field = mTypeBase.FromTypeName(customFieldType);
+                        field = FromTypeName(customFieldType);
 
                         if (field is null)
                         {
@@ -154,7 +152,7 @@ namespace GTAdhocToolchain.Menu
                                 field.Read(io);
                             }
                         }
-                        
+
                         field.Name = str.String;
                     }
 
@@ -236,7 +234,7 @@ namespace GTAdhocToolchain.Menu
                         var potentialOverride = WidgetDefinitions.TypeOverrides.FirstOrDefault(e => e.WidgetName == TypeName && e.FieldName == fieldName);
                         if (potentialOverride != null)
                             digitType = potentialOverride.ValueType;
-                        else 
+                        else
                             WidgetDefinitions.Types.TryGetValue(fieldName, out digitType); // No collision, just try to find it by name
 
                         /* No real easier way, the component types i.e 'DialogParts::DialogFrame::Pane::Head::Close::Cross' do not expose their actual type */
@@ -267,7 +265,7 @@ namespace GTAdhocToolchain.Menu
                     }
                     else
                     {
-                        field = mTypeBase.FromTypeName(fieldType);
+                        field = FromTypeName(fieldType);
                     }
 
                     if (field is mNode)

@@ -25,6 +25,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GTAdhocToolchain.Packaging"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdhocLanguage", "vs-extension\src\AdhocLanguage.csproj", "{5576E347-B799-456B-9692-058CF7E26457}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PDTools.Files", "..\TXS3Converter\PDTools\PDTools.Files\PDTools.Files.csproj", "{D9379C37-8CAA-4153-8905-CB6E58E925D9}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -167,6 +169,18 @@ Global
 		{5576E347-B799-456B-9692-058CF7E26457}.Release|arm64.Build.0 = Release|arm64
 		{5576E347-B799-456B-9692-058CF7E26457}.Release|x86.ActiveCfg = Release|x86
 		{5576E347-B799-456B-9692-058CF7E26457}.Release|x86.Build.0 = Release|x86
+		{D9379C37-8CAA-4153-8905-CB6E58E925D9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D9379C37-8CAA-4153-8905-CB6E58E925D9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D9379C37-8CAA-4153-8905-CB6E58E925D9}.Debug|arm64.ActiveCfg = Debug|Any CPU
+		{D9379C37-8CAA-4153-8905-CB6E58E925D9}.Debug|arm64.Build.0 = Debug|Any CPU
+		{D9379C37-8CAA-4153-8905-CB6E58E925D9}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{D9379C37-8CAA-4153-8905-CB6E58E925D9}.Debug|x86.Build.0 = Debug|Any CPU
+		{D9379C37-8CAA-4153-8905-CB6E58E925D9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D9379C37-8CAA-4153-8905-CB6E58E925D9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D9379C37-8CAA-4153-8905-CB6E58E925D9}.Release|arm64.ActiveCfg = Release|Any CPU
+		{D9379C37-8CAA-4153-8905-CB6E58E925D9}.Release|arm64.Build.0 = Release|Any CPU
+		{D9379C37-8CAA-4153-8905-CB6E58E925D9}.Release|x86.ActiveCfg = Release|Any CPU
+		{D9379C37-8CAA-4153-8905-CB6E58E925D9}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
