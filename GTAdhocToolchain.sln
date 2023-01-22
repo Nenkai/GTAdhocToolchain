@@ -25,7 +25,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GTAdhocToolchain.Packaging"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdhocLanguage", "vs-extension\src\AdhocLanguage.csproj", "{5576E347-B799-456B-9692-058CF7E26457}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PDTools.Files", "..\TXS3Converter\PDTools\PDTools.Files\PDTools.Files.csproj", "{D9379C37-8CAA-4153-8905-CB6E58E925D9}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PDTools.Files", "PDTools\PDTools.Files\PDTools.Files.csproj", "{D9379C37-8CAA-4153-8905-CB6E58E925D9}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
