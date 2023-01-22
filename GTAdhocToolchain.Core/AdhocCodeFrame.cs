@@ -314,7 +314,7 @@ namespace GTAdhocToolchain.Core
                     }
 
                     // Check if the symbol is a static reference, a direct reference to a module attribute, and if it doesn't match, check if it doesn't overlap with any scope locals
-                    if (Stack.HasStaticVariable(symbol) || IsStaticModuleFieldOrAttribute(symbol) || !Stack.HasLocalVariable(symbol))
+                    if (!Stack.HasLocalVariable(symbol) && (Stack.HasStaticVariable(symbol) || IsStaticModuleFieldOrAttribute(symbol)))
                     {
                         bool added = Stack.TryAddStaticVariable(symbol, out newVariable);
                         if (added)
