@@ -29,12 +29,12 @@ namespace GTAdhocToolchain.Project
         /// <summary>
         /// Scripts linked to the project to compile.
         /// </summary>
-        public AdhocProjectFile[] FilesToCompile { get; set; }
+        public AdhocProjectFile[] FilesToCompile { get; set; } = new AdhocProjectFile[0];
 
         /// <summary>
         /// Extra resources/widgets to link with the project.
         /// </summary>
-        public AdhocProjectExtraResource[] ExtraWidgetResources { get; set; }
+        public AdhocProjectExtraResource[] ExtraWidgetResources { get; set; } = new AdhocProjectExtraResource[0];
 
         public int Version { get; set; } = 12; // Default to version 12, used by GTPSP, GT5, GT6, GT Sport
 
