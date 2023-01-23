@@ -29,7 +29,7 @@ namespace GTAdhocToolchain.Menu.Fields
                 throw new UISyntaxError($"Unexpected ushort token for mUShort. Got {numbToken}.");
 
             string end = io.GetToken();
-            if (io.GetToken() != MTextIO.SCOPE_END.ToString())
+            if (end != MTextIO.SCOPE_END.ToString())
                 throw new UISyntaxError($"Expected mUShort scope end ({MTextIO.SCOPE_END}), got {end}");
         }
 

@@ -13,7 +13,7 @@ namespace GTAdhocToolchain.Menu.Fields
     public class mArray : mTypeBase
     {
         public int Length { get; set; }
-        public List<mTypeBase> Elements { get; set; }
+        public List<mTypeBase> Elements { get; set; } = new();
 
         public override void Read(MBinaryIO io)
         {
@@ -161,7 +161,7 @@ namespace GTAdhocToolchain.Menu.Fields
                     }
                     else
                     {
-                        Console.WriteLine($"Missing digit type for '{Name}', assuming Int");
+                        Console.WriteLine($"Missing digit type for '{Name}' in , assuming Int");
                         element = new mInt();
                     }
                 }
@@ -217,7 +217,7 @@ namespace GTAdhocToolchain.Menu.Fields
         public override void WriteText(MTextWriter writer)
         {
             writer.WriteString(Name);
-            writer.WriteString($"[{Length}]");
+            writer.WriteString($"[{Elements.Count}]");
             writer.WriteOpenScope();
 
             foreach (var elem in Elements)

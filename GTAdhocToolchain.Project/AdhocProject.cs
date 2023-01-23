@@ -14,6 +14,7 @@ using GTAdhocToolchain.Compiler;
 using GTAdhocToolchain.CodeGen;
 using GTAdhocToolchain.Packaging;
 using GTAdhocToolchain.Menu;
+using GTAdhocToolchain.Menu.Fields;
 
 namespace GTAdhocToolchain.Project
 {
@@ -54,6 +55,11 @@ namespace GTAdhocToolchain.Project
         /// Whether to serialize project components (.mwidget/.mproject) to binary
         /// </summary>
         public bool SerializeComponents { get; set; }
+
+        /// <summary>
+        /// Whether to merge mprojects into an mproject (when not building a package).
+        /// </summary>
+        public bool MergeWidget { get; set; }
 
 
         /// <summary>
@@ -100,6 +106,10 @@ namespace GTAdhocToolchain.Project
             Logger.Info($"Output File: {OutputName}");
         }
 
+        /// <summary>
+        /// Builds the project.
+        /// </summary>
+        /// <returns></returns>
         public bool Build()
         {
             if (!Directory.Exists(ProjectDir))
@@ -107,7 +117,6 @@ namespace GTAdhocToolchain.Project
                 Logger.Error($"Project directory does not exist ({ProjectDir})");
                 return false;
             }
-
 
             string tmpFilePath = string.Empty;
             string pkgPath = Path.Combine(ProjectDir, "pkg_tmp");
@@ -149,6 +158,12 @@ namespace GTAdhocToolchain.Project
                 codeGen.Generate();
                 codeGen.SaveTo(Path.Combine(ProjectDir, OutputName + ".adc"));
 
+                if (MergeWidget)
+                {
+                    bool res = MergeRootWidgets(Path.ChangeExtension(Path.Combine(ProjectDir, OutputName), ".mproject"), SerializeComponents);
+                    return res;
+                }
+
                 return true;
             }
             catch (ParserException parseException)
@@ -176,6 +191,9 @@ namespace GTAdhocToolchain.Project
             return false;
         }
 
+        /// <summary>
+        /// Builds a compressed .mpackage file containing all scripts and mwidgets.
+        /// </summary>
         private void BuildPackageFile()
         {
             string pkgName = $"{OutputName}.mpackage";
@@ -212,62 +230,178 @@ namespace GTAdhocToolchain.Project
                 codeGen.Generate();
                 codeGen.SaveTo(Path.Combine(pkgContentPath, Path.ChangeExtension(srcFile.Name, ".adc")));
 
-                string componentName = Path.ChangeExtension(srcFile.FullPath, srcFile.IsMain ? ".mproject" : ".mwidget");
-                if (File.Exists(componentName))
+                if (!srcFile.IsMain)
                 {
-                    Logger.Info($"Adding linked component '{Path.GetFileName(componentName)}'");
-
-                    string outTmpComponentFile = Path.Combine(pkgContentPath, Path.GetFileName(componentName));
-                    File.Copy(componentName, outTmpComponentFile);
-
-                    if (SerializeComponents)
+                    string componentName = Path.ChangeExtension(srcFile.FullPath, ".mwidget");
+                    if (File.Exists(componentName))
                     {
-                        Logger.Info($"Serializing '{Path.GetFileName(componentName)}' to binary");
-                        MTextIO io = new MTextIO(componentName);
-                        var root = io.Read();
+                        Logger.Info($"Adding linked component '{Path.GetFileName(componentName)}'");
 
-                        MBinaryWriter writer = new MBinaryWriter(outTmpComponentFile);
-                        writer.Version = SerializeComponentsVersion;
-                        writer.WriteNode(root);
+                        string outTmpComponentFile = Path.Combine(pkgContentPath, Path.GetFileName(componentName));
+                        File.Copy(componentName, outTmpComponentFile);
+
+                        if (SerializeComponents)
+                        {
+                            Logger.Info($"Serializing '{Path.GetFileName(componentName)}' to binary");
+                            MTextIO io = new MTextIO(componentName);
+                            var root = io.Read();
+
+                            MBinaryWriter writer = new MBinaryWriter(outTmpComponentFile);
+                            writer.Version = SerializeComponentsVersion;
+                            writer.WriteNode(root);
+                        }
+                    }
+                    else
+                    {
+                        Logger.Warn($"File '{srcFile.Name}' does not have a linked UI definition file '{Path.GetFileName(componentName)}' (this warning can be ignored if this is not a root)");
                     }
                 }
-                else
-                {
-                    Logger.Warn($"File '{srcFile.Name}' does not have a linked UI definition file '{Path.GetFileName(componentName)}' (this warning can be ignored if this is not a root)");
-                }
             }
+
+            // Create package mproject with external references
+            CreatePackageMProject(pkgContentPath);
 
             Logger.Info($"Packaging...");
             AdhocPackage.PackFromFolder(pkgPath, Path.Combine(ProjectDir, pkgName));
             Logger.Info($"Packaging successful -> {pkgName}");
         }
 
-        public (bool Result, string ErrorMessage) VerifyProjectFile()
+        /// <summary>
+        /// Creates a package's mproject which contains the external references to the widgets.
+        /// </summary>
+        /// <param name="pkgContentPath"></param>
+        private void CreatePackageMProject(string pkgContentPath)
         {
-            if (string.IsNullOrEmpty(ProjectName))
-                return (false, "Project name is missing or empty.");
+            var mprojectRoot = new mNode();
+            mprojectRoot.TypeName = "Project";
 
-            if (string.IsNullOrEmpty(ProjectFolder))
-                return (false, "Project folder is missing or empty.");
+            var proj_component = FilesToCompile.FirstOrDefault(e => e.ProjectComponent);
+            if (proj_component is not null)
+            {
+                mprojectRoot.Child.Add(new mExternalRef()
+                {
+                    Name = "project_component",
+                    ExternalRefName = Path.GetFileNameWithoutExtension(proj_component.Name),
+                });
+            }
+            mprojectRoot.Child.Add(new mString() { Name = "name", String = ProjectName });
+            mprojectRoot.Child.Add(new mBool() { Name = "has_script", Value = true });
 
-            if (string.IsNullOrEmpty(BaseIncludeFolder))
-                return (false, "Base Include Folder is missing or empty.");
+            var children = new mArray() { Name = "children" };
+            var root_window = new mArray() { Name = "root_window" };
 
-            if (string.IsNullOrEmpty(OutputName))
-                return (false, "Output Name is missing or empty.");
-            
-            if (FilesToCompile.Length == 0)
-                return (false, "No files to compile provided.");
+            foreach (var file in FilesToCompile)
+            {
+                if (file.IsMain || file.ProjectComponent)
+                    continue;
 
-            if (SerializeComponents && SerializeComponentsVersion > 1)
-                return (false, "Serialize component version must be 0 or 1.");
+                children.Elements.Add(new mExternalRef() { ExternalRefName = Path.GetFileNameWithoutExtension(file.Name) });
+                root_window.Elements.Add(new mString() { String = Path.GetFileNameWithoutExtension(file.Name) });
+            }
 
-            return (true, string.Empty);
+            mprojectRoot.Child.Add(children);
+            mprojectRoot.Child.Add(root_window);
+
+            string outputMprojectName = Path.ChangeExtension(Path.Combine(pkgContentPath, OutputName), ".mproject");
+            if (SerializeComponents)
+            {
+                MBinaryWriter writer = new MBinaryWriter(outputMprojectName);
+                writer.Version = SerializeComponentsVersion;
+                writer.WriteNode(mprojectRoot);
+                writer.Dispose();
+            }
+            else
+            {
+                MTextWriter writer = new MTextWriter(outputMprojectName);
+                writer.WriteNode(mprojectRoot);
+                writer.Dispose();
+            }
         }
 
+        /// <summary>
+        /// Merges all mwidgets into an mproject for non-package building.
+        /// </summary>
+        private bool MergeRootWidgets(string outputFile, bool convertToBin)
+        {
+            Logger.Info($"Merging all mwidgets into single mproject...");
+
+            var mprojectRoot = new mNode();
+            mprojectRoot.TypeName = "Project";
+
+            mNode project_component = null;
+
+            var projectRoots = new mArray();
+            projectRoots.Name = "children";
+            projectRoots.TypeNew = FieldType.ArrayMaybe;
+
+            MTextWriter writer = new MTextWriter(outputFile);
+
+            foreach (var file in FilesToCompile)
+            {
+                if (file.IsMain)
+                    continue;
+
+                string componentName = Path.ChangeExtension(file.FullPath, ".mwidget");
+                if (File.Exists(componentName))
+                {
+                    MTextIO io = new MTextIO(componentName);
+                    var root = io.Read();
+
+                    if (file.ProjectComponent)
+                    {
+                        project_component = root;
+                        project_component.Name = "project_component";
+                    }
+                    else
+                    {
+                        projectRoots.Elements.Add(root);
+                    }
+                }
+                else
+                {
+                    Logger.Error($"Component name '{componentName}' was missing.");
+                    return false;
+                }
+            }
+
+            if (project_component != null)
+                mprojectRoot.Child.Add(project_component);
+
+            // Prepare for roots
+            mprojectRoot.Child.Add(new mString() { Name = "name", String = ProjectName });
+            mprojectRoot.Child.Add(new mBool() { Name = "has_script", Value = true });
+
+            mprojectRoot.Child.Add(projectRoots);
+            writer.WriteNode(mprojectRoot);
+            writer.Dispose();
+
+            if (convertToBin)
+            {
+                MTextIO io = new MTextIO(outputFile);
+                var root = io.Read();
+
+                MBinaryWriter binaryWriter = new MBinaryWriter(outputFile);
+                binaryWriter.Version = SerializeComponentsVersion;
+                binaryWriter.WriteNode(root);
+
+                Logger.Info($"Merged widgets (as binary) -> {outputFile}");
+            }
+            else
+            {
+                Logger.Info($"Merged widgets (as text) -> {outputFile}");
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Links all project script files together.
+        /// </summary>
+        /// <param name="tmpFileName"></param>
+        /// <returns></returns>
         private bool LinkFiles(string tmpFileName)
         {
-            // Merge files together
+            // Merge script files together
             // This is how the game actually does it
             Logger.Info($"Merging ({FilesToCompile.Length}) files: [{string.Join(", ", FilesToCompile.Select(e => e.Name))}]");
             using StreamWriter mergedFile = new StreamWriter(Path.Combine(ProjectDir, tmpFileName));
@@ -303,6 +437,36 @@ namespace GTAdhocToolchain.Project
             }
 
             return true;
+        }
+
+        /// <summary>
+        /// Verifies the project/solution file.
+        /// </summary>
+        /// <returns></returns>
+        public (bool Result, string ErrorMessage) VerifyProjectFile()
+        {
+            if (string.IsNullOrEmpty(ProjectName))
+                return (false, "Project name is missing or empty.");
+
+            if (string.IsNullOrEmpty(ProjectFolder))
+                return (false, "Project folder is missing or empty.");
+
+            if (string.IsNullOrEmpty(BaseIncludeFolder))
+                return (false, "Base Include Folder is missing or empty.");
+
+            if (string.IsNullOrEmpty(OutputName))
+                return (false, "Output Name is missing or empty.");
+
+            if (FilesToCompile.Length == 0)
+                return (false, "No files to compile provided.");
+
+            if (SerializeComponents && SerializeComponentsVersion > 1)
+                return (false, "Serialize component version must be 0 or 1.");
+
+            if (FilesToCompile.Count(e => e.ProjectComponent) > 1)
+                return (false, "Only one root can be marked as a project component.");
+
+            return (true, string.Empty);
         }
     }
 }

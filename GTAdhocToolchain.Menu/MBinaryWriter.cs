@@ -12,7 +12,7 @@ using GTAdhocToolchain.Menu.Fields;
 
 namespace GTAdhocToolchain.Menu
 {
-    public class MBinaryWriter
+    public class MBinaryWriter : IDisposable
     {
         public string OutputFileName { get; set; }
 
@@ -36,6 +36,12 @@ namespace GTAdhocToolchain.Menu
             Stream.WriteVarInt(Version);
 
             node.Write(this);
+        }
+
+        public void Dispose()
+        {
+            Stream.Dispose();
+            GC.SuppressFinalize(this);
         }
     }
 }

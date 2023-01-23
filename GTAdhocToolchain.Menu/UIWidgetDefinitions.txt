@@ -31,7 +31,7 @@ add_field|depth|Float
 add_field|is_face|Bool
 add_field|is_mask|Bool
 add_field|wrap_text_target|Unknown
-add_field|wrap_text_margin|Unknown
+add_field|wrap_text_margin|Int
 add_field|minimum_height|Float
 add_field|minimum_width|Float
 add_field|navigate_box|Unknown
@@ -171,11 +171,14 @@ add_field|scale_direction|Unknown
 add_field|value|Float
 add_field|min|Float
 add_field|max|Float
-add_field|step|Unknown
+add_field|step|Float
 add_field|step_factor|Float
 
 current_type|RootWindow
 inherits|SBox
+add_field|noload|Bool
+add_field|react_event|Bool
+add_field|manual_close|Bool
 
 current_type|OptionMenu
 inherits|SBox
@@ -186,7 +189,7 @@ add_field|popup_margin_right|Float
 add_field|popup_margin_top|Float
 add_field|popup_margin_bottom|Float
 
-add_field|context_number|Unknown
+add_field|context_number|Int
 add_field|cursor_type|Unknown
 add_field|navigate_clip_angle|Unknown
 add_field|navigate_sound|Unknown
@@ -205,8 +208,6 @@ add_field|navigate_insensitive|Bool
 add_field|navigate_recovery_x|Bool
 add_field|navigate_recovery_y|Bool
 add_field|free_cursor_mode|Bool
-add_field|react_event|Unknown
-add_field|manual_close|Unknown
 
 current_type|ColorFace
 inherits|Widget
@@ -306,6 +307,11 @@ add_field|texcoord|Vector[]
 add_field|pattern_size|Unknown
 add_field|pattern_index|Unknown
 
+current_type|ImageShape
+inherits|Widget
+add_field|shadow_dx|Float
+add_field|shadow_dy|Float
+
 current_type|TextFace
 inherits|Widget
 add_field|localized_text_page|String
@@ -314,7 +320,7 @@ add_field|text|String
 //add_field|blend|Unknown
 add_field|max_text_width|Float
 add_field|adjust_scale|Bool
-add_field|imaging_cache|Unknown
+add_field|imaging_cache|Bool
 // from mTextSetting
 add_field|text_color_0|RGBA
 add_field|text_color_1|RGBA
@@ -557,3 +563,44 @@ add_field|size_1|Float
 add_field|color|RGBA
 add_field|image_path|String
 add_field|title|String
+
+current_type|ParticleFace
+add_field|stage_scale|Float
+add_field|particle_buffer_kb|UInt
+add_field|particle_packet_kb|UInt
+add_field|garnish_packet_kb|UInt
+add_field|garnish_goal_data_kb|UInt
+
+current_type|ParticleConfetti
+add_field|emit|Bool
+add_field|cone_spread|Float
+add_field|fadein_time|Float
+add_field|fadeout_time|Float
+add_field|gravity_scale|Float
+add_field|air_resist_scale|Float
+add_field|thickness|Float
+add_field|cd|Float
+
+current_type|ParticleSpark
+add_field|radius|Float
+add_field|ground_distance|Float
+add_field|amount|Int
+add_field|angle|Float
+add_field|angle_range|Float
+add_field|speed|Float
+add_field|speed_range|Float
+add_field|temperature|Float
+add_field|temperature_range|Float
+add_field|lifetime|Float
+add_field|lifetime_range|Float
+
+current_type|BlurFace
+add_field|blur|Float
+
+current_type|StrokePoint
+add_field|buffer_frame|UShort
+add_field|head_width|Float
+add_field|tail_width0|Float
+add_field|tail_width1|Float
+add_field|tail_alpha0|Float
+add_field|tail_alpha1|Float

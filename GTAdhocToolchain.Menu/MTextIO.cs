@@ -150,6 +150,10 @@ namespace GTAdhocToolchain.Menu
                         Advance();
                         return c.ToString();
                     }
+                    else
+                    {
+                        throw new UISyntaxError("Invalid token");
+                    }
                 }
             }
 
