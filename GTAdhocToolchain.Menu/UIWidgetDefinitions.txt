@@ -580,6 +580,14 @@ add_field|gravity_scale|Float
 add_field|air_resist_scale|Float
 add_field|thickness|Float
 add_field|cd|Float
+add_field|specular_rate|Float
+add_field|specular_power|Float
+add_field|texture_index_x|Int
+add_field|texture_index_y|Int
+add_field|glare_rate|Float
+add_field|glare_power|Float
+add_field|specular_as_body|Float
+add_field|object_size|Int
 
 current_type|ParticleSpark
 add_field|radius|Float
