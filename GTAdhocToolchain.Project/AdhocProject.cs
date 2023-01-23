@@ -26,7 +26,15 @@ namespace GTAdhocToolchain.Project
 
         public string OutputName { get; set; }
 
+        /// <summary>
+        /// Scripts linked to the project to compile.
+        /// </summary>
         public AdhocProjectFile[] FilesToCompile { get; set; }
+
+        /// <summary>
+        /// Extra resources/widgets to link with the project.
+        /// </summary>
+        public AdhocProjectExtraResource[] ExtraWidgetResources { get; set; }
 
         public int Version { get; set; } = 12;
 
@@ -94,6 +102,11 @@ namespace GTAdhocToolchain.Project
             {
                 fileToCompile.FullPath = Path.GetFullPath(Path.Combine(prj.ProjectDir, fileToCompile.Name));
                 fileToCompile.SourcePath = Path.Combine(prj.SourceProjectFolder, fileToCompile.Name).Replace('\\', '/');
+            }
+
+            foreach (var extraResource in prj.ExtraWidgetResources)
+            {
+                extraResource.FullPath = Path.GetFullPath(Path.Combine(prj.ProjectDir, extraResource.Name));
             }
 
             return prj;
@@ -360,6 +373,23 @@ namespace GTAdhocToolchain.Project
                 else
                 {
                     Logger.Error($"Component name '{componentName}' was missing.");
+                    return false;
+                }
+            }
+
+            foreach (var file in ExtraWidgetResources)
+            {
+                string componentName = Path.ChangeExtension(file.FullPath, ".mwidget");
+                if (File.Exists(componentName))
+                {
+                    MTextIO io = new MTextIO(componentName);
+                    var root = io.Read();
+
+                    projectRoots.Elements.Add(root);
+                }
+                else
+                {
+                    Logger.Error($"Extra resource name '{componentName}' was missing.");
                     return false;
                 }
             }

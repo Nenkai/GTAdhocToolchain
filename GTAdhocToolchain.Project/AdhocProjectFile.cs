@@ -12,7 +12,14 @@ namespace GTAdhocToolchain.Project
         public string SourcePath { get; set; }
         public string Name { get; set; }
 
+        /// <summary>
+        /// Whether this is the main file of a project.
+        /// </summary>
         public bool IsMain { get; set; }
+
+        /// <summary>
+        /// Whether this is a project component.
+        /// </summary>
         public bool ProjectComponent { get; set; }
     }
 }
