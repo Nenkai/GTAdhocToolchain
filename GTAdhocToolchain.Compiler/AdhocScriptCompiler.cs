@@ -22,6 +22,9 @@ namespace GTAdhocToolchain.Compiler
 
         public HashSet<string> PostCompilationWarnings = new();
 
+        private Script _debugPrintException;
+        private Script _debugThrow;
+
         public AdhocScriptCompiler()
         {
             var topLevelModule = new AdhocModule();
@@ -79,6 +82,15 @@ namespace GTAdhocToolchain.Compiler
             CompileStatements(frame, script.Body);
         }
 
+        /// <summary>
+        /// Builds code for printing exceptions to file (used in CompileStatements())
+        /// </summary>
+        public void BuildTryCatchDebugStatements()
+        {
+            _debugPrintException = new AdhocAbstractSyntaxTree("__toplevel__::main::pdistd::AppendFile(\"/APP_DATA_RAW/exceptions.txt\", \"%{__ex}\\n\");").ParseScript();
+            _debugThrow = new AdhocAbstractSyntaxTree("throw __ex;").ParseScript();
+        }
+
         public void CompileStatements(AdhocCodeFrame frame, Node node)
         {
             foreach (var n in node.ChildNodes)
@@ -87,8 +99,39 @@ namespace GTAdhocToolchain.Compiler
 
         public void CompileStatements(AdhocCodeFrame frame, NodeList<Statement> nodes)
         {
-            foreach (var n in nodes)
-                CompileStatement(frame, n);
+            if (_debugPrintException != null)
+            {
+                // This is super hacky. But the intent is a hack anyway.
+                var tryCatch = new InsTryCatch();
+                frame.AddInstruction(tryCatch, 0);
+
+                foreach (var n in nodes)
+                    CompileStatement(frame, n);
+
+                InsertSetState(frame, AdhocRunState.EXIT);
+                tryCatch.InstructionIndex = frame.GetLastInstructionIndex();
+
+                InsJump catchClauseSkipper = new InsJump();
+                frame.AddInstruction(catchClauseSkipper, 0);
+
+                frame.AddInstruction(new InsIntConst(0), 0);
+                InsertVariablePush(frame, new Identifier("__ex"), true);
+                frame.AddInstruction(InsAssign.Default, 0);
+
+                string tmpCaseVariable = $"catch#{SymbolMap.TempVariableCounter++}";
+                InsertVariablePush(frame, new Identifier(tmpCaseVariable), true);
+                InsertAssignPop(frame);
+
+                CompileStatement(frame, _debugPrintException.Body[0]);
+                CompileStatement(frame, _debugThrow.Body[0]);
+
+                catchClauseSkipper.JumpInstructionIndex = frame.GetLastInstructionIndex();
+            }
+            else
+            {
+                foreach (var n in nodes)
+                    CompileStatement(frame, n);
+            }
         }
 
         public void CompileStatement(AdhocCodeFrame frame, Node node)
@@ -926,6 +969,7 @@ namespace GTAdhocToolchain.Compiler
             frame.AddAttributeOrStaticMemberVariable(subroutine.Name);
             frame.AddInstruction(subroutine, parentNode.Location.Start.Line);
 
+
             if (body is BlockStatement blockStatement)
                 CompileBlockStatement(subroutine.CodeFrame, blockStatement, openScope: false, insertLeaveInstruction: false);
             else
@@ -1412,6 +1456,9 @@ namespace GTAdhocToolchain.Compiler
         /// <param name="arrowFuncExpr"></param>
         private void CompileAnonymousSubroutine(AdhocCodeFrame frame, Node parentNode, Node body, NodeList<Expression> funcParams, bool isMethod = false, bool isAsync = false)
         {
+
+            
+
             SubroutineBase subroutine = isMethod ? new InsMethodConst() : new InsFunctionConst();
             subroutine.CodeFrame.ParentFrame = frame;
             subroutine.CodeFrame.SourceFilePath = frame.SourceFilePath;

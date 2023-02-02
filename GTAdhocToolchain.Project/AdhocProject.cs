@@ -123,7 +123,7 @@ namespace GTAdhocToolchain.Project
         /// Builds the project.
         /// </summary>
         /// <returns></returns>
-        public bool Build()
+        public bool Build(bool debug = false)
         {
             if (!Directory.Exists(ProjectDir))
             {
@@ -165,6 +165,10 @@ namespace GTAdhocToolchain.Project
                 compiler.SetSourcePath(compiler.SymbolMap, ProjectFolder + "/" + tmpFileName);
                 compiler.SetVersion(Version);
                 compiler.SetupStack();
+
+                if (debug)
+                    compiler.BuildTryCatchDebugStatements();
+
                 compiler.CompileScript(program);
 
                 AdhocCodeGen codeGen = new AdhocCodeGen(compiler, compiler.SymbolMap);

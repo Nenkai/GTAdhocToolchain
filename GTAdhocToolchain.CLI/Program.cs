@@ -96,22 +96,22 @@ namespace GTAdhocToolchain.CLI
             }
         }
 
-        public static void Build(BuildVerbs project)
+        public static void Build(BuildVerbs buildVerbs)
         {
-            if (!File.Exists(project.InputPath))
+            if (!File.Exists(buildVerbs.InputPath))
             {
-                Logger.Error($"File {project.InputPath} does not exist.");
+                Logger.Error($"File {buildVerbs.InputPath} does not exist.");
                 return;
             }
 
-            if (Path.GetExtension(project.InputPath) == ".yaml")
+            if (Path.GetExtension(buildVerbs.InputPath) == ".yaml")
             {
-                BuildProject(project.InputPath);
+                BuildProject(buildVerbs);
             }
-            else if (Path.GetExtension(project.InputPath) == ".ad")
+            else if (Path.GetExtension(buildVerbs.InputPath) == ".ad")
             {
-                string output = !string.IsNullOrEmpty(project.OutputPath) ? project.OutputPath : project.InputPath;
-                BuildScript(project.InputPath, Path.ChangeExtension(output, ".adc"), project.Version);
+                string output = !string.IsNullOrEmpty(buildVerbs.OutputPath) ? buildVerbs.OutputPath : buildVerbs.InputPath;
+                BuildScript(buildVerbs.InputPath, Path.ChangeExtension(output, ".adc"), buildVerbs.Version);
             }
             else
             {
@@ -170,12 +170,12 @@ namespace GTAdhocToolchain.CLI
 
         }
 
-        private static void BuildProject(string inputPath)
+        private static void BuildProject(BuildVerbs buildVerbs)
         {
             AdhocProject prj;
             try
             {
-                prj = AdhocProject.Read(inputPath);
+                prj = AdhocProject.Read(buildVerbs.InputPath);
             }
             catch (Exception e)
             {
@@ -183,18 +183,18 @@ namespace GTAdhocToolchain.CLI
                 return;
             }
 
-            Logger.Info($"Project file: {inputPath}");
+            Logger.Info($"Project file: {buildVerbs.InputPath}");
             prj.PrintInfo();
 
 
             Logger.Info("Started project build.");
-            if (!prj.Build())
+            if (!prj.Build(buildVerbs.WriteExceptionsToFile))
                 Logger.Error("Project build failed.");
             else
                 Logger.Info("Project build successful.");
         }
 
-        private static void BuildScript(string inputPath, string output, int version = 12)
+        private static void BuildScript(string inputPath, string output, int version = 12, bool debugExceptions = false)
         {
             var source = File.ReadAllText(inputPath);
 
@@ -209,6 +209,10 @@ namespace GTAdhocToolchain.CLI
                 compiler.SetSourcePath(compiler.SymbolMap, inputPath);
                 compiler.SetVersion(version);
                 compiler.SetupStack();
+
+                if (debugExceptions)
+                    compiler.BuildTryCatchDebugStatements();
+
                 compiler.CompileScript(program);
 
                 AdhocCodeGen codeGen = new AdhocCodeGen(compiler, compiler.SymbolMap);
@@ -305,6 +309,11 @@ namespace GTAdhocToolchain.CLI
 
         [Option('v', "version", Required = false, Default = 12, HelpText = "Adhoc compile version (for files, not projects).")]
         public int Version { get; set; }
+
+        [Option("write-exceptions-to-file", Required = false, HelpText = "Artificially creates try/catch instructions to all code blocks compiled which will print adhoc exceptions to /APP_DATA_RAW/exceptions.txt (aka USRDIR) when thrown. " +
+            "Very useful if the game does not normally print any error on adhoc exceptions and you do not have access to a debugger to breakpoint on a certain function to check errors.\n" +
+            "This will only work for GT5 and above. Use carefully. Not entirely tested, may break or not work at all.")]
+        public bool WriteExceptionsToFile { get; set; }
     }
 
     [Verb("pack", HelpText = "Pack files like gpb's, or mpackage's.")]
