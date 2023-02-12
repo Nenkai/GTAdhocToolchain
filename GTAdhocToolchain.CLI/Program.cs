@@ -111,7 +111,7 @@ namespace GTAdhocToolchain.CLI
             else if (Path.GetExtension(buildVerbs.InputPath) == ".ad")
             {
                 string output = !string.IsNullOrEmpty(buildVerbs.OutputPath) ? buildVerbs.OutputPath : buildVerbs.InputPath;
-                BuildScript(buildVerbs.InputPath, Path.ChangeExtension(output, ".adc"), buildVerbs.Version);
+                BuildScript(buildVerbs.InputPath, Path.ChangeExtension(output, ".adc"), buildVerbs.Version, buildVerbs.WriteExceptionsToFile);
             }
             else
             {
