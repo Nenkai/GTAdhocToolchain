@@ -172,6 +172,7 @@ namespace GTAdhocToolchain.Core
                 case AdhocInstructionType.ASSIGN:
                 case AdhocInstructionType.JUMP_IF_FALSE:
                 case AdhocInstructionType.JUMP_IF_TRUE:
+                case AdhocInstructionType.JUMP_IF_NOT_NIL:
                 case AdhocInstructionType.REQUIRE:
                 case AdhocInstructionType.ARRAY_PUSH:
                 case AdhocInstructionType.MODULE_CONSTRUCTOR:
@@ -264,6 +265,10 @@ namespace GTAdhocToolchain.Core
                 case AdhocInstructionType.CODE_EVAL:
                 case AdhocInstructionType.LEAVE: // FIX ME LATER
                     break;
+
+                case AdhocInstructionType.LOGICAL_OPTIONAL:
+                    break; // To figure if it has any effect
+
                 default:
                     throw new Exception($"Unimplemented instruction handling for stack calculation: {ins.InstructionType}");
             }

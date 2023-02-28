@@ -10,10 +10,14 @@ namespace GTAdhocToolchain.Compiler
     {
         public const string Warning_UsingAwait_Code = "USING_AWAIT";
         public const string Warning_UsingVaCall_Code = "USING_VACALL";
+        public const string Warning_UsingOptional_Code = "USING_OPTIONAL";
+        public const string Warning_UsingNullCoalescing_Code = "USING_NULL_COALESCING";
         public static Dictionary<string, string> Warnings = new()
         {
             { Warning_UsingAwait_Code, "Async/Await is only available in GT6 and above" },
             { Warning_UsingVaCall_Code, "Variadic Calls (aka VA_CALL instruction) is only available in GT6 and above" },
+            { Warning_UsingOptional_Code, "Chained optional expressions (?.) is only available in GT Sport's Adhoc Version 12 and above" },
+            { Warning_UsingNullCoalescing_Code, "Null coalescing (??) is only available in GT Sport's Adhoc Version 12 and above. "}
         };
         
         public const string Error_ContinueWithoutContextualScope = "Continue keyword must be in a loop or break context.";

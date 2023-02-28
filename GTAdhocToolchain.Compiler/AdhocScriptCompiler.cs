@@ -1391,10 +1391,24 @@ namespace GTAdhocToolchain.Compiler
                 case Nodes.SelfExpression:
                     CompileSelfExpression(frame, exp as SelfExpression);
                     break;
+                case Nodes.ChainExpression:
+                    CompileChainExpression(frame, exp as ChainExpression);
+                    break;
+
                 default:
                     ThrowCompilationError(exp, $"Expression {exp.Type} not supported");
                     break;
             }
+        }
+
+        /// <summary>
+        /// Compile 'identifier?.attr or identifier?["attr"]'
+        /// </summary>
+        /// <param name="frame"></param>
+        /// <param name="chainExpression"></param>
+        private void CompileChainExpression(AdhocCodeFrame frame, ChainExpression chainExpression)
+        {
+            CompileExpression(frame, chainExpression.Expression);
         }
 
         /// <summary>
@@ -2118,6 +2132,15 @@ namespace GTAdhocToolchain.Compiler
         private void CompileComputedMemberExpression(AdhocCodeFrame frame, ComputedMemberExpression computedMember)
         {
             CompileExpression(frame, computedMember.Object);
+
+            if (computedMember.Optional)
+            {
+                if (frame.Version <= 13)
+                    AddPostCompilationWarning(CompilationMessages.Warning_UsingOptional_Code);
+
+                frame.AddInstruction(new InsOptional(), computedMember.Location.Start.Line);
+            }
+
             CompileExpression(frame, computedMember.Property);
 
             if (frame.Version >= 12)
@@ -2163,21 +2186,29 @@ namespace GTAdhocToolchain.Compiler
         /// Compiles an attribute member path.
         /// </summary>
         /// <param name="frame"></param>
-        /// <param name="staticExp"></param>
-        private void CompileAttributeMemberExpression(AdhocCodeFrame frame, AttributeMemberExpression staticExp)
+        /// <param name="attrExp"></param>
+        private void CompileAttributeMemberExpression(AdhocCodeFrame frame, AttributeMemberExpression attrExp)
         {
-            CompileExpression(frame, staticExp.Object); // ORG
+            CompileExpression(frame, attrExp.Object); // ORG
 
-            if (staticExp.Property.Type == Nodes.Identifier)
+            if (attrExp.Optional)
             {
-                CompileIdentifier(frame, staticExp.Property as Identifier, attribute: true); // inSession
+                if (frame.Version <= 13)
+                    AddPostCompilationWarning(CompilationMessages.Warning_UsingOptional_Code);
+
+                frame.AddInstruction(new InsOptional(), attrExp.Location.Start.Line);
             }
-            else if (staticExp.Property is StaticMemberExpression)
+
+            if (attrExp.Property.Type == Nodes.Identifier)
             {
-                CompileStaticMemberExpressionAttributeEval(frame, staticExp.Property as StaticMemberExpression);
+                CompileIdentifier(frame, attrExp.Property as Identifier, attribute: true); // inSession
+            }
+            else if (attrExp.Property is StaticMemberExpression)
+            {
+                CompileStaticMemberExpressionAttributeEval(frame, attrExp.Property as StaticMemberExpression);
             }
             else
-                ThrowCompilationError(staticExp, "Expected attribute member to be identifier or static member expression.");
+                ThrowCompilationError(attrExp, "Expected attribute member to be identifier or static member expression.");
         }
 
         private void CompileObjectSelectorExpression(AdhocCodeFrame frame, ObjectSelectorMemberExpression objSelectExpr)
@@ -2343,7 +2374,9 @@ namespace GTAdhocToolchain.Compiler
             }
 
             // Check for logical operators that checks between both conditions
-            if (binExp.Operator == BinaryOperator.LogicalAnd || binExp.Operator == BinaryOperator.LogicalOr)
+            if (binExp.Operator == BinaryOperator.LogicalAnd || 
+                binExp.Operator == BinaryOperator.LogicalOr ||
+                binExp.Operator == BinaryOperator.NullishCoalescing)
             {
                 if (binExp.Operator == BinaryOperator.LogicalOr)
                 {
@@ -2381,6 +2414,16 @@ namespace GTAdhocToolchain.Compiler
                         andIns.InstructionJumpIndex = frame.GetLastInstructionIndex();
                     }
                 }
+                else if (binExp.Operator == BinaryOperator.NullishCoalescing)
+                {
+                    if (frame.Version <= 13)
+                        AddPostCompilationWarning(CompilationMessages.Warning_UsingOptional_Code);
+
+                    var jumpIfNotNil = new InsJumpIfNotNil();
+                    frame.AddInstruction(jumpIfNotNil, binExp.Location.Start.Line);
+                    CompileExpression(frame, binExp.Right);
+                    jumpIfNotNil.InstructionIndex = frame.GetLastInstructionIndex();
+                }
                 else
                 {
                     throw new InvalidOperationException();
@@ -2389,7 +2432,7 @@ namespace GTAdhocToolchain.Compiler
             }
             else if (binExp.Operator == BinaryOperator.InstanceOf)
             {
-                CompileInstanceOfOperator(frame, binExp);
+                ThrowCompilationError(binExp, "isInstanceOf is not valid");
             }
             else
             {
@@ -2425,20 +2468,6 @@ namespace GTAdhocToolchain.Compiler
                 InsBinaryOperator binOpIns = new InsBinaryOperator(opSymbol);
                 frame.AddInstruction(binOpIns, binExp.Location.Start.Line);
             }
-        }
-
-        private void CompileInstanceOfOperator(AdhocCodeFrame frame, BinaryExpression binExp)
-        {
-            CompileExpression(frame, binExp.Left);
-
-            // Object.isInstanceOf - No idea if adhoc supports it, but eh, why not
-            InsertAttributeEval(frame, new Identifier("isInstanceOf"));
-
-            // Eval right identifier (if its one)
-            CompileExpression(frame, binExp.Right);
-
-            // Call.
-            frame.AddInstruction(new InsCall(argumentCount: 1), binExp.Location.Start.Line);
         }
 
         private void CompileFinalizerStatement(AdhocCodeFrame frame, FinalizerStatement finalizerStatement)
