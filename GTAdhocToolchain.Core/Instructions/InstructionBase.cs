@@ -97,7 +97,7 @@ namespace GTAdhocToolchain.Core.Instructions
                 AdhocInstructionType.NOP => new InsNop(),
                 AdhocInstructionType.DOUBLE_CONST => new InsDoubleConst(),
                 AdhocInstructionType.DELEGATE_DEFINE => new DelegateDefine(),
-                AdhocInstructionType.JUMP_NOT_NIL => new InsJumpNotNil(),
+                AdhocInstructionType.JUMP_IF_NOT_NIL => new InsJumpIfNotNil(),
                 AdhocInstructionType.LOGICAL_OPTIONAL => new InsOptional(),
                 _ => throw new Exception($"Encountered unimplemented {type} instruction."),
             };
@@ -193,7 +193,7 @@ namespace GTAdhocToolchain.Core.Instructions
 
         // GT Sport (V12)
         DELEGATE_DEFINE,
-        JUMP_NOT_NIL,
+        JUMP_IF_NOT_NIL,
         LOGICAL_OPTIONAL,
     }
 

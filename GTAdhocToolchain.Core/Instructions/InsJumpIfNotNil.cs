@@ -6,11 +6,11 @@ using System.Threading.Tasks;
 
 namespace GTAdhocToolchain.Core.Instructions
 {
-    public class InsJumpNotNil : InstructionBase
+    public class InsJumpIfNotNil : InstructionBase
     {
-        public override AdhocInstructionType InstructionType => AdhocInstructionType.JUMP_NOT_NIL;
+        public override AdhocInstructionType InstructionType => AdhocInstructionType.JUMP_IF_NOT_NIL;
 
-        public override string InstructionName => "JUMP_NOT_NIL";
+        public override string InstructionName => "JUMP_IF_NOT_NIL";
 
         public int InstructionIndex { get; set; }
 
