@@ -51,5 +51,6 @@ namespace GTAdhocToolchain.Compiler
         public const string Error_VaCall_MissingFunctionTarget = "Missing FunctionObject target and argument array in variadic function call";
         public const string Error_VaCall_MissingArguments = "Missing argument array in variadic function call";
 
+        public const string Error_NilNotValidVarialbleName = "nil is not a valid variable name";
     }
 }

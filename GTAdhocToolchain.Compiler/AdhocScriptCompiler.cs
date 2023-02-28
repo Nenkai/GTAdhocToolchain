@@ -1125,6 +1125,9 @@ namespace GTAdhocToolchain.Compiler
 
                     if (id is Identifier idIdentifier) // var hello [= world];
                     {
+                        if (idIdentifier.Name == "nil")
+                            ThrowCompilationError(varDeclaration, CompilationMessages.Error_NilNotValidVarialbleName);
+
                         if (initValue is not null || pushWhenNoInit)
                         {
                             // Variable is being defined with a value.
@@ -1153,6 +1156,9 @@ namespace GTAdhocToolchain.Compiler
                 {
                     if (id is Identifier idIdentifier) // var hello [= world];
                     {
+                        if (idIdentifier.Name == "nil")
+                            ThrowCompilationError(varDeclaration, CompilationMessages.Error_NilNotValidVarialbleName);
+
                         if (initValue is not null || pushWhenNoInit)
                         {
                             // Variable is being defined with a value.
@@ -2521,6 +2527,18 @@ namespace GTAdhocToolchain.Compiler
             }
             else // -var / +var / ~var
             {
+                if (unaryExp.Argument is Literal literal)
+                {
+                    if (unaryExp.Operator == UnaryOperator.Minus)
+                    {
+                        if (literal.NumericTokenType == NumericTokenType.UnsignedLong)
+                            ThrowCompilationError(unaryExp, "Unary operator '-' cannot be applied to ULong");
+
+                        if (literal.NumericTokenType == NumericTokenType.UnsignedInteger)
+                            ThrowCompilationError(unaryExp, "Unary operator '-' cannot be applied to UInt");
+                    }
+                }
+
                 CompileExpression(frame, unaryExp.Argument);
                 string op = unaryExp.Operator switch
                 {

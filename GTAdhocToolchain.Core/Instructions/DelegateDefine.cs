@@ -8,22 +8,22 @@ using System.Threading.Tasks;
 
 namespace GTAdhocToolchain.Core.Instructions
 {
-    public class Ins69 : InstructionBase
+    public class DelegateDefine : InstructionBase
     {
-        public override AdhocInstructionType InstructionType => AdhocInstructionType.UNK_69;
+        public override AdhocInstructionType InstructionType => AdhocInstructionType.DELEGATE_DEFINE;
 
-        public override string InstructionName => "UNK_69";
+        public override string InstructionName => "DELEGATE_DEFINE";
 
-        public AdhocSymbol Value { get; set; }
+        public AdhocSymbol Delegate { get; set; }
 
         public override void Serialize(AdhocStream stream)
         {
-            stream.WriteSymbol(Value);
+            stream.WriteSymbol(Delegate);
         }
 
         public override void Deserialize(AdhocStream stream)
         {
-            Value = stream.ReadSymbol();
+            Delegate = stream.ReadSymbol();
         }
 
         public override string ToString()
@@ -32,6 +32,6 @@ namespace GTAdhocToolchain.Core.Instructions
         }
 
         public override string Disassemble(bool asCompareMode = false)
-            => $"{InstructionType}: {Value}";
+            => $"{InstructionType}: {Delegate}";
     }
 }

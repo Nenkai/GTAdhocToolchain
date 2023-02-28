@@ -96,7 +96,7 @@ namespace GTAdhocToolchain.Core.Instructions
                 AdhocInstructionType.VA_CALL => new InsVaCall(),
                 AdhocInstructionType.NOP => new InsNop(),
                 AdhocInstructionType.DOUBLE_CONST => new InsDoubleConst(),
-                AdhocInstructionType.UNK_69 => new Ins69(),
+                AdhocInstructionType.DELEGATE_DEFINE => new DelegateDefine(),
                 AdhocInstructionType.UNK_70 => new Ins70(),
                 AdhocInstructionType.UNK_71 => new Ins71(),
                 _ => throw new Exception($"Encountered unimplemented {type} instruction."),
@@ -192,7 +192,7 @@ namespace GTAdhocToolchain.Core.Instructions
         CODE_EVAL,
 
         // GT Sport (V12)
-        UNK_69,
+        DELEGATE_DEFINE,
         UNK_70,
         UNK_71,
     }
