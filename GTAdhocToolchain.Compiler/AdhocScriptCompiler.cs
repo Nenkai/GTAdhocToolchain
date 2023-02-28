@@ -1431,8 +1431,24 @@ namespace GTAdhocToolchain.Compiler
             var awaitStart = new StaticMemberExpression(new Identifier(AdhocConstants.SYSTEM), new Identifier("AwaitTaskStart"), false);
             CompileExpression(frame, awaitStart);
 
-            // Function body
-            CompileExpression(frame, awaitExpr.Argument);
+            // Awaiting bare call?
+            if (awaitExpr.Argument is CallExpression call)
+            {
+                // Wrap it into a subroutine (maybe move this to an util at the bottom) 
+                var subroutine = new FunctionDeclaration(null, 
+                    new NodeList<Expression>(), // No parameters
+                    new BlockStatement(NodeList.Create(new Statement[] { new ExpressionStatement(call) })),
+                    generator: false,
+                    strict: true,
+                    async: false);
+                subroutine.Location = new Location(call.Location.Start, call.Location.End, call.Location.Source);
+
+                CompileAnonymousSubroutine(frame, subroutine, call, new NodeList<Expression>());
+            }
+            else
+            {
+                CompileExpression(frame, awaitExpr.Argument);
+            }
 
             // Get task - <task> = System::AwaitTaskStart(<func>);
             frame.AddInstruction(new InsCall(1), 0);
