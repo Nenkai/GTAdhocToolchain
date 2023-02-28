@@ -96,7 +96,7 @@ namespace GTAdhocToolchain.Core.Instructions
                 AdhocInstructionType.VA_CALL => new InsVaCall(),
                 AdhocInstructionType.NOP => new InsNop(),
                 AdhocInstructionType.DOUBLE_CONST => new InsDoubleConst(),
-                AdhocInstructionType.DELEGATE_DEFINE => new DelegateDefine(),
+                AdhocInstructionType.DELEGATE_DEFINE => new InsDelegateDefine(),
                 AdhocInstructionType.JUMP_IF_NOT_NIL => new InsJumpIfNotNil(),
                 AdhocInstructionType.LOGICAL_OPTIONAL => new InsOptional(),
                 _ => throw new Exception($"Encountered unimplemented {type} instruction."),

@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace GTAdhocToolchain.Core.Instructions
 {
-    public class DelegateDefine : InstructionBase
+    public class InsDelegateDefine : InstructionBase
     {
         public override AdhocInstructionType InstructionType => AdhocInstructionType.DELEGATE_DEFINE;
 

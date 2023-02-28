@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace GTAdhocToolchain.Core.Instructions
 {
-    public class Ins71 : InstructionBase
+    public class InsOptional : InstructionBase
     {
         public override AdhocInstructionType InstructionType => AdhocInstructionType.LOGICAL_OPTIONAL;
 
