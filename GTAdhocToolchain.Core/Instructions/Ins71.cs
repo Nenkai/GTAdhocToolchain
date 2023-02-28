@@ -8,9 +8,9 @@ namespace GTAdhocToolchain.Core.Instructions
 {
     public class Ins71 : InstructionBase
     {
-        public override AdhocInstructionType InstructionType => AdhocInstructionType.UNK_71;
+        public override AdhocInstructionType InstructionType => AdhocInstructionType.LOGICAL_OPTIONAL;
 
-        public override string InstructionName => "UNK_71";
+        public override string InstructionName => "LOGICAL_OPTIONAL";
 
         public override void Serialize(AdhocStream stream)
         {

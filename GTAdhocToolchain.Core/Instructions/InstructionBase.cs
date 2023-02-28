@@ -98,7 +98,7 @@ namespace GTAdhocToolchain.Core.Instructions
                 AdhocInstructionType.DOUBLE_CONST => new InsDoubleConst(),
                 AdhocInstructionType.DELEGATE_DEFINE => new DelegateDefine(),
                 AdhocInstructionType.UNK_70 => new Ins70(),
-                AdhocInstructionType.UNK_71 => new Ins71(),
+                AdhocInstructionType.LOGICAL_OPTIONAL => new Ins71(),
                 _ => throw new Exception($"Encountered unimplemented {type} instruction."),
             };
         }
@@ -194,7 +194,7 @@ namespace GTAdhocToolchain.Core.Instructions
         // GT Sport (V12)
         DELEGATE_DEFINE,
         UNK_70,
-        UNK_71,
+        LOGICAL_OPTIONAL,
     }
 
     enum AdhocVersion
