@@ -1033,10 +1033,13 @@ namespace GTAdhocToolchain.Compiler
                 // Push default value
                 CompileExpression(frame, pattern.Right);
             }
-            else if (param.Type == Nodes.RestElement) // Rest element (...params)
+            else if (param.Type == Nodes.RestElement) // Rest element function(args...)
             {
-                subroutine.CodeFrame.HasRestElement = true;
+                if (subroutine.CodeFrame.HasRestElement)
+                    ThrowCompilationError(parentNode, "Subroutine already has a rest parameter");
 
+                subroutine.CodeFrame.HasRestElement = true;
+                
                 Identifier paramIdent = (param as RestElement).Argument as Identifier;
                 AdhocSymbol paramSymb = SymbolMap.RegisterSymbol(paramIdent.Name);
                 subroutine.CodeFrame.FunctionParameters.Add(paramSymb);
