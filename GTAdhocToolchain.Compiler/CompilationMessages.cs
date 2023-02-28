@@ -13,7 +13,7 @@ namespace GTAdhocToolchain.Compiler
         public static Dictionary<string, string> Warnings = new()
         {
             { Warning_UsingAwait_Code, "Async/Await is only available in GT6 and above" },
-            { Warning_UsingVaCall_Code, "Variable Calls/Spread Syntax (<function>.(...<arg>) aka VA_CALL instruction) is only available in GT6 and above" },
+            { Warning_UsingVaCall_Code, "Variadic Calls (aka VA_CALL instruction) is only available in GT6 and above" },
         };
         
         public const string Error_ContinueWithoutContextualScope = "Continue keyword must be in a loop or break context.";
@@ -48,6 +48,8 @@ namespace GTAdhocToolchain.Compiler
         public const string Error_MapUnsupported = "Map constants are not supported in Adhoc Versions lower than 11.";
         public const string Error_SelfUnsupported = "'self is not supported in Adhoc Versions lower than 10.";
 
+        public const string Error_VaCall_MissingFunctionTarget = "Missing FunctionObject target and argument array in variadic function call";
+        public const string Error_VaCall_MissingArguments = "Missing argument array in variadic function call";
 
     }
 }

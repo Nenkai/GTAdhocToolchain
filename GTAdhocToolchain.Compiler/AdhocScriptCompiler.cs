@@ -2249,16 +2249,24 @@ namespace GTAdhocToolchain.Compiler
         /// <param name="call"></param>
         private void CompileCall(AdhocCodeFrame frame, CallExpression call, bool popReturnValue = false)
         {
-            CompileExpression(frame, call.Callee);
-
-            bool isVaCall = false;
-            if (call.Arguments.Count == 1 && call.Arguments[0].Type == Nodes.SpreadElement)
+            bool isVariadicCall = false;
+            if (call.Callee is Identifier ident && ident.Name == "call")
             {
-                CompileExpression(frame, call.Arguments[0]);
-                isVaCall = true;
+                if (call.Arguments.Count < 1)
+                    ThrowCompilationError(call, CompilationMessages.Error_VaCall_MissingFunctionTarget);
+
+                if (call.Arguments.Count < 2)
+                    ThrowCompilationError(call, CompilationMessages.Error_VaCall_MissingArguments);
+                
+                foreach (var arg in call.Arguments)
+                    CompileExpression(frame, arg);
+
+                isVariadicCall = true;
             }
             else
             {
+                CompileExpression(frame, call.Callee);
+
                 for (int i = 0; i < call.Arguments.Count; i++)
                 {
                     if (call.Arguments[i].Type == Nodes.SpreadElement) // Has more than 1
@@ -2271,9 +2279,9 @@ namespace GTAdhocToolchain.Compiler
                 }
             }
 
-            if (isVaCall)
+            if (isVariadicCall)
             {
-                var vaCallIns = new InsVaCall() { PopObjectCount = 2 };
+                var vaCallIns = new InsVaCall() { PopObjectCount = (uint)call.Arguments.Count };
                 frame.AddInstruction(vaCallIns, call.Location.Start.Line);
                 AddPostCompilationWarning(CompilationMessages.Warning_UsingVaCall_Code);
             }
