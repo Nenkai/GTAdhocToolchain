@@ -276,7 +276,7 @@ Finalizer statements allows running code once the current module is finalized/cl
 function func(context)
 {
   CursorUtil::setCursor(context, "wait"); // Set cursor to waiting mode
-  finally()
+  finally
   {
       // This will be executed once the module is finalized.
       // It will not execute immediately.
