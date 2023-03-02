@@ -69,7 +69,7 @@ class Dog
 var obj = MyObject("FooBar");
 ```
 
-To access an attrbibute:
+To access an attribute:
 ```java
 var name = obj.name;
 ```
