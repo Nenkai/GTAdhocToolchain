@@ -345,7 +345,7 @@ function myFunc()
     return "hello world";
 }
 
-delegate myDelegate;
+delegate myDelegate; // It is not possible to directly assign a function to a delegate
 myDelegate = myFunc; // This will not override myDelegate with a function, rather assign a function to the delegate
 return myDelegate(); // "hello world"
 ```
