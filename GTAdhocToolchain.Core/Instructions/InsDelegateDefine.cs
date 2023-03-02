@@ -16,6 +16,13 @@ namespace GTAdhocToolchain.Core.Instructions
 
         public AdhocSymbol Delegate { get; set; }
 
+        public InsDelegateDefine() { }
+
+        public InsDelegateDefine(AdhocSymbol name)
+        {
+            Delegate = name;
+        }
+
         public override void Serialize(AdhocStream stream)
         {
             stream.WriteSymbol(Delegate);

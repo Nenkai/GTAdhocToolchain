@@ -12,12 +12,15 @@ namespace GTAdhocToolchain.Compiler
         public const string Warning_UsingVaCall_Code = "USING_VACALL";
         public const string Warning_UsingOptional_Code = "USING_OPTIONAL";
         public const string Warning_UsingNullCoalescing_Code = "USING_NULL_COALESCING";
+        public const string Warning_UsingDelegateCode = "USING_DELEGATE";
+
         public static Dictionary<string, string> Warnings = new()
         {
             { Warning_UsingAwait_Code, "Async/Await is only available in GT6 and above" },
             { Warning_UsingVaCall_Code, "Variadic Calls (aka VA_CALL instruction) is only available in GT6 and above" },
-            { Warning_UsingOptional_Code, "Chained optional expressions (?.) is only available in GT Sport's Adhoc Version 12 and above" },
-            { Warning_UsingNullCoalescing_Code, "Null coalescing (??) is only available in GT Sport's Adhoc Version 12 and above. "}
+            { Warning_UsingOptional_Code, "Chained optional expressions (?. , ?[) is only available in GT Sport's Adhoc Version 12 and above" },
+            { Warning_UsingNullCoalescing_Code, "Null coalescing (??) is only available in GT Sport's Adhoc Version 12 and above."},
+            { Warning_UsingDelegateCode, "Delegates are only available in GT Sport's Adhoc Version 12 and above. "},
         };
         
         public const string Error_ContinueWithoutContextualScope = "Continue keyword must be in a loop or break context.";
@@ -51,6 +54,11 @@ namespace GTAdhocToolchain.Compiler
         public const string Error_ForeachUnsupported = "Foreach statements are not supported in Adhoc Versions below 12.";
         public const string Error_MapUnsupported = "Map constants are not supported in Adhoc Versions lower than 11.";
         public const string Error_SelfUnsupported = "'self is not supported in Adhoc Versions lower than 10.";
+
+        public const string Error_DelegatesUnsupported = "Delegates are only available starting from Adhoc version 12, starting GT Sport.";
+        public const string Error_OptionalComputedMemberUnsupported = "Optional '?[' is only available starting from Adhoc version 12, starting GT Sport.";
+        public const string Error_OptionalMemberUnsupported = "Optional '?.' is only available starting from Adhoc version 12, starting GT Sport.";
+        public const string Error_NullCoalescingUnsupported = "Null coalescing (??) is only available from Adhoc version 12, starting GT Sport";
 
         public const string Error_VaCall_MissingFunctionTarget = "Missing FunctionObject target and argument array in variadic function call";
         public const string Error_VaCall_MissingArguments = "Missing argument array in variadic function call";

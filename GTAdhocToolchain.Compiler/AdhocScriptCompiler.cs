@@ -213,6 +213,9 @@ namespace GTAdhocToolchain.Compiler
                 case Nodes.PrintStatement:
                     CompilePrintStatement(frame, node as PrintStatement);
                     break;
+                case Nodes.DelegateDefinition:
+                    CompileDelegateDefinition(frame, node as DelegateDefinition);
+                    break;
                 case Nodes.EmptyStatement:
                     break;
                 default:
@@ -1394,11 +1397,33 @@ namespace GTAdhocToolchain.Compiler
                 case Nodes.ChainExpression:
                     CompileChainExpression(frame, exp as ChainExpression);
                     break;
-
                 default:
                     ThrowCompilationError(exp, $"Expression {exp.Type} not supported");
                     break;
             }
+        }
+
+        /// <summary>
+        /// Compile 'delegate myDelegate'
+        /// </summary>
+        /// <param name="frame"></param>
+        /// <param name="chainExpression"></param>
+        private void CompileDelegateDefinition(AdhocCodeFrame frame, DelegateDefinition delegateDefinition)
+        {
+            if (frame.Version < 12)
+                ThrowCompilationError(delegateDefinition, CompilationMessages.Error_DelegatesUnsupported);
+
+            var idSymb = SymbolMap.RegisterSymbol(delegateDefinition.Identifier.Name);
+            InsDelegateDefine ins = new InsDelegateDefine(idSymb);
+            frame.AddInstruction(ins, delegateDefinition.Location.Start.Line);
+
+            if (!frame.CurrentModule.DefineStatic(idSymb))
+                ThrowCompilationError(delegateDefinition, $"Member {idSymb.Name} was already declared in this module.");
+
+            frame.AddAttributeOrStaticMemberVariable(idSymb);
+
+            if (frame.Version < 13)
+                AddPostCompilationWarning(CompilationMessages.Warning_UsingDelegateCode);
         }
 
         /// <summary>
@@ -2135,7 +2160,10 @@ namespace GTAdhocToolchain.Compiler
 
             if (computedMember.Optional)
             {
-                if (frame.Version <= 13)
+                if (frame.Version < 12)
+                    ThrowCompilationError(computedMember, CompilationMessages.Error_OptionalComputedMemberUnsupported);
+
+                if (frame.Version < 13)
                     AddPostCompilationWarning(CompilationMessages.Warning_UsingOptional_Code);
 
                 frame.AddInstruction(new InsOptional(), computedMember.Location.Start.Line);
@@ -2193,7 +2221,10 @@ namespace GTAdhocToolchain.Compiler
 
             if (attrExp.Optional)
             {
-                if (frame.Version <= 13)
+                if (frame.Version < 12)
+                    ThrowCompilationError(attrExp, CompilationMessages.Error_OptionalMemberUnsupported);
+
+                if (frame.Version < 13)
                     AddPostCompilationWarning(CompilationMessages.Warning_UsingOptional_Code);
 
                 frame.AddInstruction(new InsOptional(), attrExp.Location.Start.Line);
@@ -2416,7 +2447,10 @@ namespace GTAdhocToolchain.Compiler
                 }
                 else if (binExp.Operator == BinaryOperator.NullishCoalescing)
                 {
-                    if (frame.Version <= 13)
+                    if (frame.Version < 12)
+                        ThrowCompilationError(binExp, CompilationMessages.Error_NullCoalescingUnsupported);
+
+                    if (frame.Version < 13)
                         AddPostCompilationWarning(CompilationMessages.Warning_UsingOptional_Code);
 
                     var jumpIfNotNil = new InsJumpIfNotNil();

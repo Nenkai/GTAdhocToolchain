@@ -264,6 +264,7 @@ namespace GTAdhocToolchain.Core
                 case AdhocInstructionType.SOURCE_FILE:
                 case AdhocInstructionType.CODE_EVAL:
                 case AdhocInstructionType.LEAVE: // FIX ME LATER
+                case AdhocInstructionType.DELEGATE_DEFINE:
                     break;
 
                 case AdhocInstructionType.LOGICAL_OPTIONAL:
