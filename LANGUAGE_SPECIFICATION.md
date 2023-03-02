@@ -327,6 +327,17 @@ function myFunction(args...) // Not ...args!
 }
 ```
 
+## Identifier Literals
+Identifier literals allow defining identifiers with normally illegal characters incase you have to.
+```js
+var `my totally valid identifier` = "hello world";
+
+module `my module`
+{
+
+}
+```
+
 ## Pass by reference
 [TODO]
 
