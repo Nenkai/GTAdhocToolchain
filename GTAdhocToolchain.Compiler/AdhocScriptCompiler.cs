@@ -2470,35 +2470,24 @@ namespace GTAdhocToolchain.Compiler
             }
         }
 
-        private void CompileFinalizerStatement(AdhocCodeFrame frame, FinalizerStatement finalizerStatement)
+        private void CompileFinalizerStatement(AdhocCodeFrame frame, FinalizerStatement finalizer)
         {
-            if (finalizerStatement.Body is FunctionExpression funcExp)
-            {
-                if (funcExp.Id is not null)
-                    ThrowCompilationError(funcExp, "Finalizer function expression must not have a name.");
-                if (funcExp.Params.Count > 0)
-                    ThrowCompilationError(funcExp, "Finalizer function expression must not have arguments.");
-            }
-            else if (finalizerStatement.Body is ArrowFunctionExpression arrowFuncExp)
-            {
-                if (arrowFuncExp.Id is not null)
-                    ThrowCompilationError(arrowFuncExp, "Finalizer arrow function expression must not have a name.");
-                if (arrowFuncExp.Params.Count > 0)
-                    ThrowCompilationError(arrowFuncExp, "Finalizer arrow function expression must not have arguments.");
-            }
-            else
-            {
-                ThrowCompilationError(finalizerStatement.Body, "Expected finalizer to be a function expression or function lambda.");
-            }
+            var asSubroutine = new FunctionDeclaration(null,
+                new NodeList<Expression>(), // No parameters
+                new BlockStatement(NodeList.Create(new Statement[] { finalizer })),
+                generator: false,
+                strict: true,
+                async: false);
+            asSubroutine.Location = new Location(finalizer.Location.Start, finalizer.Location.End, finalizer.Location.Source);
 
-            CompileExpression(frame, finalizerStatement.Body);
+            CompileAnonymousSubroutine(frame, asSubroutine, finalizer.Body, new NodeList<Expression>());
 
             // add temp value & set finally
-            InsertVariablePush(frame, new Identifier($"fin#{SymbolMap.TempVariableCounter++}") { Location = finalizerStatement.Body.Location }, true);
+            InsertVariablePush(frame, new Identifier($"fin#{SymbolMap.TempVariableCounter++}") { Location = finalizer.Body.Location }, true);
 
             InsAttributePush push = new InsAttributePush();
             push.AttributeSymbols.Add(SymbolMap.RegisterSymbol("finally"));
-            frame.AddInstruction(push, finalizerStatement.Body.Location.Start.Line);
+            frame.AddInstruction(push, finalizer.Body.Location.Start.Line);
             InsertAssignPop(frame);
         }
 
