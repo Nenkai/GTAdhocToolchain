@@ -338,6 +338,18 @@ module `my module`
 }
 ```
 
+## Delegates (GT Sport and above)
+```cs
+function myFunc()
+{
+    return "hello world";
+}
+
+delegate myDelegate;
+myDelegate = myFunc; // This will not override myDelegate with a function, rather assign a function to the delegate
+return myDelegate(); // "hello world"
+```
+
 ## Pass by reference
 [TODO]
 
