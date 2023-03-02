@@ -19,7 +19,7 @@ module MyModule
 }
 ```
 
-For statics, the keyword `static` is used. They are accessed in a C++ namespace manner, or through `[]`indexing
+For statics, the keyword `static` is used. They are accessed in a C++ namespace manner, or through `[]` indexing:
 ```java
 module StaticModule
 {
