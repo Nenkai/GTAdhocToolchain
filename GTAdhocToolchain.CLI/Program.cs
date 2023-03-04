@@ -16,6 +16,7 @@ using GTAdhocToolchain.Menu.Resources;
 using GTAdhocToolchain.Packaging;
 using GTAdhocToolchain.Core.Instructions;
 using GTAdhocToolchain.Menu.Fields;
+using GTAdhocToolchain.Preprocessor;
 
 namespace GTAdhocToolchain.CLI
 {
@@ -26,6 +27,9 @@ namespace GTAdhocToolchain.CLI
         public static void Main(string[] args)
         {
             Console.WriteLine("[-- GTAdhocToolchain by Nenkai#9075 -- ]");
+
+            var preprocessor = new AdhocScriptPreprocessor();
+            preprocessor.Preprocess(File.ReadAllText("test.ad"));
 
             if (args.Length == 1)
             {

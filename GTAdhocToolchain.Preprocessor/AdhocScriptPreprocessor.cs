@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 using System.IO;
+using Esprima.Ast;
 
 namespace GTAdhocToolchain.Preprocessor
 {
@@ -28,6 +29,7 @@ namespace GTAdhocToolchain.Preprocessor
                 var define = new DefineMacro();
                 _defines.Add(def.Key, new DefineMacro()
                 {
+                    Name = def.Key,
                     IsBuiltin = true,
                     Content = new List<Token>()
                     {
@@ -41,7 +43,12 @@ namespace GTAdhocToolchain.Preprocessor
         {
             _scanner = new Scanner(code);
             NextToken();
-            while (true) 
+            _Preprocess("");
+        }
+
+        private void _Preprocess(string until)
+        {
+            while (true)
             {
                 if (_lookahead.Type == TokenType.EOF)
                     break;
@@ -56,6 +63,17 @@ namespace GTAdhocToolchain.Preprocessor
                             ParseDefine(); break;
                         case "undef":
                             ParseUndef(); break;
+                        case "ifdef":
+                            ParseIfdef(); break;
+
+                        case "endif":
+                            if (_lookahead.Value as string == until)
+                            {
+                                NextToken();
+                                return;
+                            }
+
+                            throw new Exception("#endif without #if");
                     }
 
                     continue;
@@ -84,6 +102,7 @@ namespace GTAdhocToolchain.Preprocessor
             int count = 0;
 
             var define = new DefineMacro();
+            define.Name = name.Value as string;
 
             while (true)
             {
@@ -119,7 +138,7 @@ namespace GTAdhocToolchain.Preprocessor
             Token name = _lookahead;
 
             if (name.Type != TokenType.Identifier)
-                throw new Exception("Expected identifier for undef name");
+                throw new Exception("macro names must be identifiers");
 
             if (!_defines.TryGetValue(name.Value as string, out DefineMacro define))
             {
@@ -133,6 +152,44 @@ namespace GTAdhocToolchain.Preprocessor
             _defines.Remove(name.Value as string);
 
             NextToken();
+        }
+
+
+        private void ParseIfdef()
+        {
+            NextToken();
+            Token name = _lookahead;
+
+            if (name.Type != TokenType.Identifier)
+                throw new Exception("macro names must be identifiers");
+
+            if (_defines.ContainsKey(name.Value as string))
+            {
+                NextToken();
+
+                // Do lines until endif
+                _Preprocess("endif");
+                return;
+            }
+
+            // Skip until next endif
+            while (true)
+            {
+                if (_lookahead.Type == TokenType.EOF)
+                    throw new Exception("unterminated #ifdef");
+
+                if (_lookahead.Value as string == "#")
+                {
+                    NextToken();
+                    if (_lookahead.Value as string == "endif")
+                    {
+                        NextToken();
+                        break;
+                    }
+                }
+
+                NextToken();
+            }
         }
 
         /// <summary>
@@ -178,7 +235,7 @@ namespace GTAdhocToolchain.Preprocessor
 
                     List<Token> expanded = ExpandMacroFunction(define, args);
                     if (args.Count != define.Arguments.Count)
-                        throw new Exception("Not enough arguments in macro function");
+                        throw new Exception($"macro \"{define.Name}\" requires {define.Arguments.Count} arguments, but only {args.Count} given");
 
                     WriteTokens(expanded);
                 }
@@ -465,6 +522,7 @@ namespace GTAdhocToolchain.Preprocessor
 
     public class DefineMacro
     {
+        public string Name { get; set; }
         public bool IsFunctionMacro { get; set; }
         public bool IsBuiltin { get; set; }
 
