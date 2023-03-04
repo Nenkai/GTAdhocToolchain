@@ -28,6 +28,7 @@ namespace GTAdhocToolchain.Preprocessor
                 var define = new DefineMacro();
                 _defines.Add(def.Key, new DefineMacro()
                 {
+                    IsBuiltin = true,
                     Content = new List<Token>()
                     {
                         new Token() { Value = def.Value },
@@ -53,6 +54,8 @@ namespace GTAdhocToolchain.Preprocessor
                     {
                         case "define":
                             ParseDefine(); break;
+                        case "undef":
+                            ParseUndef(); break;
                     }
 
                     continue;
@@ -105,6 +108,31 @@ namespace GTAdhocToolchain.Preprocessor
                 Console.WriteLine(@$"Warning: Redefinition of macro '{name.Value}'");
                 _defines[(string)name.Value] = define;
             }
+        }
+
+        /// <summary>
+        /// Parses #undef
+        /// </summary>
+        private void ParseUndef()
+        {
+            NextToken();
+            Token name = _lookahead;
+
+            if (name.Type != TokenType.Identifier)
+                throw new Exception("Expected identifier for undef name");
+
+            if (!_defines.TryGetValue(name.Value as string, out DefineMacro define))
+            {
+                Console.WriteLine($"Warning: Cannot undef '{name.Value as string}', not defined");
+            }
+            else if (define.IsBuiltin)
+            {
+                Console.WriteLine($"Warning: Undefining builtin define '{name.Value as string}'");
+            }
+
+            _defines.Remove(name.Value as string);
+
+            NextToken();
         }
 
         /// <summary>
@@ -438,6 +466,7 @@ namespace GTAdhocToolchain.Preprocessor
     public class DefineMacro
     {
         public bool IsFunctionMacro { get; set; }
+        public bool IsBuiltin { get; set; }
 
         public List<DefineMacroArgument> Arguments { get; set; } = new List<DefineMacroArgument>();
         public List<Token> Content { get; set; } = new List<Token>();
