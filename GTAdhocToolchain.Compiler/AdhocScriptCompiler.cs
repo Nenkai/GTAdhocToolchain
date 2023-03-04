@@ -2756,15 +2756,6 @@ namespace GTAdhocToolchain.Compiler
                 frame.AddInstruction(new InsStringConst(frame.SourceFilePath), identifier.Location.Start.Line);
                 return true;
             }
-            else if (AdhocDefineConstants.CompilerProvidedConstants.ContainsKey(identifier.Name))
-            {
-                var define = AdhocDefineConstants.CompilerProvidedConstants[identifier.Name];
-                if (define is InsStringConst str)
-                    str.String = SymbolMap.RegisterSymbol(str.String.Name);
-
-                frame.AddInstruction(define, identifier.Location.Start.Line);
-                return true;
-            }
 
             return false;
         }

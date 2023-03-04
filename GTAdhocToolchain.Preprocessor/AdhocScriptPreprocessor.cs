@@ -22,6 +22,18 @@ namespace GTAdhocToolchain.Preprocessor
         public AdhocScriptPreprocessor()
         {
             _writer = new StreamWriter(new MemoryStream(), Encoding.UTF8);
+
+            foreach (var def in BuiltinDefines.CompilerProvidedConstants)
+            {
+                var define = new DefineMacro();
+                _defines.Add(def.Key, new DefineMacro()
+                {
+                    Content = new List<Token>()
+                    {
+                        new Token() { Value = def.Value },
+                    }
+                });
+            }
         }
 
         public void Preprocess(string code)
@@ -37,15 +49,17 @@ namespace GTAdhocToolchain.Preprocessor
                 {
                     NextToken();
 
-                    if ((string)_lookahead.Value == "define")
+                    switch (_lookahead.Value)
                     {
-                        ParseDefine();
-                        continue;
+                        case "define":
+                            ParseDefine(); break;
                     }
+
+                    continue;
                 }
                 else if (_lookahead.Type == TokenType.Identifier)
                 {
-                    ProcessIdentifier(_lookahead);
+                    ProcessSourceIdentifier(_lookahead);
                 }
                 else
                 {
@@ -64,23 +78,26 @@ namespace GTAdhocToolchain.Preprocessor
             NextToken();
             Token name = _lookahead;
 
-            bool parsedArguments = false;
+            int count = 0;
 
             var define = new DefineMacro();
+
             while (true)
             {
                 NextToken();
-                if (!parsedArguments && (string)_lookahead.Value == "(")
+                if (count == 0 && (string)_lookahead.Value == "(")
                 {
                     ParseMacroFunctionParameters(define);
-                    parsedArguments = true;
-                    continue;
+                }
+                else
+                {
+                    if (_lookahead.Location.Start.Line != name.Location.Start.Line)
+                        break;
+
+                    define.Content.Add(_lookahead);
                 }
 
-                if (_lookahead.Location.Start.Line != name.Location.Start.Line)
-                    break;
-
-                define.Content.Add(_lookahead);
+                count++;
             }
 
             if (!_defines.TryAdd((string)name.Value, define))
@@ -90,7 +107,38 @@ namespace GTAdhocToolchain.Preprocessor
             }
         }
 
-        private void ProcessIdentifier(Token token)
+        /// <summary>
+        /// Parses a macro define's parameters
+        /// </summary>
+        /// <param name="define"></param>
+        private void ParseMacroFunctionParameters(DefineMacro define)
+        {
+            Expect("(");
+            NextToken();
+
+            define.IsFunctionMacro = true;
+
+            while ((string)_lookahead.Value != ")")
+            {
+                var arg = new DefineMacroArgument();
+                arg.Name = _lookahead.Value as string;
+                define.Arguments.Add(arg);
+
+                NextToken();
+
+                if ((string)_lookahead.Value == ",")
+                    NextToken();
+            }
+
+            Expect(")");
+        }
+
+        /// <summary>
+        /// Processes a source code identifier
+        /// </summary>
+        /// <param name="token"></param>
+        /// <exception cref="Exception"></exception>
+        private void ProcessSourceIdentifier(Token token)
         {
             if (_defines.TryGetValue(token.Value as string, out DefineMacro define))
             {
@@ -100,13 +148,16 @@ namespace GTAdhocToolchain.Preprocessor
                     NextToken();
                     var args = CollectArguments(define);
 
+                    List<Token> expanded = ExpandMacroFunction(define, args);
                     if (args.Count != define.Arguments.Count)
-                        throw new Exception("Not enough arguments in macro");
+                        throw new Exception("Not enough arguments in macro function");
+
+                    WriteTokens(expanded);
                 }
                 else
                 {
-                    foreach (var t in define.Content)
-                        ProcessIdentifier(t);
+                    var expanded = ExpandTokens(define.Content);
+                    WriteTokens(expanded);
                 }
             }
             else
@@ -114,18 +165,99 @@ namespace GTAdhocToolchain.Preprocessor
                 Write(token.Value as string);
             }
         }
+        
+        private List<Token> ExpandMacroFunction(DefineMacro define, Dictionary<string, List<Token>> callArgs)
+        {
+            var list = new List<Token>();
 
-        private List<List<Token>> CollectArguments(DefineMacro define)
+            int i = 0;
+            foreach (var token in define.Content)
+            {
+                if (token.Type != TokenType.Identifier)
+                {
+                    list.Add(token);
+                    continue;
+                }
+
+                if (callArgs.TryGetValue(token.Value as string, out List<Token> replacements))
+                {
+                    list.AddRange(ExpandTokens(replacements));
+                }
+                else
+                {
+                    ;
+                }
+            }
+
+            return list;
+        }
+
+        /// <summary>
+        /// Takes a list of tokens and expands them all if needed
+        /// </summary>
+        /// <param name="inputTokens"></param>
+        /// <returns></returns>
+        private List<Token> ExpandTokens(List<Token> inputTokens)
+        {
+            List<Token> tokens = new List<Token>();
+            for (var currentIndex = 0; currentIndex < inputTokens.Count; currentIndex++)
+            {
+                tokens.AddRange(Evaluate(inputTokens, ref currentIndex));
+            }
+
+            return tokens;
+        }
+
+        private List<Token> Evaluate(List<Token> list, ref int currentIndex)
+        {
+            var token = list[currentIndex];
+
+            var output = new List<Token>();
+
+            if (_defines.TryGetValue(token.Value as string, out DefineMacro define))
+            {
+                if (define.IsFunctionMacro)
+                {
+                    // Parse arguments
+                    token = list[++currentIndex];
+                    var args = EvalCollectArguments(list, ref currentIndex, define);
+
+                    List<Token> expanded = ExpandMacroFunction(define, args);
+                    if (args.Count != define.Arguments.Count)
+                        throw new Exception("Not enough arguments in macro");
+
+                    output.AddRange(expanded);
+                }
+                else
+                {
+                    int idx = 0;
+                    output.AddRange(Evaluate(define.Content, ref idx));
+                }
+            }
+            else
+            {
+                output.Add(token);
+            }
+
+            return output;
+        }
+
+        /// <summary>
+        /// Collects all the arguments of a macro call
+        /// </summary>
+        /// <param name="define"></param>
+        /// <returns></returns>
+        private Dictionary<string, List<Token>> CollectArguments(DefineMacro define)
         {
             Expect("(");
             NextToken();
 
-            var args = new List<List<Token>>();
+            var args = new Dictionary<string, List<Token>>();
 
             for (var i = 0; i < define.Arguments.Count; i++)
             {
                 List<Token> argTokens = CollectArgument();
-                args.Add(argTokens);
+                args.Add(define.Arguments[i].Name, argTokens);
 
                 if ((string)_lookahead.Value != ",")
                     break;
@@ -136,6 +268,37 @@ namespace GTAdhocToolchain.Preprocessor
             return args;
         }
 
+        /// <summary>
+        /// Collects all the arguments of a macro call
+        /// </summary>
+        /// <param name="define"></param>
+        /// <returns></returns>
+        private Dictionary<string, List<Token>> EvalCollectArguments(List<Token> list, ref int currentIndex, DefineMacro define)
+        {
+            var token = list[currentIndex++];
+            if (token.Value as string != "(")
+                throw new Exception("Expected");
+
+            var args = new Dictionary<string, List<Token>>();
+            for (var i = 0; i < define.Arguments.Count; i++)
+            {
+                List<Token> argTokens = EvalCollectArgument(list, ref currentIndex);
+                args.Add(define.Arguments[i].Name, argTokens);
+
+                token = list[currentIndex];
+                if ((string)token.Value != ",")
+                    break;
+
+                ++currentIndex;
+            }
+
+            return args;
+        }
+
+        /// <summary>
+        /// Collects a single argument of a macro call
+        /// </summary>
+        /// <returns></returns>
         private List<Token> CollectArgument()
         {
             List<Token> tokens = new List<Token>();
@@ -162,26 +325,35 @@ namespace GTAdhocToolchain.Preprocessor
             return tokens;
         }
 
-        private void ParseMacroFunctionParameters(DefineMacro define)
+        /// <summary>
+        /// Collects a single argument of a macro call
+        /// </summary>
+        /// <returns></returns>
+        private List<Token> EvalCollectArgument(List<Token> tokensToEval, ref int currentIndex)
         {
-            Expect("(");
-            NextToken();
+            List<Token> tokens = new List<Token>();
+            int depth = 0;
 
-            define.IsFunctionMacro = true;
-
-            while ((string)_lookahead.Value != ")")
+            var token = tokensToEval[currentIndex];
+            while (true)
             {
-                var arg = new DefineMacroArgument();
-                arg.Name = _lookahead.Value as string;
-                define.Arguments.Add(arg);
+                if ((string)token.Value == ")" && depth == 0)
+                    break;
 
-                NextToken();
+                if ((string)token.Value == "," && depth == 0)
+                    break;
 
-                if ((string)_lookahead.Value == ",")
-                    NextToken();
+                if ((string)token.Value == "(")
+                    depth++;
+                else if ((string)token.Value == ")")
+                    depth--;
+
+                tokens.Add(token);
+
+                token = tokensToEval[++currentIndex];
             }
 
-            Expect(")");
+            return tokens;
         }
 
         private void Expect(string val)
@@ -199,6 +371,12 @@ namespace GTAdhocToolchain.Preprocessor
         private void Write(string str)
         {
             _writer.Write(str);
+        }
+
+        private void WriteTokens(IEnumerable<Token> tokens)
+        {
+            foreach (var token in tokens)
+                _writer.Write(token.Value as string);
         }
 
         /// <summary>
