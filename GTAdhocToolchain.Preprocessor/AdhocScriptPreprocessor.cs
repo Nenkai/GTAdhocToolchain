@@ -43,10 +43,10 @@ namespace GTAdhocToolchain.Preprocessor
         {
             _scanner = new Scanner(code);
             NextToken();
-            _Preprocess("");
+            _Preprocess(false);
         }
 
-        private void _Preprocess(string until)
+        private void _Preprocess(bool conditional)
         {
             while (true)
             {
@@ -65,13 +65,13 @@ namespace GTAdhocToolchain.Preprocessor
                             ParseUndef(); break;
                         case "ifdef":
                             ParseIfdef(); break;
+                        case "ifndef":
+                            ParseIfndef(); break;
 
                         case "endif":
-                            if (_lookahead.Value as string == until)
-                            {
-                                NextToken();
-                                return;
-                            }
+                        case "elif":
+                        case "else":
+                            return;
 
                             throw new Exception("#endif without #if");
                     }
@@ -163,16 +163,80 @@ namespace GTAdhocToolchain.Preprocessor
             if (name.Type != TokenType.Identifier)
                 throw new Exception("macro names must be identifiers");
 
-            if (_defines.ContainsKey(name.Value as string))
+            var res = _defines.ContainsKey(name.Value as string);
+            DoConditional(res);
+        }
+
+        private void ParseIfndef()
+        {
+            NextToken();
+            Token name = _lookahead;
+
+            if (name.Type != TokenType.Identifier)
+                throw new Exception("macro names must be identifiers");
+
+            var res = _defines.ContainsKey(name.Value as string);
+            DoConditional(!res);
+        }
+
+        private void DoConditional(bool res)
+        {
+            if (res)
             {
                 NextToken();
 
                 // Do lines until endif
-                _Preprocess("endif");
-                return;
+                _Preprocess(true);
+            }
+            else
+            {
+                SkipUntilNextConditionalDirective();
             }
 
-            // Skip until next endif
+            while (true)
+            {
+                if (_lookahead.Value as string == "else")
+                {
+                    NextToken();
+                    if (res)
+                        SkipUntilNextConditionalDirective();
+                    else
+                        _Preprocess(true);
+                }
+                else if (_lookahead.Value as string == "elif")
+                {
+                    var cond = new List<Token>();
+                    int line = _lookahead.Location.Start.Line;
+
+                    NextToken();
+                    while (true)
+                    {
+                        if (line != _lookahead.Location.Start.Line)
+                            break;
+
+                        cond.Add(_lookahead);
+                        NextToken();
+                    }
+
+                    List<Token> expanded = ExpandTokens(cond);
+                    var evaluator = new AdhocExpressionEvaluator(expanded);
+
+                    int elif_res = evaluator.Evaluate();
+                    if (elif_res != 0)
+                        _Preprocess(true);
+                    else
+                        SkipUntilNextConditionalDirective();
+                }
+                else if (_lookahead.Value as string == "endif")
+                {
+                    NextToken();
+                    break;
+                }
+            }
+        }
+
+        private void SkipUntilNextConditionalDirective()
+        {
             while (true)
             {
                 if (_lookahead.Type == TokenType.EOF)
@@ -181,16 +245,16 @@ namespace GTAdhocToolchain.Preprocessor
                 if (_lookahead.Value as string == "#")
                 {
                     NextToken();
-                    if (_lookahead.Value as string == "endif")
-                    {
-                        NextToken();
+
+                    string dir = _lookahead.Value as string;
+                    if (dir == "elif" || dir == "endif" || dir == "else")
                         break;
-                    }
                 }
 
                 NextToken();
             }
         }
+
 
         /// <summary>
         /// Parses a macro define's parameters
