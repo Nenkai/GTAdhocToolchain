@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using System.Xml.Linq;
 using System.IO;
 using Esprima.Ast;
+using System.Globalization;
 
 namespace GTAdhocToolchain.Preprocessor
 {
@@ -18,15 +19,17 @@ namespace GTAdhocToolchain.Preprocessor
         private Scanner _scanner;
         private Token _lookahead;
 
-        private StreamWriter _writer;
+        private StringWriter _writer;
+        private StringBuilder _sb = new();
+
+        private string _baseDirectory;
 
         public AdhocScriptPreprocessor()
         {
-            _writer = new StreamWriter(new MemoryStream(), Encoding.UTF8);
+            _writer = new StringWriter(_sb);
 
             foreach (var def in BuiltinDefines.CompilerProvidedConstants)
             {
-                var define = new DefineMacro();
                 _defines.Add(def.Key, new DefineMacro()
                 {
                     Name = def.Key,
@@ -39,11 +42,19 @@ namespace GTAdhocToolchain.Preprocessor
             }
         }
 
-        public void Preprocess(string code)
+        public void SetBaseDirectory(string baseDirectory)
+        {
+            _baseDirectory = baseDirectory;
+        }
+
+        public string Preprocess(string code)
         {
             _scanner = new Scanner(code);
+
             NextToken();
             _Preprocess(false);
+
+            return _sb.ToString();
         }
 
         private void _Preprocess(bool inConditional)
@@ -59,13 +70,16 @@ namespace GTAdhocToolchain.Preprocessor
 
                     switch (_lookahead.Value)
                     {
+                        case "include":
+                            ParseInclude(); break;
+
                         case "define":
                             ParseDefine(); break;
                         case "undef":
                             ParseUndef(); break;
+
                         case "if":
                             ParseIf(); break;
-
                         case "ifdef":
                             ParseIfdef(); break;
                         case "ifndef":
@@ -73,17 +87,17 @@ namespace GTAdhocToolchain.Preprocessor
 
                         case "endif":
                             if (!inConditional)
-                                throw new Exception("#endif without #if");
+                                ThrowPreprocessorError(_lookahead, "#endif without #if");
                             return;
 
                         case "elif":
                             if (!inConditional)
-                                throw new Exception("#elif without #if");
+                                ThrowPreprocessorError(_lookahead, "#elif without #if");
                             return;
 
                         case "else":
                             if (!inConditional)
-                                throw new Exception("#else without #if");
+                                ThrowPreprocessorError(_lookahead, "#else without #if");
                             return;
                     }
 
@@ -149,7 +163,7 @@ namespace GTAdhocToolchain.Preprocessor
             Token name = _lookahead;
 
             if (name.Type != TokenType.Identifier)
-                throw new Exception("macro names must be identifiers");
+                ThrowPreprocessorError(name, "macro names must be identifiers");
 
             if (!_defines.TryGetValue(name.Value as string, out DefineMacro define))
             {
@@ -171,7 +185,7 @@ namespace GTAdhocToolchain.Preprocessor
             Token name = _lookahead;
 
             if (name.Type != TokenType.Identifier)
-                throw new Exception("#ifdef: macro names must be identifiers");
+                ThrowPreprocessorError(name, "#ifdef: macro names must be identifiers");
 
             var res = _defines.ContainsKey(name.Value as string);
 
@@ -185,7 +199,7 @@ namespace GTAdhocToolchain.Preprocessor
             Token name = _lookahead;
 
             if (name.Type != TokenType.Identifier)
-                throw new Exception("#ifndef: macro names must be identifiers");
+                ThrowPreprocessorError(name, "#ifndef: macro names must be identifiers");
 
             var res = _defines.ContainsKey(name.Value as string);
 
@@ -195,15 +209,16 @@ namespace GTAdhocToolchain.Preprocessor
 
         private void ParseIf()
         {
+            int line = _lookahead.Location.Start.Line;
+            Token ifToken = _lookahead;
             NextToken();
 
             var cond = new List<Token>();
-            int line = _lookahead.Location.Start.Line;
-
+            
             while (true)
             {
                 if (_lookahead.Type == TokenType.EOF)
-                    throw new Exception("unexpected end of file after #elif");
+                    ThrowPreprocessorError(ifToken, "unexpected end of file after #if");
 
                 if (line != _lookahead.Location.Start.Line)
                     break;
@@ -212,11 +227,46 @@ namespace GTAdhocToolchain.Preprocessor
                 NextToken();
             }
 
+            if (cond.Count == 0)
+                ThrowPreprocessorError(ifToken, "#if with no expression");
+
             var expanded = ExpandTokens(cond);
 
             var evaluator = new AdhocExpressionEvaluator(expanded);
             int res = evaluator.Evaluate();
             DoConditional(res != 0);
+        }
+
+        private void ParseInclude()
+        {
+            NextToken();
+
+            if (_lookahead.Type != TokenType.Template)
+                ThrowPreprocessorError(_lookahead, "#include expects a file name");
+
+            string file = (_lookahead.Value as string).Trim('\"');
+            string pathToInclude = Path.Combine(_baseDirectory, file);
+            if (!File.Exists(pathToInclude))
+                ThrowPreprocessorError(_lookahead, "#include: No such file or directory");
+
+
+            NextToken();
+
+            var content = File.ReadAllText(pathToInclude);
+
+            // Save state
+            var _oldToken = _lookahead;
+            var _oldScanner = _scanner;
+
+            _writer.WriteLine($"# 1 \"{file}\"");
+            Preprocess(content);
+            _writer.WriteLine();
+
+            // Restore state
+            _lookahead = _oldToken;
+            _scanner = _oldScanner;
+
+            _writer.WriteLine($"# {_lookahead.Location.Start.Line} \"test.ad\"");
         }
 
         private void DoConditional(bool res)
@@ -242,7 +292,7 @@ namespace GTAdhocToolchain.Preprocessor
                         _Preprocess(true);
 
                     if (_lookahead.Type == TokenType.EOF)
-                        throw new Exception("Unterminated #else");
+                        ThrowPreprocessorError(_lookahead, "Unterminated #else");
                 }
                 else if (_lookahead.Value as string == "elif")
                 {
@@ -253,7 +303,7 @@ namespace GTAdhocToolchain.Preprocessor
                     while (true)
                     {
                         if (_lookahead.Type == TokenType.EOF)
-                            throw new Exception("unexpected end of file after #elif");
+                            ThrowPreprocessorError(_lookahead, "unexpected end of file after #elif");
 
                         if (line != _lookahead.Location.Start.Line)
                             break;
@@ -263,7 +313,7 @@ namespace GTAdhocToolchain.Preprocessor
                     }
 
                     if (cond.Count == 0)
-                        throw new Exception("#elif with no expression");
+                        ThrowPreprocessorError(_lookahead, "#elif with no expression");
 
                     List<Token> expanded = ExpandTokens(cond);
                     var evaluator = new AdhocExpressionEvaluator(expanded);
@@ -287,7 +337,7 @@ namespace GTAdhocToolchain.Preprocessor
             while (true)
             {
                 if (_lookahead.Type == TokenType.EOF)
-                    throw new Exception("unterminated #ifdef");
+                    ThrowPreprocessorError(_lookahead, "unterminated #ifdef");
 
                 if (_lookahead.Value as string == "#")
                 {
@@ -301,7 +351,6 @@ namespace GTAdhocToolchain.Preprocessor
                 NextToken();
             }
         }
-
 
         /// <summary>
         /// Parses a macro define's parameters
@@ -320,7 +369,7 @@ namespace GTAdhocToolchain.Preprocessor
                 string name = _lookahead.Value as string;
 
                 if (define.Arguments.Find(e => e.Name == name) is not null)
-                    throw new Exception($"duplicate macro parameter \"{name}\"");
+                    ThrowPreprocessorError(_lookahead, $"duplicate macro parameter \"{name}\"");
 
                 arg.Name = name;
                 define.Arguments.Add(arg);
@@ -348,11 +397,10 @@ namespace GTAdhocToolchain.Preprocessor
                     // Parse arguments
                     NextToken();
                     var args = CollectArguments(define);
+                    if (args.Count < define.Arguments.Count)
+                        ThrowPreprocessorError(token, $"macro \"{define.Name}\" requires {define.Arguments.Count} arguments, but only {args.Count} given");
 
-                    List<Token> expanded = ExpandMacroFunction(define, args);
-                    if (args.Count != define.Arguments.Count)
-                        throw new Exception($"macro \"{define.Name}\" requires {define.Arguments.Count} arguments, but only {args.Count} given");
-
+                    List<Token> expanded = args.Count > 0 ? ExpandMacroFunction(define, args) : ExpandTokens(define.Content);
                     WriteTokens(expanded);
                 }
                 else
@@ -454,12 +502,11 @@ namespace GTAdhocToolchain.Preprocessor
                 if (define.IsFunctionMacro)
                 {
                     // Parse arguments
-                    token = list[++currentIndex];
                     var args = EvalCollectArguments(list, ref currentIndex, define);
 
                     List<Token> expanded = ExpandMacroFunction(define, args);
                     if (args.Count != define.Arguments.Count)
-                        throw new Exception("Not enough arguments in macro");
+                        ThrowPreprocessorError(token, "Not enough arguments in macro");
 
                     output.AddRange(expanded);
                 }
@@ -491,6 +538,12 @@ namespace GTAdhocToolchain.Preprocessor
 
             for (var i = 0; i < define.Arguments.Count; i++)
             {
+                if (_lookahead.Value as string == ")")
+                {
+                    NextToken();
+                    break;
+                }
+
                 List<Token> argTokens = CollectArgument();
                 args.Add(define.Arguments[i].Name, argTokens);
 
@@ -512,7 +565,7 @@ namespace GTAdhocToolchain.Preprocessor
         {
             var token = list[currentIndex++];
             if (token.Value as string != "(")
-                throw new Exception("Expected");
+                ThrowPreprocessorError(token, "Expected '('");
 
             var args = new Dictionary<string, List<Token>>();
             for (var i = 0; i < define.Arguments.Count; i++)
@@ -528,7 +581,7 @@ namespace GTAdhocToolchain.Preprocessor
             }
 
             if (token.Value as string == ",")
-                throw new Exception("Too many arguments to macro call");
+                ThrowPreprocessorError(token, "Too many arguments to macro call");
 
             return args;
         }
@@ -597,13 +650,7 @@ namespace GTAdhocToolchain.Preprocessor
         private void Expect(string val)
         {
             if (_lookahead.Value as string != val)
-                throw new Exception("Unexpected");
-        }
-
-        private void Save()
-        {
-            _writer.Flush();
-            File.WriteAllBytes("test.bin", (_writer.BaseStream as MemoryStream).ToArray());
+                ThrowPreprocessorError(_lookahead, $"Unexpected '{_lookahead.Value as string}'");
         }
 
         private void Write(string str)
@@ -670,6 +717,11 @@ namespace GTAdhocToolchain.Preprocessor
                     }
                 }
             }
+        }
+
+        private void ThrowPreprocessorError(Token token, string message)
+        {
+
         }
     }
 

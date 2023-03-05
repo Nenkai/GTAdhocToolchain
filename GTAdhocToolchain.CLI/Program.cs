@@ -28,9 +28,6 @@ namespace GTAdhocToolchain.CLI
         {
             Console.WriteLine("[-- GTAdhocToolchain by Nenkai#9075 -- ]");
 
-            var preprocessor = new AdhocScriptPreprocessor();
-            preprocessor.Preprocess(File.ReadAllText("test.ad"));
-
             if (args.Length == 1)
             {
                 if (args[0].ToLower().EndsWith(".adc"))
@@ -205,7 +202,11 @@ namespace GTAdhocToolchain.CLI
             Logger.Info($"Started script build ({inputPath}).");
             try
             {
-                var parser = new AdhocAbstractSyntaxTree(source);
+                var preprocessor = new AdhocScriptPreprocessor();
+                preprocessor.SetBaseDirectory(Path.GetDirectoryName(inputPath));
+                string preprocessed = preprocessor.Preprocess(source);
+
+                var parser = new AdhocAbstractSyntaxTree(preprocessed);
                 parser.SetFileName(inputPath);
                 var program = parser.ParseScript();
 

@@ -143,7 +143,8 @@ namespace GTAdhocToolchain.Preprocessor
             }
             else if (_lookahead.Type == TokenType.Identifier)
             {
-                throw new Exception("Unresolved macro identifier");
+                // Resolver goes here if we need it
+                return 0;
             }
             else if (_lookahead.Type == TokenType.BooleanLiteral)
             {
