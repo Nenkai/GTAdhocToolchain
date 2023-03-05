@@ -84,18 +84,18 @@ namespace GTAdhocToolchain.Preprocessor
 
         public int EvalTernary()
         {
-            int c = EvalBinary(10);
+            int c = EvalBinary(11);
             if (_lookahead?.Value as string != "?")
                 return c;
 
             NextToken();
-            int v1 = EvalBinary(10);
+            int v1 = EvalBinary(11);
 
             if (_lookahead.Value as string != ":")
                 throw new Exception("Expected ':' after '?' for ternary expression");
 
             NextToken();
-            int v2 = EvalBinary(10);
+            int v2 = EvalBinary(11);
 
             return c == 0 ? v2 : v1;
         }
@@ -135,16 +135,15 @@ namespace GTAdhocToolchain.Preprocessor
                 NextToken();
                 var v = Evaluate();
 
-                // Check parenthesis
                 if (_lookahead?.Value as string != ")")
                     throw new Exception("missing closing parenthesis");
 
                 NextToken();
                 return v;
             }
-            else if (_lookahead.Type == TokenType.Identifier) // Identifier check
+            else if (_lookahead.Type == TokenType.Identifier)
             {
-                throw new Exception("Not supported");
+                throw new Exception("Unresolved macro identifier");
             }
             else if (_lookahead.Type == TokenType.BooleanLiteral)
             {
@@ -156,7 +155,7 @@ namespace GTAdhocToolchain.Preprocessor
             {
                 var v = int.Parse(_lookahead.Value as string);
                 NextToken();
-                return (int)v;
+                return v;
             }
             else
             {
