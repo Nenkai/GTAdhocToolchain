@@ -204,6 +204,8 @@ namespace GTAdhocToolchain.CLI
             {
                 var preprocessor = new AdhocScriptPreprocessor();
                 preprocessor.SetBaseDirectory(Path.GetDirectoryName(inputPath));
+                preprocessor.SetCurrentFileName(inputPath);
+
                 string preprocessed = preprocessor.Preprocess(source);
 
                 var parser = new AdhocAbstractSyntaxTree(preprocessed);

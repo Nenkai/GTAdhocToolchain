@@ -1747,7 +1747,7 @@ namespace GTAdhocToolchain.Compiler
             if (frame.Version < 11)
                 ThrowCompilationError(mapExpression, CompilationMessages.Error_MapUnsupported);
 
-            frame.AddInstruction(InsMapConst.Default, mapExpression.Location.Start.Line);
+            frame.AddInstruction(new InsMapConst(), mapExpression.Location.Start.Line);
 
             foreach (var (key, value) in mapExpression.Elements)
             {

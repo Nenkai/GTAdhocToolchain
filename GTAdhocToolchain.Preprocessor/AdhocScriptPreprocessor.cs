@@ -23,6 +23,7 @@ namespace GTAdhocToolchain.Preprocessor
         private StringBuilder _sb = new();
 
         private string _baseDirectory;
+        private string _currentFileName;
 
         public AdhocScriptPreprocessor()
         {
@@ -45,6 +46,11 @@ namespace GTAdhocToolchain.Preprocessor
         public void SetBaseDirectory(string baseDirectory)
         {
             _baseDirectory = baseDirectory;
+        }
+
+        public void SetCurrentFileName(string fileName)
+        {
+            _currentFileName = fileName;
         }
 
         public string Preprocess(string code)
@@ -71,19 +77,19 @@ namespace GTAdhocToolchain.Preprocessor
                     switch (_lookahead.Value)
                     {
                         case "include":
-                            ParseInclude(); break;
+                            DoInclude(); break;
 
                         case "define":
-                            ParseDefine(); break;
+                            DoDefine(); break;
                         case "undef":
-                            ParseUndef(); break;
+                            DoUndef(); break;
 
                         case "if":
-                            ParseIf(); break;
+                            DoIf(); break;
                         case "ifdef":
-                            ParseIfdef(); break;
+                            DoIfDef(); break;
                         case "ifndef":
-                            ParseIfndef(); break;
+                            DoIfNotDef(); break;
 
                         case "endif":
                             if (!inConditional)
@@ -119,7 +125,7 @@ namespace GTAdhocToolchain.Preprocessor
         /// <summary>
         /// Parses #define and adds it to the macro table
         /// </summary>
-        private void ParseDefine()
+        private void DoDefine()
         {
             NextToken();
             Token name = _lookahead;
@@ -157,7 +163,7 @@ namespace GTAdhocToolchain.Preprocessor
         /// <summary>
         /// Parses #undef
         /// </summary>
-        private void ParseUndef()
+        private void DoUndef()
         {
             NextToken();
             Token name = _lookahead;
@@ -179,7 +185,7 @@ namespace GTAdhocToolchain.Preprocessor
             NextToken();
         }
 
-        private void ParseIfdef()
+        private void DoIfDef()
         {
             NextToken();
             Token name = _lookahead;
@@ -193,7 +199,7 @@ namespace GTAdhocToolchain.Preprocessor
             DoConditional(res);
         }
 
-        private void ParseIfndef()
+        private void DoIfNotDef()
         {
             NextToken();
             Token name = _lookahead;
@@ -207,7 +213,7 @@ namespace GTAdhocToolchain.Preprocessor
             DoConditional(!res);
         }
 
-        private void ParseIf()
+        private void DoIf()
         {
             int line = _lookahead.Location.Start.Line;
             Token ifToken = _lookahead;
@@ -237,7 +243,7 @@ namespace GTAdhocToolchain.Preprocessor
             DoConditional(res != 0);
         }
 
-        private void ParseInclude()
+        private void DoInclude()
         {
             NextToken();
 
@@ -249,24 +255,26 @@ namespace GTAdhocToolchain.Preprocessor
             if (!File.Exists(pathToInclude))
                 ThrowPreprocessorError(_lookahead, "#include: No such file or directory");
 
-
             NextToken();
 
             var content = File.ReadAllText(pathToInclude);
 
             // Save state
-            var _oldToken = _lookahead;
-            var _oldScanner = _scanner;
+            var oldToken = _lookahead;
+            var oldScanner = _scanner;
+            var oldFileName = _currentFileName;
+            _currentFileName = file;
 
             _writer.WriteLine($"# 1 \"{file}\"");
             Preprocess(content);
             _writer.WriteLine();
 
             // Restore state
-            _lookahead = _oldToken;
-            _scanner = _oldScanner;
+            _lookahead = oldToken;
+            _scanner = oldScanner;
+            _currentFileName = oldFileName;
 
-            _writer.WriteLine($"# {_lookahead.Location.Start.Line} \"test.ad\"");
+            _writer.WriteLine($"# {_lookahead.Location.Start.Line} \"{_currentFileName}\"");
         }
 
         private void DoConditional(bool res)
@@ -721,7 +729,7 @@ namespace GTAdhocToolchain.Preprocessor
 
         private void ThrowPreprocessorError(Token token, string message)
         {
-
+            throw new Exception($"{_currentFileName}:{token.Location.Start.Line}: preprocess error: {message}");
         }
     }
 
