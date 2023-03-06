@@ -105,6 +105,10 @@ namespace GTAdhocToolchain.Preprocessor
                             if (!inConditional)
                                 ThrowPreprocessorError(_lookahead, "#else without #if");
                             return;
+
+                        default:
+                            ThrowPreprocessorError(_lookahead, $"invalid preprocessing directive #{_lookahead.Value as string}");
+                            break;
                     }
 
                     continue;
@@ -688,6 +692,8 @@ namespace GTAdhocToolchain.Preprocessor
             _writer.Write(_scanner.Source.Substring(prevIndex, _scanner.Index - prevIndex));
 
             var token = _scanner.Lex();
+            if (token.Value as string == "ENYD")
+                ;
 
             Token t;
 
@@ -729,7 +735,7 @@ namespace GTAdhocToolchain.Preprocessor
 
         private void ThrowPreprocessorError(Token token, string message)
         {
-            throw new Exception($"{_currentFileName}:{token.Location.Start.Line}: preprocess error: {message}");
+            throw new PreprocessorException(message, _currentFileName, token);
         }
     }
 

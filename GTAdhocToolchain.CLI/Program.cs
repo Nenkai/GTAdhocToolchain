@@ -17,6 +17,7 @@ using GTAdhocToolchain.Packaging;
 using GTAdhocToolchain.Core.Instructions;
 using GTAdhocToolchain.Menu.Fields;
 using GTAdhocToolchain.Preprocessor;
+using YamlDotNet.Core.Tokens;
 
 namespace GTAdhocToolchain.CLI
 {
@@ -229,17 +230,21 @@ namespace GTAdhocToolchain.CLI
                 Logger.Info($"Script build successful.");
                 return;
             }
+            catch (PreprocessorException preprocessException)
+            {
+                Logger.Error($"{preprocessException.FileName}:{preprocessException.Token.Location.Start.Line}: preprocess error: {preprocessException.Message}");
+            }
             catch (ParserException parseException)
             {
-                Logger.Fatal($"Syntax error: {parseException.Description} at {parseException.SourceText}:{parseException.LineNumber}");
+                Logger.Error($"Syntax error: {parseException.Description} at {parseException.SourceText}:{parseException.LineNumber}");
             }
             catch (AdhocCompilationException compileException)
             {
-                Logger.Fatal($"Compilation error: {compileException.Message}");
+                Logger.Error($"Compilation error: {compileException.Message}");
             }
             catch (Exception e)
             {
-                Logger.Error(e, "Internal error in compilation");
+                Logger.Fatal(e, "Internal error in compilation");
             }
 
             Logger.Error("Script build failed.");
