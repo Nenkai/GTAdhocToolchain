@@ -150,15 +150,10 @@ foreach (var [key, value] in map) // Pair deconstruction
 ```
 
 ## Macros/Preprocessing
-Supported as C supports it (Compiler does not yet have a pre-processor). **NOTE** - the toolchain does not support this yet.
+Supported as C supports it
 ```c
-#define SET_INDEX(#INDEX) \
-  arr[#INDEX] = #INDEX;
-  
-var arr = Array();
-SET_INDEX(0);
-
-// arr[0] = 0;
+#define ADD(x,y) (x+y)
+var val = ADD(5, 6)
 ```
 
 ## Native Number Types
