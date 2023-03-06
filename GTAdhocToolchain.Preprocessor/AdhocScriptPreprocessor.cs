@@ -9,11 +9,29 @@ using System.Xml.Linq;
 using System.IO;
 using Esprima.Ast;
 using System.Globalization;
+using GTAdhocToolchain.Core;
 
 namespace GTAdhocToolchain.Preprocessor
 {
+    /* This preprocessor is a bit hacky at times, but it works. It's pretty much intended to work like a C preprocessor.
+     * 
+     * It does not output text 1:1 as esprima's scanner only fetches the tokens but does not provide
+     * a way to have a callback for each character that is read
+     * 
+     * So that means that we have to find an alternate method to write whitespaces, newlines etc.
+     * What we do is copy the entirety of the characters between two tokens using their locations
+     * into the output, it may unnecessarily copy whitespaces and comments so kind of wasteful, but it still works nonetheless
+     * 
+     * Some of the subroutines are duplicated when not operating on the source tokens but macro tokens, could be optimized
+     */
+
+    /// <summary>
+    /// Script preprocessor.
+    /// </summary>
     public class AdhocScriptPreprocessor
     {
+        private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
+
         private Dictionary<string, DefineMacro> _defines { get; set; } = new Dictionary<string, DefineMacro>();
 
         private Scanner _scanner;
@@ -159,7 +177,7 @@ namespace GTAdhocToolchain.Preprocessor
 
             if (!_defines.TryAdd((string)name.Value, define))
             {
-                Console.WriteLine(@$"Warning: Redefinition of macro '{name.Value}'");
+                Warn(name, $"redefinition of macro '{name.Value}'");
                 _defines[(string)name.Value] = define;
             }
         }
@@ -176,13 +194,9 @@ namespace GTAdhocToolchain.Preprocessor
                 ThrowPreprocessorError(name, "macro names must be identifiers");
 
             if (!_defines.TryGetValue(name.Value as string, out DefineMacro define))
-            {
-                Console.WriteLine($"Warning: Cannot undef '{name.Value as string}', not defined");
-            }
+                Warn(name, $"cannot undef '{name.Value as string}', not defined");
             else if (define.IsBuiltin)
-            {
-                Console.WriteLine($"Warning: Undefining builtin define '{name.Value as string}'");
-            }
+                Warn(name, $"undefining builtin define '{name.Value as string}'");
 
             _defines.Remove(name.Value as string);
 
@@ -290,7 +304,7 @@ namespace GTAdhocToolchain.Preprocessor
             }
             else
             {
-                SkipUntilNextConditionalDirective();
+                SkipUntilNextScopedConditionalDirective();
             }
 
             while (true)
@@ -299,7 +313,7 @@ namespace GTAdhocToolchain.Preprocessor
                 {
                     NextToken();
                     if (res)
-                        SkipUntilNextConditionalDirective();
+                        SkipUntilNextScopedConditionalDirective();
                     else
                         _Preprocess(true);
 
@@ -308,33 +322,43 @@ namespace GTAdhocToolchain.Preprocessor
                 }
                 else if (_lookahead.Value as string == "elif")
                 {
-                    var cond = new List<Token>();
-                    int line = _lookahead.Location.Start.Line;
-
-                    NextToken();
-                    while (true)
+                    if (!res)
                     {
-                        if (_lookahead.Type == TokenType.EOF)
-                            ThrowPreprocessorError(_lookahead, "unexpected end of file after #elif");
+                        var cond = new List<Token>();
+                        int line = _lookahead.Location.Start.Line;
 
-                        if (line != _lookahead.Location.Start.Line)
-                            break;
-
-                        cond.Add(_lookahead);
                         NextToken();
+                        while (true)
+                        {
+                            if (_lookahead.Type == TokenType.EOF)
+                                ThrowPreprocessorError(_lookahead, "unexpected end of file after #elif");
+
+                            if (line != _lookahead.Location.Start.Line)
+                                break;
+
+                            cond.Add(_lookahead);
+                            NextToken();
+                        }
+
+                        if (cond.Count == 0)
+                            ThrowPreprocessorError(_lookahead, "#elif with no expression");
+
+                        List<Token> expanded = ExpandTokens(cond);
+                        var evaluator = new AdhocExpressionEvaluator(expanded);
+
+                        var elif_res = evaluator.Evaluate() != 0;
+                        if (elif_res)
+                            _Preprocess(elif_res);
+                        else
+                            SkipUntilNextScopedConditionalDirective();
+
+                        if (elif_res && !res)
+                            res = true;
                     }
-
-                    if (cond.Count == 0)
-                        ThrowPreprocessorError(_lookahead, "#elif with no expression");
-
-                    List<Token> expanded = ExpandTokens(cond);
-                    var evaluator = new AdhocExpressionEvaluator(expanded);
-
-                    int elif_res = evaluator.Evaluate();
-                    if (elif_res != 0)
-                        _Preprocess(true);
                     else
-                        SkipUntilNextConditionalDirective();
+                    {
+                        SkipUntilNextScopedConditionalDirective();
+                    }
                 }
                 else if (_lookahead.Value as string == "endif")
                 {
@@ -344,8 +368,9 @@ namespace GTAdhocToolchain.Preprocessor
             }
         }
 
-        private void SkipUntilNextConditionalDirective()
+        private void SkipUntilNextScopedConditionalDirective()
         {
+            int depth = 1;
             while (true)
             {
                 if (_lookahead.Type == TokenType.EOF)
@@ -356,9 +381,23 @@ namespace GTAdhocToolchain.Preprocessor
                     NextToken();
 
                     string dir = _lookahead.Value as string;
-                    if (dir == "elif" || dir == "endif" || dir == "else")
-                        break;
+                    if (dir == "if" || dir == "ifdef" || dir == "ifndef")
+                    {
+                        depth++;
+                    }
+                    else if (dir == "elif" || dir == "else")
+                    {
+                        if (depth == 1)
+                            break;
+                    }
+                    else if (dir == "endif")
+                    {
+                        depth--;
+                    }
                 }
+
+                if (depth < 1)
+                    break;
 
                 NextToken();
             }
@@ -692,9 +731,6 @@ namespace GTAdhocToolchain.Preprocessor
             _writer.Write(_scanner.Source.Substring(prevIndex, _scanner.Index - prevIndex));
 
             var token = _scanner.Lex();
-            if (token.Value as string == "ENYD")
-                ;
-
             Token t;
 
             t = new Token { Type = token.Type, Value = GetTokenRaw(token), Start = token.Start, End = token.End };
@@ -731,6 +767,11 @@ namespace GTAdhocToolchain.Preprocessor
                     }
                 }
             }
+        }
+
+        private void Warn(Token token, string message)
+        {
+            Logger.Warn($"{message} - {_currentFileName}:{token.Location.Start.Line}");
         }
 
         private void ThrowPreprocessorError(Token token, string message)

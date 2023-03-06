@@ -141,8 +141,7 @@ namespace GTAdhocToolchain.Project
                     BuildPackageFile();
 
                 string mergedScriptName = OutputName + ".adc";
-                Logger.Info($"Building merged script '{mergedScriptName}'");
-
+                Logger.Info($"Building project '{mergedScriptName}' from {FilesToCompile.Length} files: [{string.Join(", ", FilesToCompile.Select(e => e.Name))}]");
                 string tmpFileName = $"_tmp_{OutputName}.ad";
                 if (!LinkFiles(tmpFileName))
                     return false;
@@ -445,14 +444,12 @@ namespace GTAdhocToolchain.Project
         /// <returns></returns>
         private bool LinkFiles(string tmpFileName)
         {
-            // Merge script files together
+            // Merge script/roots files together
             // This is how the game actually does it
-            Logger.Info($"Merging ({FilesToCompile.Length}) files: [{string.Join(", ", FilesToCompile.Select(e => e.Name))}]");
+            
             using StreamWriter mergedFile = new StreamWriter(Path.Combine(ProjectDir, tmpFileName));
             foreach (AdhocProjectFile srcFile in FilesToCompile)
             {
-                string srcFilePath = Path.Combine(ProjectDir, srcFile.Name);
-
                 if (!srcFile.IsMain)
                 {
                     mergedFile.WriteLine($"module {ProjectName}");
