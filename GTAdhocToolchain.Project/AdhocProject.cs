@@ -15,6 +15,7 @@ using GTAdhocToolchain.CodeGen;
 using GTAdhocToolchain.Packaging;
 using GTAdhocToolchain.Menu;
 using GTAdhocToolchain.Menu.Fields;
+using GTAdhocToolchain.Preprocessor;
 
 namespace GTAdhocToolchain.Project
 {
@@ -140,8 +141,7 @@ namespace GTAdhocToolchain.Project
                     BuildPackageFile();
 
                 string mergedScriptName = OutputName + ".adc";
-                Logger.Info($"Building merged script '{mergedScriptName}'");
-
+                Logger.Info($"Building project '{mergedScriptName}' from {FilesToCompile.Length} files: [{string.Join(", ", FilesToCompile.Select(e => e.Name))}]");
                 string tmpFileName = $"_tmp_{OutputName}.ad";
                 if (!LinkFiles(tmpFileName))
                     return false;
@@ -155,8 +155,16 @@ namespace GTAdhocToolchain.Project
 
                 // Begin compilation
                 string source = File.ReadAllText(Path.Combine(ProjectDir, tmpFileName));
+                var time = new FileInfo(Path.Combine(ProjectDir, tmpFileName)).LastWriteTime;
 
-                var parser = new AdhocAbstractSyntaxTree(source);
+                var preprocessor = new AdhocScriptPreprocessor();
+                preprocessor.SetBaseDirectory(BaseIncludeFolder);
+                preprocessor.SetCurrentFileName(Path.Combine(SourceProjectFolder, $"_tmp_{OutputName}.ad").Replace('\\', '/'));
+                preprocessor.SetCurrentFileTimestamp(time);
+
+                var preprocessed = preprocessor.Preprocess(source);
+
+                var parser = new AdhocAbstractSyntaxTree(preprocessed);
                 var program = parser.ParseScript();
 
                 var compiler = new AdhocScriptCompiler();
@@ -183,17 +191,21 @@ namespace GTAdhocToolchain.Project
 
                 return true;
             }
+            catch (PreprocessorException preprocessException)
+            {
+                Logger.Error($"{preprocessException.FileName}:{preprocessException.Token.Location.Start.Line}: preprocess error: {preprocessException.Message}");
+            }
             catch (ParserException parseException)
             {
-                Logger.Fatal($"Syntax error: {parseException.Description} at {parseException.SourceText}:{parseException.LineNumber}");
+                Logger.Error($"Syntax error: {parseException.Description} at {parseException.SourceText}:{parseException.LineNumber}");
             }
             catch (AdhocCompilationException compileException)
             {
-                Logger.Fatal($"Compilation error: {compileException.Message}");
+                Logger.Error($"Compilation error: {compileException.Message}");
             }
             catch (Exception e)
             {
-                Logger.Error(e, "Internal error in compilation");
+                Logger.Fatal(e, "Internal error in compilation");
             }
             finally
             {
@@ -435,38 +447,26 @@ namespace GTAdhocToolchain.Project
         /// <returns></returns>
         private bool LinkFiles(string tmpFileName)
         {
-            // Merge script files together
+            // Merge script/roots files together
             // This is how the game actually does it
-            Logger.Info($"Merging ({FilesToCompile.Length}) files: [{string.Join(", ", FilesToCompile.Select(e => e.Name))}]");
+            
             using StreamWriter mergedFile = new StreamWriter(Path.Combine(ProjectDir, tmpFileName));
             foreach (AdhocProjectFile srcFile in FilesToCompile)
             {
-                string srcFilePath = Path.Combine(ProjectDir, srcFile.Name);
-
                 if (!srcFile.IsMain)
                 {
-                    mergedFile.WriteLine($"module {ProjectName} // Compiler Generated");
+                    mergedFile.WriteLine($"module {ProjectName}");
                     mergedFile.WriteLine("{");
-                }
-
-                mergedFile.WriteLine($"#source " + "\"" + srcFile.SourcePath + "\"");
-                if (!File.Exists(srcFilePath))
-                {
-                    Logger.Error($"Source file {srcFile.Name} for linking was not found.");
-                    return false;
-                }
-
-                Logger.Info($"Merging: {srcFile.Name}");
-                using var fileReader = new StreamReader(srcFilePath);
-                string line;
-                while ((line = fileReader.ReadLine()) != null)
-                    mergedFile.WriteLine(line);
-
-                mergedFile.WriteLine($"#resetline");
-
-                if (!srcFile.IsMain)
-                {
+                    mergedFile.WriteLine($"#define ROOT {Path.ChangeExtension(srcFile.Name, null)}");
+                    mergedFile.WriteLine($"#define IMPL ROOT.getImpl()"); // GT Sport
+                    mergedFile.WriteLine($"#include \"{srcFile.SourcePath}\"");
+                    mergedFile.WriteLine($"#undef ROOT");
+                    mergedFile.WriteLine($"#undef IMPL");
                     mergedFile.WriteLine("}");
+                }
+                else
+                {
+                    mergedFile.WriteLine($"#include \"{srcFile.SourcePath}\"");
                 }
             }
 

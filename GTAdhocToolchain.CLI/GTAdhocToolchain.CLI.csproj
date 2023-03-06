@@ -12,7 +12,7 @@
 
   <ItemGroup>
     <PackageReference Include="CommandLineParser" Version="2.8.0" />
-    <PackageReference Include="NLog" Version="4.7.13" />
+    <PackageReference Include="NLog" Version="5.1.2" />
   </ItemGroup>
 
   <ItemGroup>
@@ -21,6 +21,7 @@
     <ProjectReference Include="..\GTAdhocToolchain.CodeGen\GTAdhocToolchain.CodeGen.csproj" />
     <ProjectReference Include="..\GTAdhocToolchain.Disasm\GTAdhocToolchain.Disasm.csproj" />
     <ProjectReference Include="..\GTAdhocToolchain.Packaging\GTAdhocToolchain.Packaging.csproj" />
+    <ProjectReference Include="..\GTAdhocToolchain.Preprocessor\GTAdhocToolchain.Preprocessor.csproj" />
     <ProjectReference Include="..\GTAdhocToolchain.Project\GTAdhocToolchain.Project.csproj" />
     <ProjectReference Include="..\GTAdhocToolchain.MenuResources\GTAdhocToolchain.Menu.Resources.csproj" />
   </ItemGroup>

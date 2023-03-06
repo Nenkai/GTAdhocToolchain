@@ -11,8 +11,6 @@ namespace GTAdhocToolchain.Core.Instructions
     /// </summary>
     public class InsMapConst : InstructionBase
     {
-        public readonly static InsMapConst Default = new();
-
         public override AdhocInstructionType InstructionType => AdhocInstructionType.MAP_CONST;
 
         public override string InstructionName => "MAP_CONST";

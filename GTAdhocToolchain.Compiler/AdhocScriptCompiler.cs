@@ -1747,7 +1747,7 @@ namespace GTAdhocToolchain.Compiler
             if (frame.Version < 11)
                 ThrowCompilationError(mapExpression, CompilationMessages.Error_MapUnsupported);
 
-            frame.AddInstruction(InsMapConst.Default, mapExpression.Location.Start.Line);
+            frame.AddInstruction(new InsMapConst(), mapExpression.Location.Start.Line);
 
             foreach (var (key, value) in mapExpression.Elements)
             {
@@ -2754,15 +2754,6 @@ namespace GTAdhocToolchain.Compiler
             else if (identifier.Name == "__FILE__")
             {
                 frame.AddInstruction(new InsStringConst(frame.SourceFilePath), identifier.Location.Start.Line);
-                return true;
-            }
-            else if (AdhocDefineConstants.CompilerProvidedConstants.ContainsKey(identifier.Name))
-            {
-                var define = AdhocDefineConstants.CompilerProvidedConstants[identifier.Name];
-                if (define is InsStringConst str)
-                    str.String = SymbolMap.RegisterSymbol(str.String.Name);
-
-                frame.AddInstruction(define, identifier.Location.Start.Line);
                 return true;
             }
 
