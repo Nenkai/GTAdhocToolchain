@@ -700,13 +700,8 @@ namespace GTAdhocToolchain.Preprocessor
                 {
                     return EvalCollectArguments(list, ref currentIndex, define);
                 }
-                
-                ;
             }
-            else
-            {
 
-            }
             if (token.Value as string != "(")
                 ThrowPreprocessorError(token, "Expected '('");
 

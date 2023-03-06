@@ -155,10 +155,13 @@ namespace GTAdhocToolchain.Project
 
                 // Begin compilation
                 string source = File.ReadAllText(Path.Combine(ProjectDir, tmpFileName));
+                var time = new FileInfo(Path.Combine(ProjectDir, tmpFileName)).LastWriteTime;
 
                 var preprocessor = new AdhocScriptPreprocessor();
                 preprocessor.SetBaseDirectory(BaseIncludeFolder);
                 preprocessor.SetCurrentFileName(Path.Combine(SourceProjectFolder, $"_tmp_{OutputName}.ad").Replace('\\', '/'));
+                preprocessor.SetCurrentFileTimestamp(time);
+
                 var preprocessed = preprocessor.Preprocess(source);
 
                 var parser = new AdhocAbstractSyntaxTree(preprocessed);

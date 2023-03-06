@@ -199,6 +199,7 @@ namespace GTAdhocToolchain.CLI
         private static void BuildScript(string inputPath, string output, int version = 12, bool debugExceptions = false)
         {
             var source = File.ReadAllText(inputPath);
+            var time = new FileInfo(inputPath).LastWriteTime;
 
             Logger.Info($"Started script build ({inputPath}).");
             try
@@ -206,6 +207,7 @@ namespace GTAdhocToolchain.CLI
                 var preprocessor = new AdhocScriptPreprocessor();
                 preprocessor.SetBaseDirectory(Path.GetDirectoryName(inputPath));
                 preprocessor.SetCurrentFileName(inputPath);
+                preprocessor.SetCurrentFileTimestamp(time);
 
                 string preprocessed = preprocessor.Preprocess(source);
 
