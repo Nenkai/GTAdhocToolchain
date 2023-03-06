@@ -485,37 +485,46 @@ namespace GTAdhocToolchain.Preprocessor
                 }
                 else if (_defines.TryGetValue(token.Value as string, out DefineMacro def))
                 {
-                    // We are possibly passing an argument from parent to child macro function
-                    i++;
-                    var args = EvalCollectArguments(define.Content, ref i, def);
-
-                    // Translate parent to child args
-                    foreach (var arg in args)
+                    if (def.IsFunctionMacro)
                     {
-                        var argTokens = arg.Value;
+                        // We are possibly passing an argument from parent to child macro function
+                        i++;
+                        var args = EvalCollectArguments(define.Content, ref i, def);
 
-                        for (var j = 0; j < argTokens.Count; j++)
+                        // Translate parent to child args
+                        foreach (var arg in args)
                         {
-                            var tken = argTokens[j];
-                            if (tken.Type != TokenType.Identifier)
-                                continue;
+                            var argTokens = arg.Value;
 
-                            string tokenStr = tken.Value as string;
-                            if (callArgs.TryGetValue(tokenStr, out List<Token> callTokens))
+                            for (var j = 0; j < argTokens.Count; j++)
                             {
-                                // Remove arg identifier
-                                argTokens.Remove(tken);
+                                var tken = argTokens[j];
+                                if (tken.Type != TokenType.Identifier)
+                                    continue;
 
-                                // Insert what we are replacing with
-                                argTokens.InsertRange(j, callTokens);
-                                j += callTokens.Count;
+                                string tokenStr = tken.Value as string;
+                                if (callArgs.TryGetValue(tokenStr, out List<Token> callTokens))
+                                {
+                                    // Remove arg identifier
+                                    argTokens.Remove(tken);
+
+                                    // Insert what we are replacing with
+                                    argTokens.InsertRange(j, callTokens);
+                                    j += callTokens.Count;
+                                }
                             }
                         }
+
+                        List<Token> expanded = ExpandMacroFunction(def, args);
+
+                        list.AddRange(expanded);
+                    }
+                    else
+                    {
+                        List<Token> expanded = ExpandTokens(def.Content);
+                        list.AddRange(expanded);
                     }
                     
-                    List<Token> expanded = ExpandMacroFunction(def, args);
-                    
-                    list.AddRange(expanded);
                 }
                 else
                 {
@@ -615,6 +624,19 @@ namespace GTAdhocToolchain.Preprocessor
         private Dictionary<string, List<Token>> EvalCollectArguments(List<Token> list, ref int currentIndex, DefineMacro define)
         {
             var token = list[currentIndex++];
+            if (token.Type == TokenType.Identifier)
+            {
+                if (_defines.TryGetValue(token.Value as string, out DefineMacro n))
+                {
+                    return EvalCollectArguments(list, ref currentIndex, define);
+                }
+                
+                ;
+            }
+            else
+            {
+
+            }
             if (token.Value as string != "(")
                 ThrowPreprocessorError(token, "Expected '('");
 
