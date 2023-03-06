@@ -1,8 +1,0 @@
-{
-  "profiles": {
-    "GTAdhocToolchain.CLI": {
-      "commandName": "Project",
-      "commandLineArgs": "build -i C:\\Users\\nenkai\\source\\repos\\GTAdhocToolchain\\GTAdhocToolchain.CLI\\bin\\Debug\\net6.0\\test.ad"
-    }
-  }
-}
