@@ -458,8 +458,10 @@ namespace GTAdhocToolchain.Project
                     mergedFile.WriteLine($"module {ProjectName}");
                     mergedFile.WriteLine("{");
                     mergedFile.WriteLine($"#define ROOT {Path.ChangeExtension(srcFile.Name, null)}");
+                    mergedFile.WriteLine($"#define IMPL ROOT.getImpl()"); // GT Sport
                     mergedFile.WriteLine($"#include \"{srcFile.SourcePath}\"");
                     mergedFile.WriteLine($"#undef ROOT");
+                    mergedFile.WriteLine($"#undef IMPL");
                     mergedFile.WriteLine("}");
                 }
                 else
