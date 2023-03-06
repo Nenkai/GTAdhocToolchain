@@ -10,6 +10,7 @@ using System.IO;
 using Esprima.Ast;
 using System.Globalization;
 using GTAdhocToolchain.Core;
+using System.Runtime.CompilerServices;
 
 namespace GTAdhocToolchain.Preprocessor
 {
@@ -42,10 +43,24 @@ namespace GTAdhocToolchain.Preprocessor
 
         private string _baseDirectory;
         private string _currentFileName;
+        private DateTime _fileTimeStamp;
 
+        /// <summary>
+        /// For the __COUNTER__ directive
+        /// </summary>
+        private int _counter;
+        private DateTime _time;
         public AdhocScriptPreprocessor()
         {
             _writer = new StringWriter(_sb);
+            _time = DateTime.Now;
+
+            _defines.Add("__LINE__", new DefineMacro() { Name = "__LINE__", IsBuiltin = true, Content = new List<Token>() { new Token() { Value = "__LINE__" } } });
+            _defines.Add("__FILE__", new DefineMacro() { Name = "__FILE__", IsBuiltin = true, Content = new List<Token>() { new Token() { Value = "__FILE__" } } });
+            _defines.Add("__DATE__", new DefineMacro() { Name = "__DATE__", IsBuiltin = true, Content = new List<Token>() { new Token() { Value = "__DATE__" } } });
+            _defines.Add("__TIME__", new DefineMacro() { Name = "__TIME__", IsBuiltin = true, Content = new List<Token>() { new Token() { Value = "__TIME__" } } });
+            _defines.Add("__COUNTER__", new DefineMacro() { Name = "__COUNTER__", IsBuiltin = true, Content = new List<Token>() { new Token() { Value = "__COUNTER__" } } });
+            _defines.Add("__TIMESTAMP__", new DefineMacro() { Name = "__TIMESTAMP__", IsBuiltin = true, Content = new List<Token>() { new Token() { Value = "__TIMESTAMP__" } } });
 
             foreach (var def in BuiltinDefines.CompilerProvidedConstants)
             {
@@ -69,6 +84,11 @@ namespace GTAdhocToolchain.Preprocessor
         public void SetCurrentFileName(string fileName)
         {
             _currentFileName = fileName;
+        }
+
+        public void SetCurrentFileTimestamp(DateTime timestamp)
+        {
+            _fileTimeStamp = timestamp;
         }
 
         public string Preprocess(string code)
@@ -281,7 +301,10 @@ namespace GTAdhocToolchain.Preprocessor
             var oldToken = _lookahead;
             var oldScanner = _scanner;
             var oldFileName = _currentFileName;
+            var oldTimestamp = _fileTimeStamp;
+
             _currentFileName = file;
+            _fileTimeStamp = new FileInfo(pathToInclude).LastWriteTime;
 
             _writer.WriteLine($"# 1 \"{file}\"");
             Preprocess(content);
@@ -291,6 +314,7 @@ namespace GTAdhocToolchain.Preprocessor
             _lookahead = oldToken;
             _scanner = oldScanner;
             _currentFileName = oldFileName;
+            _fileTimeStamp = oldTimestamp;
 
             _writer.WriteLine($"# {_lookahead.Location.Start.Line} \"{_currentFileName}\"");
         }
@@ -466,6 +490,41 @@ namespace GTAdhocToolchain.Preprocessor
             }
         }
         
+        private Token ExpandSpecialMacro(Token token)
+        {
+            if (token.Value as string == "__LINE__")
+            {
+                return new Token() { Value = $"{token.Location.Start.Line}u" };
+            }
+
+            if (token.Value as string == "__FILE__")
+            {
+                return new Token() { Value = $"\"{_currentFileName}\"" };
+            }
+
+            if (token.Value as string == "__COUNTER__")
+            {
+                return new Token() { Value = _counter.ToString() };
+            }
+
+            if (token.Value as string == "__DATE__")
+            {
+                return new Token() { Value = $"\"{_time:MMM dd yyyy}\"" };
+            }
+
+            if (token.Value as string == "__TIME__")
+            {
+                return new Token() { Value = $"\"{_time:HH:mm:ss}\"" };
+            }
+
+            if (token.Value as string == "__TIMESTAMP__")
+            {
+                return new Token() { Value = $"\"{_fileTimeStamp:MMM dd yyyy HH:mm:ss yyyy}\"" };
+            }
+
+            return null;
+        }
+
         private List<Token> ExpandMacroFunction(DefineMacro define, Dictionary<string, List<Token>> callArgs)
         {
             var list = new List<Token>();
@@ -543,6 +602,17 @@ namespace GTAdhocToolchain.Preprocessor
         private List<Token> ExpandTokens(List<Token> inputTokens)
         {
             List<Token> tokens = new List<Token>();
+
+            if (inputTokens.Count == 1)
+            {
+                var t = ExpandSpecialMacro(inputTokens[0]);
+                if (t != null)
+                {
+                    tokens.Add(t);
+                    return tokens;
+                }
+            }
+
             for (var currentIndex = 0; currentIndex < inputTokens.Count; currentIndex++)
             {
                 tokens.AddRange(Evaluate(inputTokens, ref currentIndex));

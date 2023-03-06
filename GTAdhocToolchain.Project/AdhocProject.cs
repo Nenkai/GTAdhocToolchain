@@ -454,7 +454,9 @@ namespace GTAdhocToolchain.Project
                 {
                     mergedFile.WriteLine($"module {ProjectName}");
                     mergedFile.WriteLine("{");
+                    mergedFile.WriteLine($"#define ROOT {Path.ChangeExtension(srcFile.Name, null)}");
                     mergedFile.WriteLine($"#include \"{srcFile.SourcePath}\"");
+                    mergedFile.WriteLine($"#undef ROOT");
                     mergedFile.WriteLine("}");
                 }
                 else
