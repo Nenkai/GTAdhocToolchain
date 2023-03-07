@@ -291,7 +291,15 @@ namespace GTAdhocToolchain.Preprocessor
             string file = (_lookahead.Value as string).Trim('\"');
             string pathToInclude = Path.Combine(_baseDirectory, file);
             if (!File.Exists(pathToInclude))
-                ThrowPreprocessorError(_lookahead, "#include: No such file or directory");
+            {
+                // Try in same directory as current file
+                string dir = Path.GetDirectoryName(Path.Combine(_baseDirectory, _currentFileName));
+                string potentialFile = Path.Combine(dir, file);
+                if (!File.Exists(potentialFile))
+                    ThrowPreprocessorError(_lookahead, "#include: No such file or directory");
+
+                pathToInclude = potentialFile;
+            }
 
             NextToken();
 

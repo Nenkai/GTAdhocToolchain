@@ -242,22 +242,48 @@ namespace GTAdhocToolchain.Project
                 AdhocProjectFile srcFile = FilesToCompile[i];
                 Logger.Info($"[{(i + 1).ToString().PadLeft(logPadLen)}/{FilesToCompile.Length}] Compiling: {srcFile.Name}");
 
-                string source = File.ReadAllText(srcFile.FullPath);
+                try
+                {
+                    string source = File.ReadAllText(srcFile.FullPath);
+                    var time = new FileInfo(srcFile.FullPath).LastWriteTime;
 
-                var parser = new AdhocAbstractSyntaxTree(source);
-                var program = parser.ParseScript();
+                    var preprocessor = new AdhocScriptPreprocessor();
+                    preprocessor.SetBaseDirectory(BaseIncludeFolder);
+                    preprocessor.SetCurrentFileName(srcFile.SourcePath);
+                    preprocessor.SetCurrentFileTimestamp(time);
+                    var preprocessed = preprocessor.Preprocess(source);
 
-                var compiler = new AdhocScriptCompiler();
-                compiler.SetBaseIncludeFolder(BaseIncludeFolder);
-                compiler.SetProjectDirectory(ProjectDir);
-                compiler.SetSourcePath(compiler.SymbolMap, srcFile.SourcePath);
-                compiler.SetVersion(Version);
-                compiler.SetupStack();
-                compiler.CompileScript(program);
+                    var parser = new AdhocAbstractSyntaxTree(preprocessed);
+                    var program = parser.ParseScript();
 
-                AdhocCodeGen codeGen = new AdhocCodeGen(compiler, compiler.SymbolMap);
-                codeGen.Generate();
-                codeGen.SaveTo(Path.Combine(pkgContentPath, Path.ChangeExtension(srcFile.Name, ".adc")));
+                    var compiler = new AdhocScriptCompiler();
+                    compiler.SetBaseIncludeFolder(BaseIncludeFolder);
+                    compiler.SetProjectDirectory(ProjectDir);
+                    compiler.SetSourcePath(compiler.SymbolMap, srcFile.SourcePath);
+                    compiler.SetVersion(Version);
+                    compiler.SetupStack();
+                    compiler.CompileScript(program);
+
+                    AdhocCodeGen codeGen = new AdhocCodeGen(compiler, compiler.SymbolMap);
+                    codeGen.Generate();
+                    codeGen.SaveTo(Path.Combine(pkgContentPath, Path.ChangeExtension(srcFile.Name, ".adc")));
+                }
+                catch (PreprocessorException preprocessException)
+                {
+                    Logger.Error($"{preprocessException.FileName}:{preprocessException.Token.Location.Start.Line}: preprocess error: {preprocessException.Message}");
+                }
+                catch (ParserException parseException)
+                {
+                    Logger.Error($"Syntax error: {parseException.Description} at {parseException.SourceText}:{parseException.LineNumber}");
+                }
+                catch (AdhocCompilationException compileException)
+                {
+                    Logger.Error($"Compilation error: {compileException.Message}");
+                }
+                catch (Exception e)
+                {
+                    Logger.Fatal(e, "Internal error in compilation");
+                }
 
                 if (!srcFile.IsMain)
                 {
