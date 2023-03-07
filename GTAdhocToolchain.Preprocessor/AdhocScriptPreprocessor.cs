@@ -50,6 +50,9 @@ namespace GTAdhocToolchain.Preprocessor
         /// </summary>
         private int _counter;
         private DateTime _time;
+
+        private int _includeDepth = 0;
+
         public AdhocScriptPreprocessor()
         {
             _writer = new StringWriter(_sb);
@@ -177,22 +180,34 @@ namespace GTAdhocToolchain.Preprocessor
             var define = new DefineMacro();
             define.Name = name.Value as string;
 
+            int startLine = name.Location.Start.Line;
+            NextToken();
+
             while (true)
             {
-                NextToken();
+                if (_lookahead.Type == TokenType.EOF)
+                    break;
+
                 if (count == 0 && (string)_lookahead.Value == "(")
                 {
                     ParseMacroFunctionParameters(define);
                 }
+                else if (_lookahead.Value as string == "\\")
+                {
+                    NextToken();
+                    startLine = _lookahead.Location.Start.Line;
+                    continue;
+                }    
                 else
                 {
-                    if (_lookahead.Location.Start.Line != name.Location.Start.Line)
+                    if (_lookahead.Location.Start.Line != startLine)
                         break;
 
                     define.Content.Add(_lookahead);
                 }
 
                 count++;
+                NextToken();
             }
 
             if (!_defines.TryAdd((string)name.Value, define))
@@ -264,6 +279,13 @@ namespace GTAdhocToolchain.Preprocessor
                 if (_lookahead.Type == TokenType.EOF)
                     ThrowPreprocessorError(ifToken, "unexpected end of file after #if");
 
+                if (_lookahead.Value as string == "\\")
+                {
+                    NextToken();
+                    line = _lookahead.Location.Start.Line;
+                    continue;
+                }
+
                 if (line != _lookahead.Location.Start.Line)
                     break;
 
@@ -283,6 +305,9 @@ namespace GTAdhocToolchain.Preprocessor
 
         private void DoInclude()
         {
+            if (_includeDepth >= 200)
+                ThrowPreprocessorError(_lookahead, "max #include depth reached");
+
             NextToken();
 
             if (_lookahead.Type != TokenType.Template)
@@ -315,7 +340,11 @@ namespace GTAdhocToolchain.Preprocessor
             _fileTimeStamp = new FileInfo(pathToInclude).LastWriteTime;
 
             _writer.WriteLine($"# 1 \"{file}\"");
+
+            _includeDepth++;
             Preprocess(content);
+            _includeDepth--;
+
             _writer.WriteLine();
 
             // Restore state
@@ -341,6 +370,9 @@ namespace GTAdhocToolchain.Preprocessor
 
             while (true)
             {
+                if (_lookahead.Type == TokenType.EOF)
+                    ThrowPreprocessorError(_lookahead, "Unexpected EOF in conditional preprocessor directive");
+
                 if (_lookahead.Value as string == "else")
                 {
                     NextToken();
@@ -364,6 +396,13 @@ namespace GTAdhocToolchain.Preprocessor
                         {
                             if (_lookahead.Type == TokenType.EOF)
                                 ThrowPreprocessorError(_lookahead, "unexpected end of file after #elif");
+
+                            if (_lookahead.Value as string == "\\")
+                            {
+                                NextToken();
+                                line = _lookahead.Location.Start.Line;
+                                continue;
+                            }
 
                             if (line != _lookahead.Location.Start.Line)
                                 break;
@@ -595,7 +634,7 @@ namespace GTAdhocToolchain.Preprocessor
                 }
                 else
                 {
-                    throw new Exception("Should not get here");
+                    list.Add(token);
                 }
             }
 
@@ -743,6 +782,9 @@ namespace GTAdhocToolchain.Preprocessor
 
             while (true)
             {
+                if (_lookahead.Type == TokenType.EOF)
+                    ThrowPreprocessorError(_lookahead, "unexpected EOF after macro function definition");
+
                 if ((string)_lookahead.Value == ")" && depth == 0)
                     break;
 
