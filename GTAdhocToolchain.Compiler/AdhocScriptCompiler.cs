@@ -1964,6 +1964,10 @@ namespace GTAdhocToolchain.Compiler
                         {
                             CompileComputedMemberExpressionAssignmentPush(frame, compExpression);
                         }
+                        else if (assignExpression.Left is StaticMemberExpression staticMember)
+                        {
+                            CompileStaticMemberExpressionAssignment(frame, staticMember);
+                        }
                         else if (assignExpression.Left is ObjectSelectorMemberExpression objectSelector)
                         {
                             throw new NotImplementedException("Unimplemented object selector assignment expression");
