@@ -55,12 +55,12 @@ namespace GTAdhocToolchain.Preprocessor
             { "COLOR_CYAN", $"{0x16}" },
             { "COLOR_BLACK", $"{0x17}" },
 
-            { "STATE_EXIT", $"{AdhocRunState.EXIT}" },
-            { "STATE_RETURN", $"{AdhocRunState.RETURN}" },
-            { "STATE_YIELD", $"{AdhocRunState.YIELD}" },
-            { "STATE_EXCEPTION", $"{AdhocRunState.EXCEPTION}" },
-            { "STATE_CALL", $"{AdhocRunState.CALL}" },
-            { "STATE_RUN", $"{AdhocRunState.RUN}" },
+            { "STATE_EXIT", $"{(int)AdhocRunState.EXIT}" },
+            { "STATE_RETURN", $"{(int)AdhocRunState.RETURN}" },
+            { "STATE_YIELD", $"{(int)AdhocRunState.YIELD}" },
+            { "STATE_EXCEPTION", $"{(int)AdhocRunState.EXCEPTION}" },
+            { "STATE_CALL", $"{(int)AdhocRunState.CALL}" },
+            { "STATE_RUN", $"{(int)AdhocRunState.RUN}" },
 
             // mScrollClip - scroll_mode
             { "SCROLL_MODE_FOLLOW_FOCUS", $"{0}" }, // follow_focus
