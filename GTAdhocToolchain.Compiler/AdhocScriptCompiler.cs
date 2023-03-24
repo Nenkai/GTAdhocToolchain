@@ -2869,7 +2869,7 @@ namespace GTAdhocToolchain.Compiler
         {
             var lastScope = frame.CurrentScopes.Pop();
 
-            // No such thing as cleanup in older versions
+            // Local variables can be cleaned up in later versions
             if (frame.Version >= 11)
             {
                 if (!isModuleLeave) // Module leaves don't actually reset the max.
@@ -2878,11 +2878,12 @@ namespace GTAdhocToolchain.Compiler
                     foreach (var variable in lastScope.LocalScopeVariables)
                         frame.FreeLocalVariable(variable.Value);
                 }
-                else
-                {
-                    foreach (var variable in lastScope.StaticScopeVariables)
-                        frame.FreeStaticVariable(variable.Value);
-                }
+            }
+
+            if (isModuleLeave)
+            {
+                foreach (var variable in lastScope.StaticScopeVariables)
+                    frame.FreeStaticVariable(variable.Value);
             }
 
             if (insertLeaveInstruction && frame.Version >= 11) // Leave only available >= 11
