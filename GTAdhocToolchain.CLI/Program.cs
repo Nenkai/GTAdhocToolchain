@@ -113,7 +113,7 @@ namespace GTAdhocToolchain.CLI
             else if (Path.GetExtension(buildVerbs.InputPath) == ".ad")
             {
                 string output = !string.IsNullOrEmpty(buildVerbs.OutputPath) ? buildVerbs.OutputPath : buildVerbs.InputPath;
-                BuildScript(buildVerbs.InputPath, Path.ChangeExtension(output, ".adc"), buildVerbs.Version, buildVerbs.WriteExceptionsToFile);
+                BuildScript(buildVerbs.InputPath, Path.ChangeExtension(output, ".adc"), buildVerbs.Version, buildVerbs.WriteExceptionsToFile, buildVerbs.PreprocessOnly);
             }
             else
             {
@@ -196,12 +196,11 @@ namespace GTAdhocToolchain.CLI
                 Logger.Info("Project build successful.");
         }
 
-        private static void BuildScript(string inputPath, string output, int version = 12, bool debugExceptions = false)
+        private static void BuildScript(string inputPath, string output, int version = 12, bool debugExceptions = false, bool preprocessOnly = false)
         {
             var source = File.ReadAllText(inputPath);
             var time = new FileInfo(inputPath).LastWriteTime;
 
-            Logger.Info($"Started script build ({inputPath}).");
             try
             {
                 var preprocessor = new AdhocScriptPreprocessor();
@@ -210,6 +209,13 @@ namespace GTAdhocToolchain.CLI
                 preprocessor.SetCurrentFileTimestamp(time);
 
                 string preprocessed = preprocessor.Preprocess(source);
+                if (preprocessOnly)
+                {
+                    Console.Write(preprocessed);
+                    return;
+                }
+
+                Logger.Info($"Started script build ({inputPath}).");
 
                 var parser = new AdhocAbstractSyntaxTree(preprocessed);
                 parser.SetFileName(inputPath);
@@ -328,6 +334,9 @@ namespace GTAdhocToolchain.CLI
             "Very useful if the game does not normally print any error on adhoc exceptions and you do not have access to a debugger to breakpoint on a certain function to check errors.\n" +
             "This will only work for GT5 and above. Use carefully. Not entirely tested, may break or not work at all.")]
         public bool WriteExceptionsToFile { get; set; }
+
+        [Option('e', Required = false, HelpText = "Preprocess only and output to stdout. Only for compiling scripts.")]
+        public bool PreprocessOnly { get; set; }
     }
 
     [Verb("pack", HelpText = "Pack files like gpb's, or mpackage's.")]
