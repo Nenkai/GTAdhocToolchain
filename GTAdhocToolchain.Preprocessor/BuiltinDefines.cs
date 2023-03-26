@@ -12,6 +12,7 @@ namespace GTAdhocToolchain.Preprocessor
     {
         public static Dictionary<string, string> CompilerProvidedConstants = new()
         {
+            // Numeric min/max
             { "INT_MIN", $"{int.MinValue}" },
             { "INT_MAX", $"{int.MaxValue}" },
             { "UINT_MIN", $"{uint.MinValue}u" },
@@ -21,6 +22,7 @@ namespace GTAdhocToolchain.Preprocessor
             { "ULONG_MIN", $"{ulong.MinValue}UL" },
             { "ULONG_MAX", $"{ulong.MaxValue}UL" },
 
+            // PS3
             { "CELL_PAD_CTRL_L3_LEFT", $"{0xFF51}" },
             { "CELL_PAD_CTRL_L3_UP", $"{0xFF52}" },
             { "CELL_PAD_CTRL_L3_RIGHT", $"{0xFF53}" },
@@ -46,6 +48,31 @@ namespace GTAdhocToolchain.Preprocessor
             { "CELL_PAD_CTRL_R2", $"{0xFFDD}" },
             { "CELL_PAD_CTRL_R3", $"{0xFFDE}" },
 
+            // PS2
+            { "PS2_PAD_CTRL_L3_LEFT", $"{0xFF51}" },
+            { "PS2_PAD_CTRL_L3_UP", $"{0xFF52}" },
+            { "PS2_PAD_CTRL_L3_RIGHT", $"{0xFF53}" },
+            { "PS2_PAD_CTRL_L3_DOWN", $"{0xFF54}" },
+
+            { "PS2_PAD_CTRL_R3_LEFT", $"{0xFFB4}" },
+            { "PS2_PAD_CTRL_R3_UP", $"{0xFFB8}" },
+            { "PS2_PAD_CTRL_R3_RIGHT", $"{0xFFB6}" },
+            { "PS2_PAD_CTRL_R3_DOWN", $"{0xFFB2}" },
+
+            { "PS2_PAD_CTRL_CROSS", $"{0xFF0D}" },
+            { "PS2_PAD_CTRL_SQUARE", $"{0xFFBF}" },
+            { "PS2_PAD_CTRL_TRIANGLE", $"{0xFFBE}" },
+            { "PS2_PAD_CTRL_CIRCLE", $"{0xFF1B}" },
+
+            { "PS2_PAD_CTRL_SELECT", $"{0xFF63}" },
+            { "PS2_PAD_CTRL_START", $"{0xFF8D}" },
+
+            { "PS2_PAD_CTRL_L1", $"{0xFFC8}" },
+            { "PS2_PAD_CTRL_L2", $"{0xFFC9}" },
+            { "PS2_PAD_CTRL_R1", $"{0xFFD2}" },
+            { "PS2_PAD_CTRL_R2", $"{0xFFD3}" },
+
+            // Colors for text formatting for MTextSetting - PS3
             { "COLOR_DEFAULT", $"{0x10}" },
             { "COLOR_WHITE", $"{0x11}" },
             { "COLOR_RED", $"{0x12}" },
@@ -55,6 +82,7 @@ namespace GTAdhocToolchain.Preprocessor
             { "COLOR_CYAN", $"{0x16}" },
             { "COLOR_BLACK", $"{0x17}" },
 
+            // Event Result
             { "STATE_EXIT", $"{(int)AdhocRunState.EXIT}" },
             { "STATE_RETURN", $"{(int)AdhocRunState.RETURN}" },
             { "STATE_YIELD", $"{(int)AdhocRunState.YIELD}" },
