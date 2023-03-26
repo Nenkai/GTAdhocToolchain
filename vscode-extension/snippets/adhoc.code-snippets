@@ -782,6 +782,30 @@
 	"CELL_PAD_CTRL_R2 (0xFFDD)": { "prefix": "CELL_PAD_CTRL_R2", "body": [ "CELL_PAD_CTRL_R2" ], "description": "R2 Button"},
 	"CELL_PAD_CTRL_R3 (0xFFDE)": { "prefix": "CELL_PAD_CTRL_R3", "body": [ "CELL_PAD_CTRL_R3" ], "description": "R3 Button"},
 
+	// PS2 key codes
+	"PS2_PAD_CTRL_L3_LEFT (0xFF51)": { "prefix": "PS2_PAD_CTRL_L3_LEFT", "body": [ "PS2_PAD_CTRL_L3_LEFT" ], "description": "Left Stick LEFT"},
+	"PS2_PAD_CTRL_L3_UP (0xFF52)": { "prefix": "PS2_PAD_CTRL_L3_UP", "body": [ "PS2_PAD_CTRL_L3_UP" ], "description": "Left Stick UP"},
+	"PS2_PAD_CTRL_L3_RIGHT (0xFF53)": { "prefix": "PS2_PAD_CTRL_L3_RIGHT", "body": [ "PS2_PAD_CTRL_L3_RIGHT" ], "description": "Left Stick RIGHT"},
+	"PS2_PAD_CTRL_L3_DOWN (0xFF54)": { "prefix": "PS2_PAD_CTRL_L3_DOWN", "body": [ "PS2_PAD_CTRL_L3_DOWN" ], "description": "Left Stick DOWN"},
+	
+	"PS2_PAD_CTRL_R3_LEFT (0xFFB4)": { "prefix": "PS2_PAD_CTRL_R3_LEFT", "body": [ "PS2_PAD_CTRL_R3_LEFT" ], "description": "Right Stick LEFT"},
+	"PS2_PAD_CTRL_R3_UP (0xFFB8)": { "prefix": "PS2_PAD_CTRL_R3_UP", "body": [ "PS2_PAD_CTRL_R3_UP" ], "description": "Right Stick UP"},
+	"PS2_PAD_CTRL_R3_RIGHT (0xFF51)": { "prefix": "PS2_PAD_CTRL_R3_RIGHT", "body": [ "PS2_PAD_CTRL_R3_RIGHT" ], "description": "Right Stick RIGHT"},
+	"PS2_PAD_CTRL_R3_DOWN (0xFFB2)": { "prefix": "PS2_PAD_CTRL_R3_DOWN", "body": [ "PS2_PAD_CTRL_R3_DOWN" ], "description": "Right Stick DOWN"},
+	
+	"PS2_PAD_CTRL_CROSS (0xFF0D)": { "prefix": "PS2_PAD_CTRL_CROSS", "body": [ "PS2_PAD_CTRL_CROSS" ], "description": "X Button"},
+	"PS2_PAD_CTRL_SQUARE (0xFFBF)": { "prefix": "PS2_PAD_CTRL_SQUARE", "body": [ "PS2_PAD_CTRL_SQUARE" ], "description": "□ Button"},
+	"PS2_PAD_CTRL_TRIANGLE (0xFFBE)": { "prefix": "PS2_PAD_CTRL_TRIANGLE", "body": [ "PS2_PAD_CTRL_TRIANGLE" ], "description": "△ Triangle Button"},
+	"PS2_PAD_CTRL_CIRCLE (0xFF1B)": { "prefix": "PS2_PAD_CTRL_CIRCLE", "body": [ "PS2_PAD_CTRL_CIRCLE" ], "description": "O Button"},
+	
+	"PS2_PAD_CTRL_SELECT (0xFF63)": { "prefix": "PS2_PAD_CTRL_SELECT", "body": [ "PS2_PAD_CTRL_SELECT" ], "description": "Select Button"},
+	"PS2_PAD_CTRL_START (0xFF8D)": { "prefix": "PS2_PAD_CTRL_START", "body": [ "PS2_PAD_CTRL_START" ], "description": "Start Buton"},
+	
+	"PS2_PAD_CTRL_L1 (0xFFC8)": { "prefix": "PS2_PAD_CTRL_L1", "body": [ "PS2_PAD_CTRL_L1" ], "description": "L1 Button"},
+	"PS2_PAD_CTRL_L2 (0xFFC9)": { "prefix": "PS2_PAD_CTRL_L2", "body": [ "PS2_PAD_CTRL_L2" ], "description": "L2 Button"},
+	"PS2_PAD_CTRL_R1 (0xFFD2)": { "prefix": "PS2_PAD_CTRL_R1", "body": [ "PS2_PAD_CTRL_R1" ], "description": "R1 Button"},
+	"PS2_PAD_CTRL_R2 (0xFFD3)": { "prefix": "PS2_PAD_CTRL_R2", "body": [ "PS2_PAD_CTRL_R2" ], "description": "R2 Button"},
+	
 	// Text colors
 	"COLOR_DEFAULT (0x10)": { "prefix": "TEXT_COLOR_DEFAULT", "body": [ "COLOR_DEFAULT" ], "description": "Reverts to normal color"},
 	"COLOR_WHITE (0x11)": { "prefix": "TEXT_COLOR_WHITE", "body": [ "COLOR_WHITE" ], "description": "Sets next text to white"},
@@ -792,6 +816,11 @@
 	"COLOR_CYAN (0x16)": { "prefix": "TEXT_COLOR_CYAN", "body": [ "COLOR_CYAN" ], "description": "Sets next text to cyan"},
 	"COLOR_BLACK (0x17)": { "prefix": "TEXT_COLOR_BLACK", "body": [ "COLOR_BLACK" ], "description": "Sets next text to black"},
 
+	"SCROLL_MODE_FOLLOW_FOCUS (0)": { "prefix": "SCROLL_MODE_FOLLOW_FOCUS", "body": [ "SCROLL_MODE_FOLLOW_FOCUS" ], "description": "Scroll Mode - Follow Focus"},
+	"SCROLL_MODE_FLOATING (1)": { "prefix": "SCROLL_MODE_FLOATING", "body": [ "SCROLL_MODE_FLOATING" ], "description": "Scroll Mode - Floating"},
+	"SCROLL_MODE_MANUAL (2)": { "prefix": "SCROLL_MODE_MANUAL", "body": [ "SCROLL_MODE_MANUAL" ], "description": "Scroll Mode - Manual"},
+	"SCROLL_MODE_FOLLOW_MODE (3)": { "prefix": "SCROLL_MODE_FOLLOW_MODE", "body": [ "SCROLL_MODE_FOLLOW_MODE" ], "description": "Scroll Mode - Follow Mode"},
+	
 	// Thread States
 	"STATE_EXIT (0)": { "prefix": "THREAD_STATE_EXIT", "body": [ "STATE_EXIT" ], "description": "State Exit"},
 	"STATE_RETURN (1)": { "prefix": "THREAD_STATE_RETURN", "body": [ "STATE_RETURN" ], "description": "State Return"},
@@ -799,6 +828,14 @@
 	"STATE_EXCEPTION (3)": { "prefix": "THREAD_STATE_EXCEPTION", "body": [ "STATE_EXCEPTION" ], "description": "State Exception"},
 	"STATE_CALL (4)": { "prefix": "THREAD_STATE_CALL", "body": [ "STATE_CALL" ], "description": "State Call"},
 	"STATE_RUN (5)": { "prefix": "THREAD_STATE_RUN", "body": [ "STATE_RUN" ], "description": "State Run"},
+
+	"LINE": { "prefix": "LINE", "body": [ "__LINE__" ], "description": "Current Script Line"},
+	"FILE": { "prefix": "FILE", "body": [ "__FILE__" ], "description": "Current Script Path"},
+	"DATE": { "prefix": "FILE", "body": [ "__DATE__" ], "description": "Returns compilation date i.e 'Jun 15 2009'"},
+	"TIME": { "prefix": "TIME", "body": [ "__TIME__" ], "description": "Returns compilation time i.e '13:45:30'"},
+	"COUNTER": { "prefix": "COUNTER", "body": [ "__COUNTER__" ], "description": "Returns global counter"},
+	"TIMESTAMP": { "prefix": "TIMESTAMP", "body": [ "__TIMESTAMP__" ], "description": "Returns script last write timestamp i.e 'Jun 15 2009 13:45:30 2009'"},
+
 
 	// Numeric limits
 	"IntMin": {
