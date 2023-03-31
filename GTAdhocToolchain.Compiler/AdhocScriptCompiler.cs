@@ -1590,6 +1590,7 @@ namespace GTAdhocToolchain.Compiler
                 // Statics in < V10 are always set to a nil if not explicitly set to a value
                 if (frame.Version < 10)
                 {
+                    InsertVariablePush(frame, ident, isVariableDeclaration: false);
                     frame.AddInstruction(new InsNilConst(), ident.Location.Start.Line);
                     InsertAssignPop(frame);
                 }
