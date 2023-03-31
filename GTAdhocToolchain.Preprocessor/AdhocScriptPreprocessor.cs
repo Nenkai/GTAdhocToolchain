@@ -204,6 +204,13 @@ namespace GTAdhocToolchain.Preprocessor
                     if (_lookahead.Location.Start.Line != startLine)
                         break;
 
+                    // If the next token is separated by a whitespace, insert one as a token
+                    if (define.Content.Count > 0)
+                    {
+                        if (define.Content[^1].Location.End != _lookahead.Location.Start)
+                            define.Content.Add(new Token() { Value = " "});
+                    }
+
                     define.Content.Add(_lookahead);
                 }
 
