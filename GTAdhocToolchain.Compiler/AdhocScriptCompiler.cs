@@ -1587,6 +1587,12 @@ namespace GTAdhocToolchain.Compiler
 
                 frame.AddAttributeOrStaticMemberVariable(idSymb);
                 
+                // Statics in < V10 are always set to a nil if not explicitly set to a value
+                if (frame.Version < 10)
+                {
+                    frame.AddInstruction(new InsNilConst(), ident.Location.Start.Line);
+                    InsertAssignPop(frame);
+                }
             }
             else if (staticExpression.VarExpression is ClassExpression classExp) // Static Modules/Absolute
             {
