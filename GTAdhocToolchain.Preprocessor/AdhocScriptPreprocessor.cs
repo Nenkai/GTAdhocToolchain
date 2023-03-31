@@ -188,7 +188,8 @@ namespace GTAdhocToolchain.Preprocessor
                 if (_lookahead.Type == TokenType.EOF)
                     break;
 
-                if (count == 0 && (string)_lookahead.Value == "(")
+                if (count == 0 && 
+                    (string)_lookahead.Value == "(" && _lookahead.Location.Start == name.Location.End) // Function macro arguments's open parenthesis must be right next to macro name
                 {
                     ParseMacroFunctionParameters(define);
                 }
@@ -518,6 +519,10 @@ namespace GTAdhocToolchain.Preprocessor
                 {
                     // Parse arguments
                     NextToken();
+
+                    if (_lookahead.Value as string != "(")
+                        ThrowPreprocessorError(token, $"Expected arguments for macro function '{define.Name}'");
+
                     var args = CollectArguments(define);
                     if (args.Count < define.Arguments.Count)
                         ThrowPreprocessorError(token, $"macro \"{define.Name}\" requires {define.Arguments.Count} arguments, but only {args.Count} given");
