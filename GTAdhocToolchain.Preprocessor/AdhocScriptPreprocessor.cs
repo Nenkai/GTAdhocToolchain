@@ -920,7 +920,7 @@ namespace GTAdhocToolchain.Preprocessor
 
         private void Warn(Token token, string message)
         {
-            Logger.Warn($"{message} - {_currentFileName}:{token.Location.Start.Line}");
+            Logger.Warn($"{message} at {_currentFileName}:{token.Location.Start.Line}");
         }
 
         private void ThrowPreprocessorError(Token token, string message)
