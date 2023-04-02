@@ -1959,9 +1959,13 @@ namespace GTAdhocToolchain.Compiler
                     }
                     else
                     {
-                        if (assignExpression.Left is Identifier)
+                        if (assignExpression.Left.Type == Nodes.Identifier)
                         {
                             InsertVariablePush(frame, assignExpression.Left as Identifier, isVariableDeclaration: false);
+                        }
+                        else if (assignExpression.Left.Type == Nodes.ArrayPattern)
+                        {
+                            CompileArrayPatternPush(frame, assignExpression.Left as ArrayPattern, isDeclaration: false);
                         }
                         else if (assignExpression.Left is AttributeMemberExpression attr)
                         {
@@ -1994,10 +1998,23 @@ namespace GTAdhocToolchain.Compiler
                         CompileExpression(frame, assignExpression.Right);
                     }
 
-                    if (popResult)
-                        InsertAssignPop(frame);
+                    if (assignExpression.Left.Type == Nodes.ArrayPattern)
+                    {
+                        // Finish array pattern assignment by adding LIST_ASSIGN_OLD
+                        ArrayPattern arrayPattern = assignExpression.Left as ArrayPattern;
+                        InsListAssignOld listAssign = new InsListAssignOld(arrayPattern.Elements.Count);
+                        frame.AddInstruction(listAssign, arrayPattern.Location.Start.Line);
+
+                        if (popResult)
+                            InsertPop(frame);
+                    }
                     else
-                        ; // throw new NotImplementedException("aa");
+                    {
+                        if (popResult)
+                            InsertAssignPop(frame);
+                        else
+                            ; // throw new NotImplementedException("aa");
+                    }
                 }
             }
             else if (IsAdhocAssignWithOperandOperator(assignExpression.Operator)) // += -= /= etc..
@@ -2012,7 +2029,7 @@ namespace GTAdhocToolchain.Compiler
                 {
                     // Regular update of left-hand side
                     // Left-hand side needs to be pushed first
-                    if (assignExpression.Left is Identifier)
+                    if (assignExpression.Left.Type == Nodes.Identifier)
                     {
                         InsertVariablePush(frame, assignExpression.Left as Identifier, isVariableDeclaration: false);
                     }
@@ -2059,7 +2076,6 @@ namespace GTAdhocToolchain.Compiler
         /// <param name="expression"></param>
         public void CompileVariableAssignment(AdhocCodeFrame frame, Expression expression, bool popValue = true)
         {
-
             if (expression.Type == Nodes.Identifier) // hello = world
             {
                 InsertVariablePush(frame, expression as Identifier, false);
