@@ -123,6 +123,8 @@ namespace GTAdhocToolchain.Disasm
                     ifdepth++;
                 else if (inst.InstructionType == AdhocInstructionType.LEAVE)
                     ifdepth--;
+                else if (inst.InstructionType == AdhocInstructionType.JUMP && Version < 10)
+                    ifdepth--;
                 else if (inst.InstructionType == AdhocInstructionType.MODULE_DEFINE)
                     modOrClass.Push((inst as InsModuleDefine).Names[^1].Name);
                 else if (inst.InstructionType == AdhocInstructionType.CLASS_DEFINE)
@@ -195,6 +197,8 @@ namespace GTAdhocToolchain.Disasm
                 else if (inst.InstructionType == AdhocInstructionType.JUMP_IF_FALSE || inst.InstructionType == AdhocInstructionType.JUMP_IF_TRUE)
                     ifdepth++;
                 else if (inst.InstructionType == AdhocInstructionType.LEAVE)
+                    ifdepth--;
+                else if (inst.InstructionType == AdhocInstructionType.JUMP && Version < 10)
                     ifdepth--;
                 else if (inst.InstructionType == AdhocInstructionType.MODULE_DEFINE)
                     modOrClass.Push((inst as InsModuleDefine).Names[^1].Name);
