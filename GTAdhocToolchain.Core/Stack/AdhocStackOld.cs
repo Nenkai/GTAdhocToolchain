@@ -18,10 +18,10 @@ namespace GTAdhocToolchain.Core.Stack
         /// </summary>
         public List<Variable> VariableStorage { get; set; } = new()
         {
-            // Empty unlike new
+            
         };
 
-        public int VariableStorageSize { get; set; } = 0;
+        public int VariableStorageSize { get; set; } = 1;
 
         // Used for counting the stack size within a block
         private int _stackSizeCounter;
@@ -99,17 +99,9 @@ namespace GTAdhocToolchain.Core.Stack
 
         public void AddLocalVariable(LocalVariable variable)
         {
-            int freeIdx = VariableStorage.IndexOf(null);
-            if (freeIdx == -1) // No free space? If so grow storage
-            {
-                VariableStorage.Add(variable); // Expand
-                if (VariableStorage.Count > VariableStorageSize)
-                    VariableStorageSize = VariableStorage.Count;
-            }
-            else
-            {
-                VariableStorage[freeIdx] = variable;
-            }
+            VariableStorage.Add(variable); // Expand
+            if (VariableStorage.Count > VariableStorageSize)
+                VariableStorageSize = VariableStorage.Count;
         }
 
         public void AddStaticVariable(StaticVariable variable)

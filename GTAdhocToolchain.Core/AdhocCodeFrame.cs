@@ -138,29 +138,34 @@ namespace GTAdhocToolchain.Core
                     Stack.IncrementStackCounter(); break;
                 case AdhocInstructionType.FUNCTION_DEFINE:
                     InsFunctionDefine func = ins as InsFunctionDefine;
-                    Stack.DecreaseStackCounter(func.CodeFrame.FunctionParameters.Count); // Ver > 8
+                    if (Version >= 8)
+                        Stack.DecreaseStackCounter(func.CodeFrame.FunctionParameters.Count);
 
                     if (Version >= 8)
                         Stack.DecreaseStackCounter(func.CodeFrame.CapturedCallbackVariables.Count);
                     break;
                 case AdhocInstructionType.METHOD_DEFINE:
                     InsMethodDefine method = ins as InsMethodDefine;
-                    Stack.DecreaseStackCounter(method.CodeFrame.FunctionParameters.Count); // Ver > 8
+                    if (Version >= 8)
+                        Stack.DecreaseStackCounter(method.CodeFrame.FunctionParameters.Count);
 
                     if (Version >= 8)
                         Stack.DecreaseStackCounter(method.CodeFrame.CapturedCallbackVariables.Count);
                     break;
                 case AdhocInstructionType.FUNCTION_CONST:
                     InsFunctionConst funcConst = ins as InsFunctionConst;
-                    Stack.DecreaseStackCounter(funcConst.CodeFrame.FunctionParameters.Count); // Ver > 8
+                    if (Version >= 8)
+                        Stack.DecreaseStackCounter(funcConst.CodeFrame.FunctionParameters.Count); // Ver > 8
 
                     if (Version >= 8)
                         Stack.DecreaseStackCounter(funcConst.CodeFrame.CapturedCallbackVariables.Count);
+
                     Stack.IncrementStackCounter(); // Function itself
                     break;
                 case AdhocInstructionType.METHOD_CONST:
                     InsMethodConst methodConst = ins as InsMethodConst;
-                    Stack.DecreaseStackCounter(methodConst.CodeFrame.FunctionParameters.Count); // Ver > 8
+                    if (Version >= 8)
+                        Stack.DecreaseStackCounter(methodConst.CodeFrame.FunctionParameters.Count); // Ver > 8
 
                     if (Version >= 8)
                         Stack.DecreaseStackCounter(methodConst.CodeFrame.CapturedCallbackVariables.Count);
@@ -177,8 +182,14 @@ namespace GTAdhocToolchain.Core
                 case AdhocInstructionType.ARRAY_PUSH:
                 case AdhocInstructionType.MODULE_CONSTRUCTOR:
                 case AdhocInstructionType.THROW:
+                    Stack.DecrementStackCounter();
+                    break;
+
                 case AdhocInstructionType.ATTRIBUTE_DEFINE: // Note: Investigate check potential pop by attribute_define only if Version > 6
-                    Stack.DecrementStackCounter(); break;
+                    if (Version > 6)
+                        Stack.DecrementStackCounter();
+                    break;
+
                 case AdhocInstructionType.ASSIGN_POP:
                 case AdhocInstructionType.MAP_INSERT:
                     Stack.DecreaseStackCounter(2);
@@ -319,22 +330,23 @@ namespace GTAdhocToolchain.Core
                         return AddCapturedVariableFromParentScope(symbol);
                     }
 
-                    // Check if the symbol is a static reference, a direct reference to a module attribute, and if it doesn't match, check if it doesn't overlap with any scope locals
-                    if (!Stack.HasLocalVariable(symbol) && (Stack.HasStaticVariable(symbol) || IsStaticModuleFieldOrAttribute(symbol)))
-                    {
-                        bool added = Stack.TryAddStaticVariable(symbol, out newVariable);
-                        if (added)
-                            lastScope.StaticScopeVariables.Add(symbol.Name, symbol);
-                    }
-                    else
+                    // Are we trying to assign to a local variable?
+                    if (Stack.HasLocalVariable(symbol))
                     {
                         // Assigning to a local that already exists
                         bool added = Stack.TryAddLocalVariable(symbol, out newVariable);
                         if (added)
                             lastScope.LocalScopeVariables.Add(symbol.Name, symbol);
                     }
+                    else
+                    {
+                        // Nope. Assuming this is a static
+                        bool added = Stack.TryAddStaticVariable(symbol, out newVariable);
+                        if (added)
+                            lastScope.StaticScopeVariables.Add(symbol.Name, symbol);
+                    }
                 }
-                else // Actually declaring a new (?) local 
+                else // Actually declaring a new local 
                 {
                     bool added = Stack.TryAddLocalVariable(symbol, out newVariable);
                     if (added)

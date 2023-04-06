@@ -959,9 +959,10 @@ namespace GTAdhocToolchain.Compiler
             foreach (Expression param in subParams)
                 CompileSubroutineParameter(frame, parentNode, subroutine, param);
 
-            if (isMethod && frame.Version <= 10)
+            // Methods always reserve a variable slot for 'self'
+            // For older versions it's always there anyway.
+            if (isMethod || frame.Version <= 10)
             {
-                // Methods always reserve a variable slot for 'self' (the keyword doesn't exist) in older versions
                 // It's also after parameters
                 subroutine.CodeFrame.Stack.AddLocalVariable(null);
             }
@@ -969,7 +970,11 @@ namespace GTAdhocToolchain.Compiler
             if (frame.CurrentScope.StaticScopeVariables.ContainsKey(subroutine.Name.Name))
                 ThrowCompilationError(parentNode, $"Static subroutine name '{subroutine.Name.Name}' is already defined in this scope.");
 
-            frame.AddAttributeOrStaticMemberVariable(subroutine.Name);
+            if (frame.Version >= 10)
+                frame.AddAttributeOrStaticMemberVariable(subroutine.Name);
+            else
+                frame.CurrentScope.StaticScopeVariables.Add(subroutine.Name.Name, subroutine.Name);
+
             frame.AddInstruction(subroutine, parentNode.Location.Start.Line);
 
 
@@ -2892,17 +2897,15 @@ namespace GTAdhocToolchain.Compiler
         {
             var lastScope = frame.CurrentScopes.Pop();
 
-            // Local variables can be cleaned up in later versions
-            if (frame.Version >= 11)
+            // Module leaves don't actually reset the max.
+            // For earlier versions it doesn't matter
+            if (!isModuleLeave || frame.Version < 10) 
             {
-                if (!isModuleLeave) // Module leaves don't actually reset the max.
-                {
-                    // Clear up/rewind
-                    foreach (var variable in lastScope.LocalScopeVariables)
-                        frame.FreeLocalVariable(variable.Value);
-                }
+                // Clear up/rewind
+                foreach (var variable in lastScope.LocalScopeVariables)
+                    frame.FreeLocalVariable(variable.Value);
             }
-
+            
             if (isModuleLeave)
             {
                 foreach (var variable in lastScope.StaticScopeVariables)
