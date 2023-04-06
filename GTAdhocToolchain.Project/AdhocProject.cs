@@ -477,6 +477,8 @@ namespace GTAdhocToolchain.Project
             // This is how the game actually does it
             
             using StreamWriter mergedFile = new StreamWriter(Path.Combine(ProjectDir, tmpFileName));
+            mergedFile.WriteLine($"#define PROJECT {ProjectName}");
+
             foreach (AdhocProjectFile srcFile in FilesToCompile)
             {
                 mergedFile.WriteLine($"#define ROOT {Path.ChangeExtension(srcFile.Name, null)}");
