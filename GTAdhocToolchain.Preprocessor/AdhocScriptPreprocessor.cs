@@ -87,6 +87,7 @@ namespace GTAdhocToolchain.Preprocessor
         public void SetCurrentFileName(string fileName)
         {
             _currentFileName = fileName;
+            _scanner?.SetFileName(fileName);
         }
 
         public void SetCurrentFileTimestamp(DateTime timestamp)
@@ -363,7 +364,7 @@ namespace GTAdhocToolchain.Preprocessor
             var oldFileName = _currentFileName;
             var oldTimestamp = _fileTimeStamp;
 
-            _currentFileName = file;
+            SetCurrentFileName(file);
             _fileTimeStamp = new FileInfo(pathToInclude).LastWriteTime;
 
             _writer.WriteLine($"# 1 \"{file}\"");
@@ -377,7 +378,7 @@ namespace GTAdhocToolchain.Preprocessor
             // Restore state
             _lookahead = oldToken;
             _scanner = oldScanner;
-            _currentFileName = oldFileName;
+            SetCurrentFileName(oldFileName);
             _fileTimeStamp = oldTimestamp;
 
             _writer.WriteLine($"# {_lookahead.Location.Start.Line} \"{_currentFileName}\"");

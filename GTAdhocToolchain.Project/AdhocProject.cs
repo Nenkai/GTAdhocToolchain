@@ -237,13 +237,14 @@ namespace GTAdhocToolchain.Project
             Directory.CreateDirectory(pkgContentPath);
 
             int logPadLen = FilesToCompile.Length.ToString().Length;
-            for (int i = 0; i < FilesToCompile.Length; i++)
+            try
             {
-                AdhocProjectFile srcFile = FilesToCompile[i];
-                Logger.Info($"[{(i + 1).ToString().PadLeft(logPadLen)}/{FilesToCompile.Length}] Compiling: {srcFile.Name}");
-
-                try
+                for (int i = 0; i < FilesToCompile.Length; i++)
                 {
+                    AdhocProjectFile srcFile = FilesToCompile[i];
+                    Logger.Info($"[{(i + 1).ToString().PadLeft(logPadLen)}/{FilesToCompile.Length}] Compiling: {srcFile.Name}");
+
+
                     string source = File.ReadAllText(srcFile.FullPath);
                     var time = new FileInfo(srcFile.FullPath).LastWriteTime;
 
@@ -267,58 +268,58 @@ namespace GTAdhocToolchain.Project
                     AdhocCodeGen codeGen = new AdhocCodeGen(compiler, compiler.SymbolMap);
                     codeGen.Generate();
                     codeGen.SaveTo(Path.Combine(pkgContentPath, Path.ChangeExtension(srcFile.Name, ".adc")));
-                }
-                catch (PreprocessorException preprocessException)
-                {
-                    Logger.Error($"{preprocessException.FileName}:{preprocessException.Token.Location.Start.Line}: preprocess error: {preprocessException.Message}");
-                }
-                catch (ParserException parseException)
-                {
-                    Logger.Error($"Syntax error: {parseException.Description} at {parseException.SourceText}:{parseException.LineNumber}");
-                }
-                catch (AdhocCompilationException compileException)
-                {
-                    Logger.Error($"Compilation error: {compileException.Message}");
-                }
-                catch (Exception e)
-                {
-                    Logger.Fatal(e, "Internal error in compilation");
-                }
 
-                if (!srcFile.IsMain)
-                {
-                    string componentName = Path.ChangeExtension(srcFile.FullPath, ".mwidget");
-                    if (File.Exists(componentName))
+                    if (!srcFile.IsMain)
                     {
-                        Logger.Info($"Adding linked component '{Path.GetFileName(componentName)}'");
-
-                        string outTmpComponentFile = Path.Combine(pkgContentPath, Path.GetFileName(componentName));
-                        File.Copy(componentName, outTmpComponentFile);
-
-                        if (SerializeComponents)
+                        string componentName = Path.ChangeExtension(srcFile.FullPath, ".mwidget");
+                        if (File.Exists(componentName))
                         {
-                            Logger.Info($"Serializing '{Path.GetFileName(componentName)}' to binary");
-                            MTextIO io = new MTextIO(componentName);
-                            var root = io.Read();
+                            Logger.Info($"Adding linked component '{Path.GetFileName(componentName)}'");
 
-                            MBinaryWriter writer = new MBinaryWriter(outTmpComponentFile);
-                            writer.Version = SerializeComponentsVersion;
-                            writer.WriteNode(root);
+                            string outTmpComponentFile = Path.Combine(pkgContentPath, Path.GetFileName(componentName));
+                            File.Copy(componentName, outTmpComponentFile);
+
+                            if (SerializeComponents)
+                            {
+                                Logger.Info($"Serializing '{Path.GetFileName(componentName)}' to binary");
+                                MTextIO io = new MTextIO(componentName);
+                                var root = io.Read();
+
+                                MBinaryWriter writer = new MBinaryWriter(outTmpComponentFile);
+                                writer.Version = SerializeComponentsVersion;
+                                writer.WriteNode(root);
+                            }
+                        }
+                        else
+                        {
+                            Logger.Warn($"File '{srcFile.Name}' does not have a linked UI definition file '{Path.GetFileName(componentName)}' (this warning can be ignored if this is not a root)");
                         }
                     }
-                    else
-                    {
-                        Logger.Warn($"File '{srcFile.Name}' does not have a linked UI definition file '{Path.GetFileName(componentName)}' (this warning can be ignored if this is not a root)");
-                    }
                 }
+
+                // Create package mproject with external references
+                CreatePackageMProject(pkgContentPath);
+
+                Logger.Info($"Packaging...");
+                AdhocPackage.PackFromFolder(pkgPath, Path.Combine(ProjectDir, pkgName));
+                Logger.Info($"Packaging successful -> {pkgName}");
             }
-
-            // Create package mproject with external references
-            CreatePackageMProject(pkgContentPath);
-
-            Logger.Info($"Packaging...");
-            AdhocPackage.PackFromFolder(pkgPath, Path.Combine(ProjectDir, pkgName));
-            Logger.Info($"Packaging successful -> {pkgName}");
+            catch (PreprocessorException preprocessException)
+            {
+                Logger.Error($"{preprocessException.FileName}:{preprocessException.Token.Location.Start.Line}: preprocess error: {preprocessException.Message}");
+            }
+            catch (ParserException parseException)
+            {
+                Logger.Error($"Syntax error: {parseException.Description} at {parseException.SourceText}:{parseException.LineNumber}");
+            }
+            catch (AdhocCompilationException compileException)
+            {
+                Logger.Error($"Compilation error: {compileException.Message}");
+            }
+            catch (Exception e)
+            {
+                Logger.Fatal(e, "Internal error in compilation");
+            }
         }
 
         /// <summary>
