@@ -11,6 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\PDTools\PDTools.Compression\PDTools.Compression.csproj" />
     <ProjectReference Include="..\PDTools\PDTools.Files\PDTools.Files.csproj" />
     <ProjectReference Include="..\GTAdhocToolchain.Core\GTAdhocToolchain.Core.csproj" />
   </ItemGroup>

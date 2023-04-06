@@ -8,6 +8,7 @@ using Syroot.BinaryData;
 
 using GTAdhocToolchain.Core;
 using PDTools.Files.Textures;
+using PDTools.Compression;
 using System.Buffers.Binary;
 
 namespace GTAdhocToolchain.Menu.Resources
@@ -56,6 +57,9 @@ namespace GTAdhocToolchain.Menu.Resources
 
                 string outputFile = Path.Combine(outputFolder, path);
                 Directory.CreateDirectory(Path.GetDirectoryName(outputFile));
+
+                if (BinaryPrimitives.ReadUInt32LittleEndian(file.FileData) == 0xfff7eec5)
+                    file.FileData = PS2ZIP.Inflate(file.FileData);
 
                 if (convertImages && this is GpbData4 && BinaryPrimitives.ReadUInt32LittleEndian(file.FileData) == 0x30504449) // Is GTS/7 gpb, is PDI0 (GT7), and allow converting to png
                 {

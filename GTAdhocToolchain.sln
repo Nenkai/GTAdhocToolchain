@@ -27,7 +27,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AdhocLanguage", "vs-extensi
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PDTools.Files", "PDTools\PDTools.Files\PDTools.Files.csproj", "{D9379C37-8CAA-4153-8905-CB6E58E925D9}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GTAdhocToolchain.Preprocessor", "GTAdhocToolchain.Preprocessor\GTAdhocToolchain.Preprocessor.csproj", "{69BE688B-C7AB-4D47-AF45-AA10DD2DCFF2}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GTAdhocToolchain.Preprocessor", "GTAdhocToolchain.Preprocessor\GTAdhocToolchain.Preprocessor.csproj", "{69BE688B-C7AB-4D47-AF45-AA10DD2DCFF2}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "PDTools.Compression", "PDTools\PDTools.Compression\PDTools.Compression.csproj", "{0F42714E-9115-4E15-88FE-E61DC5C29386}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -195,6 +197,18 @@ Global
 		{69BE688B-C7AB-4D47-AF45-AA10DD2DCFF2}.Release|arm64.Build.0 = Release|Any CPU
 		{69BE688B-C7AB-4D47-AF45-AA10DD2DCFF2}.Release|x86.ActiveCfg = Release|Any CPU
 		{69BE688B-C7AB-4D47-AF45-AA10DD2DCFF2}.Release|x86.Build.0 = Release|Any CPU
+		{0F42714E-9115-4E15-88FE-E61DC5C29386}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0F42714E-9115-4E15-88FE-E61DC5C29386}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0F42714E-9115-4E15-88FE-E61DC5C29386}.Debug|arm64.ActiveCfg = Debug|Any CPU
+		{0F42714E-9115-4E15-88FE-E61DC5C29386}.Debug|arm64.Build.0 = Debug|Any CPU
+		{0F42714E-9115-4E15-88FE-E61DC5C29386}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{0F42714E-9115-4E15-88FE-E61DC5C29386}.Debug|x86.Build.0 = Debug|Any CPU
+		{0F42714E-9115-4E15-88FE-E61DC5C29386}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0F42714E-9115-4E15-88FE-E61DC5C29386}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0F42714E-9115-4E15-88FE-E61DC5C29386}.Release|arm64.ActiveCfg = Release|Any CPU
+		{0F42714E-9115-4E15-88FE-E61DC5C29386}.Release|arm64.Build.0 = Release|Any CPU
+		{0F42714E-9115-4E15-88FE-E61DC5C29386}.Release|x86.ActiveCfg = Release|Any CPU
+		{0F42714E-9115-4E15-88FE-E61DC5C29386}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
