@@ -132,6 +132,9 @@ namespace GTAdhocToolchain.Preprocessor
                         case "ifndef":
                             DoIfNotDef(); break;
 
+                        case "error":
+                            DoError(); break; 
+
                         case "endif":
                             if (!inConditional)
                                 ThrowPreprocessorError(_lookahead, "#endif without #if");
@@ -272,6 +275,22 @@ namespace GTAdhocToolchain.Preprocessor
 
             NextToken();
             DoConditional(!res);
+        }
+
+        private void DoError()
+        {
+            Expect("error");
+
+            Token name = _lookahead;
+            NextToken();
+
+            Token msg = _lookahead;
+            NextToken();
+
+            if (msg.Type != TokenType.Template)
+                ThrowPreprocessorError(msg, "#error: error message must be a string");
+
+            ThrowPreprocessorError(name, $"#error was called: {(msg.Value as string).Trim('\"')}");
         }
 
         private void DoIf()
