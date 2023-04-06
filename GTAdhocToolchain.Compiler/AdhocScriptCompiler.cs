@@ -2776,22 +2776,6 @@ namespace GTAdhocToolchain.Compiler
             }
         }
 
-        public bool ProcessStringDefine(AdhocCodeFrame frame, Identifier identifier)
-        {
-            if (identifier.Name == "__LINE__")
-            {
-                frame.AddInstruction(new InsUIntConst((uint)identifier.Location.Start.Line), identifier.Location.Start.Line);
-                return true;
-            }
-            else if (identifier.Name == "__FILE__")
-            {
-                frame.AddInstruction(new InsStringConst(frame.SourceFilePath), identifier.Location.Start.Line);
-                return true;
-            }
-
-            return false;
-        }
-
         /// <summary>
         /// Inserts a variable push instruction to push a variable into the heap.
         /// </summary>
@@ -2993,9 +2977,6 @@ namespace GTAdhocToolchain.Compiler
         /// <returns></returns>
         private void InsertVariableEval(AdhocCodeFrame frame, Identifier identifier)
         {
-            if (ProcessStringDefine(frame, identifier))
-                return;
-
             AdhocSymbol symb = SymbolMap.RegisterSymbol(identifier.Name);
             int idx = frame.AddScopeVariable(symb, isAssignment: false);
             var varEval = new InsVariableEvaluation(idx);
