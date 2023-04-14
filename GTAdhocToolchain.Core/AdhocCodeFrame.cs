@@ -96,7 +96,7 @@ namespace GTAdhocToolchain.Core
 
         public void SetupStack()
         {
-            if (Version >= 12)
+            if (Version >= 11)
                 Stack = new AdhocStack();
             else
                 Stack = new AdhocStackOld();

@@ -555,7 +555,7 @@ namespace GTAdhocToolchain.Compiler
             else
             {
                 // On older versions, an alternate jump exists anyway
-                if (frame.Version < 12)
+                if (frame.Version < 11)
                 {
                     InsJump skipAlternateJmp = new InsJump();
                     frame.AddInstruction(skipAlternateJmp, 0);
@@ -778,7 +778,7 @@ namespace GTAdhocToolchain.Compiler
 
         public void CompileForeach(AdhocCodeFrame frame, ForeachStatement foreachStatement)
         {
-            if (frame.Version < 12)
+            if (frame.Version < 11)
                 ThrowCompilationError(foreachStatement, CompilationMessages.Error_ForeachUnsupported);
 
             LoopContext loopCtx = EnterLoop(frame, foreachStatement);
@@ -1072,7 +1072,7 @@ namespace GTAdhocToolchain.Compiler
                 if (retStatement.Argument is AssignmentExpression assignmentExpr)
                     CompileExpression(frame, assignmentExpr.Left); // If we are returning an assignment i.e return <variable or path> += "hi", we need to eval str again
 
-                if (frame.Version < 12)
+                if (frame.Version < 11)
                 {
                     // Initial return indicates a return value in older versions
                     InsertPop(frame);
@@ -1082,7 +1082,7 @@ namespace GTAdhocToolchain.Compiler
             else
             {
                 
-                if (frame.Version >= 12)
+                if (frame.Version >= 11)
                     InsertVoid(frame); // Void const is returned
             }
 
@@ -1247,7 +1247,7 @@ namespace GTAdhocToolchain.Compiler
                     ThrowCompilationError(exp, "Expected array pattern element to be an identifier or attribute member expression.");
             }
 
-            if (frame.Version >= 12)
+            if (frame.Version >= 11)
             {
                 InsListAssign listAssign = new InsListAssign(arrayPattern.Elements.Count);
                 frame.AddInstruction(listAssign, arrayPattern.Location.Start.Line);
@@ -2154,7 +2154,7 @@ namespace GTAdhocToolchain.Compiler
             InsJump altSkipJump = new InsJump();
             frame.AddInstruction(altSkipJump, 0);
 
-            if (frame.Version >= 12)
+            if (frame.Version >= 11)
                 InsertPop(frame);
 
             // Update alternate jump index now that we've compiled the consequent
@@ -2410,7 +2410,7 @@ namespace GTAdhocToolchain.Compiler
                 frame.AddInstruction(callIns, call.Location.Start.Line);
             }
 
-            if (frame.Version < 12)
+            if (frame.Version < 11)
                 frame.AddInstruction(new InsEval(), call.Location.Start.Line);
 
             // When calling and not caring about returns
@@ -3133,7 +3133,7 @@ namespace GTAdhocToolchain.Compiler
             // Was a return explicitly specified?
             if (!frame.HasTopLevelReturnValue)
             {
-                if (frame.Version >= 12)
+                if (frame.Version >= 11)
                 {
                     // All functions return a value internally in newer adhoc, even if they don't in the code.
                     // So, add one.
