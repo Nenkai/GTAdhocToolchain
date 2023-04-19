@@ -40,7 +40,8 @@ namespace GTAdhocToolchain.CodeGen
 
             MainBlock.Write(stream);
 
-            Logger.Debug($"Code generated (Size: {stream.Length} bytes, {MainBlock.Instructions.Count} main instructions)");
+            Logger.Info($"Code generated (Size: {stream.Length} bytes, {MainBlock.Instructions.Count} main instructions)");
+            Logger.Debug($"[Stack] Stack Size: {MainBlock.Stack.GetStackSize()} - Locals: {MainBlock.Stack.GetLocalVariableStorageSize()}");
         }
 
         public void SaveTo(string path)

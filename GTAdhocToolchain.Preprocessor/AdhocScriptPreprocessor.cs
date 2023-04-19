@@ -43,6 +43,8 @@ namespace GTAdhocToolchain.Preprocessor
 
         private string _baseDirectory;
         private string _currentFileName;
+        public string _currentIncludePath;
+
         private DateTime _fileTimeStamp;
 
         /// <summary>
@@ -349,7 +351,13 @@ namespace GTAdhocToolchain.Preprocessor
                 string dir = Path.GetDirectoryName(Path.Combine(_baseDirectory, _currentFileName));
                 string potentialFile = Path.Combine(dir, file);
                 if (!File.Exists(potentialFile))
-                    ThrowPreprocessorError(_lookahead, "#include: No such file or directory");
+                {
+                    // Try alternative based on current (include) file
+                    potentialFile = Path.Combine(Path.GetDirectoryName(_currentIncludePath), file);
+                    if (!File.Exists(potentialFile))
+                        ThrowPreprocessorError(_lookahead, $"#include '{file}': No such file or directory");
+                }
+                    
 
                 pathToInclude = potentialFile;
             }
@@ -363,8 +371,11 @@ namespace GTAdhocToolchain.Preprocessor
             var oldScanner = _scanner;
             var oldFileName = _currentFileName;
             var oldTimestamp = _fileTimeStamp;
+            var oldIncludePath = _currentIncludePath;
 
             SetCurrentFileName(file);
+            _currentIncludePath = pathToInclude;
+
             _fileTimeStamp = new FileInfo(pathToInclude).LastWriteTime;
 
             _writer.WriteLine($"# 1 \"{file}\"");
@@ -378,6 +389,7 @@ namespace GTAdhocToolchain.Preprocessor
             // Restore state
             _lookahead = oldToken;
             _scanner = oldScanner;
+            _currentIncludePath = oldIncludePath;
             SetCurrentFileName(oldFileName);
             _fileTimeStamp = oldTimestamp;
 

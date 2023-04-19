@@ -973,7 +973,11 @@ namespace GTAdhocToolchain.Compiler
             if (frame.Version >= 10)
                 frame.AddAttributeOrStaticMemberVariable(subroutine.Name);
             else
+            {
+                // In older versions the subroutines don't count towards the local storage
+                // Just keep track of it instead
                 frame.CurrentScope.StaticScopeVariables.Add(subroutine.Name.Name, subroutine.Name);
+            }
 
             frame.AddInstruction(subroutine, parentNode.Location.Start.Line);
 
@@ -1935,7 +1939,7 @@ namespace GTAdhocToolchain.Compiler
             // Assigning to a variable or literal directly?
             if (assignExpression.Operator == AssignmentOperator.Assign)
             {
-                if (frame.Version > 10)
+                if (frame.Version >= 11)
                 {
                     // a = b = c?
                     if (assignExpression.Right.Type == Nodes.AssignmentExpression)

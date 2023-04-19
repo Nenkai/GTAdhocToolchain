@@ -266,7 +266,11 @@ namespace GTAdhocToolchain.Core
                 case AdhocInstructionType.JUMP:
                 case AdhocInstructionType.LOCAL_DEFINE:
                 case AdhocInstructionType.MODULE_DEFINE:
+                    break;
+
                 case AdhocInstructionType.STATIC_DEFINE:
+                    break;
+
                 case AdhocInstructionType.NOP:
                 case AdhocInstructionType.SET_STATE_OLD:
                 case AdhocInstructionType.TRY_CATCH:
@@ -367,7 +371,7 @@ namespace GTAdhocToolchain.Core
                 {
                     bool added = Stack.TryAddStaticVariable(symbol, out newVariable);
                     if (added)
-                        lastScope.StaticScopeVariables.Add(symbol.Name, symbol);
+                        lastScope.StaticScopeVariables.TryAdd(symbol.Name, symbol);
                 }
                 else
                 {
