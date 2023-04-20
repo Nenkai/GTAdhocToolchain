@@ -2852,6 +2852,7 @@ namespace GTAdhocToolchain.Compiler
         {
             var scope = new ScopeContext(node);
             frame.CurrentScopes.Push(scope);
+            frame.ModuleOrClassScopes.Push(scope);
 
             AdhocModule newModule = new AdhocModule();
             ModuleStack.Push(newModule);
@@ -2897,7 +2898,12 @@ namespace GTAdhocToolchain.Compiler
             if (isModuleLeave)
             {
                 foreach (var variable in lastScope.StaticScopeVariables)
+                {
+                    if (variable.Value.Name == "Pane")
+                        ;
+
                     frame.FreeStaticVariable(variable.Value);
+                }
             }
 
             if (insertLeaveInstruction && frame.Version >= 11) // Leave only available >= 11
@@ -2925,6 +2931,8 @@ namespace GTAdhocToolchain.Compiler
         private void LeaveModuleOrClass(AdhocCodeFrame frame, bool fromSubroutine = false)
         {
             LeaveScope(frame, isModuleLeave: true, isModuleExitFromSubroutine: fromSubroutine);
+
+            ModuleOrClassScopes.Pop();
             ModuleStack.Pop();
             frame.CurrentModule = ModuleStack.Peek();
         }
@@ -2990,7 +2998,34 @@ namespace GTAdhocToolchain.Compiler
             // Static references or pushes always have double their own symbol
             // If its a static reference, do not add it as a declared variable within this scope
             if (frame.IsStaticVariable(symb))
+            {
                 varEval.VariableSymbols.Add(symb); // Static, two symbols
+
+                /* HACK: Register identifier accesses at the very top level inside modules as new statics so that they can be cleared later. 
+                 * This is somewhat of a hack-fix - spotted for GT4O. This hopefully won't break anything for later versions.
+                   
+                   Example code (pretend this is at the very top level)
+                   
+                   /////////////////////////////
+                   module MyModule
+                   {
+                       for (var i = 0; i < 10; i++)
+                       {
+                            var value = someStatic[0];
+                       }
+                   }
+                   ////////////////////////////
+                   The compiler would treat 'someStatic' as a static not part of the module, thus not be cleaned
+                   Reuses of someStatic in other modules would be errornous especially in modules defining that stuff through widgets
+                 */
+
+                if (frame.ModuleOrClassScopes.Count > 0)
+                {
+                    var moduleScope = frame.ModuleOrClassScopes.Peek();
+                    if (frame.ParentFrame is null && !moduleScope.StaticScopeVariables.ContainsKey(symb.Name))
+                        moduleScope.StaticScopeVariables.Add(symb.Name, symb);
+                }
+            }
         }
 
         /// <summary>

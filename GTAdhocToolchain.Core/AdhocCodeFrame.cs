@@ -65,6 +65,8 @@ namespace GTAdhocToolchain.Core
         /// </summary>
         public Stack<ScopeContext> CurrentScopes { get; set; } = new();
 
+        public Stack<ScopeContext> ModuleOrClassScopes { get; set; } = new();
+
         /// <summary>
         /// Gets the current scope.
         /// </summary>
