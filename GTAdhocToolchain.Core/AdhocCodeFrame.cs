@@ -465,7 +465,7 @@ namespace GTAdhocToolchain.Core
 
             // TODO: Refactor me maybe?
             Stack.AddStaticVariable(newVar);
-            CurrentScope.StaticScopeVariables.Add(symbol.Name, symbol);
+            CurrentScope.StaticScopeVariables.TryAdd(symbol.Name, symbol);
         }
 
         public bool IsStaticVariable(AdhocSymbol symb)
