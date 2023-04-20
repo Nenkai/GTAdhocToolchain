@@ -2998,8 +2998,8 @@ namespace GTAdhocToolchain.Compiler
             {
                 varEval.VariableSymbols.Add(symb); // Static, two symbols
 
-                /* HACK: Register identifier accesses at the very top level inside modules as new statics so that they can be cleared later. 
-                 * This is somewhat of a hack-fix - spotted for GT4O. This hopefully won't break anything for later versions.
+                /* HACK (?): Register identifier accesses at the very top level inside modules as new statics so that they can be cleared later. 
+                 * This is somewhat of a hack-fix maybe? - spotted for GT4O. This hopefully won't break anything for later versions.
                    
                    Example code (pretend this is at the very top level)
                    

@@ -353,6 +353,9 @@ namespace GTAdhocToolchain.Preprocessor
                 if (!File.Exists(potentialFile))
                 {
                     // Try alternative based on current (include) file
+                    if (string.IsNullOrEmpty(_currentIncludePath))
+                        ThrowPreprocessorError(_lookahead, $"#include '{file}': No such file or directory");
+                    
                     potentialFile = Path.Combine(Path.GetDirectoryName(_currentIncludePath), file);
                     if (!File.Exists(potentialFile))
                         ThrowPreprocessorError(_lookahead, $"#include '{file}': No such file or directory");
