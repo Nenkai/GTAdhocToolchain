@@ -2899,9 +2899,6 @@ namespace GTAdhocToolchain.Compiler
             {
                 foreach (var variable in lastScope.StaticScopeVariables)
                 {
-                    if (variable.Value.Name == "Pane")
-                        ;
-
                     frame.FreeStaticVariable(variable.Value);
                 }
             }
