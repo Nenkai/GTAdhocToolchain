@@ -558,8 +558,8 @@ namespace GTAdhocToolchain.Compiler
             }
             else
             {
-                // On older versions, an alternate jump exists anyway
-                if (frame.Version < 11)
+                
+                if (frame.Version >= 7 && frame.Version < 11) // Version 7-10 and under has an implicit, alternate jump anyway
                 {
                     InsJump skipAlternateJmp = new InsJump();
                     frame.AddInstruction(skipAlternateJmp, 0);
@@ -2897,7 +2897,7 @@ namespace GTAdhocToolchain.Compiler
 
             newModule.ParentModule = frame.CurrentModule;
             frame.CurrentModule = newModule;
-            
+
             return newModule;
         }
 
@@ -3260,6 +3260,20 @@ namespace GTAdhocToolchain.Compiler
                 InsertSetState(frame, AdhocRunState.RETURN);
             }
         }
+
+        /// <summary>
+        /// For debugging, inserts a nop for new scopes - not used for now
+        /// </summary>
+        /// <param name="frame"></param>
+        /// <param name="bodyNode"></param>
+        private void InsertNopForNewScopeIfNeeded(AdhocCodeFrame frame, Node bodyNode)
+        {
+            // This was used for debugging on their end (breakpoint on scope tokens with an adhoc debugger) - it's not needed so don't emit it
+            // Older versions (< 7) and release scripts just had it not stripped
+
+            // frame.AddInstruction(new InsNop(), bodyNode.Location.Start.Line);
+        }
+
         #endregion
 
         #region Utils
