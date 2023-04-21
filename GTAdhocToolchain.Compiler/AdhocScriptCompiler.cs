@@ -250,6 +250,10 @@ namespace GTAdhocToolchain.Compiler
 
         public void CompileSourceFileStatement(AdhocCodeFrame frame, SourceFileStatement srcFileStatement)
         {
+            // Source file instructions are supported starting in version 7
+            if (frame.Version < 7)
+                return;
+
             InsSourceFile srcFileIns = new InsSourceFile(SymbolMap.RegisterSymbol(srcFileStatement.Path, false));
             frame.AddInstruction(srcFileIns, 0);
             frame.SetSourcePath(SymbolMap, srcFileStatement.Path);
@@ -805,7 +809,7 @@ namespace GTAdhocToolchain.Compiler
 
             // Entering body, but we need to get the iterator's value into our declared variable, equivalent to *iterator
             InsertVariableEvalFromSymbol(frame, itorIdentifier);
-            frame.AddInstruction(InsEval.Default, 0);
+            frame.AddInstruction(new InsEval(), 0);
 
             if (foreachStatement.Left is not VariableDeclaration)
                 ThrowCompilationError(foreachStatement, CompilationMessages.Error_ForeachDeclarationNotVariable);
@@ -1011,56 +1015,65 @@ namespace GTAdhocToolchain.Compiler
                 subroutine.CodeFrame.FunctionParameters.Add(paramSymb);
                 subroutine.CodeFrame.AddScopeVariable(paramSymb, isAssignment: true, isLocalDeclaration: true);
 
-                // Subroutine param is uninitialized, push nil into current frame
-                frame.AddInstruction(new InsNilConst(), paramIdent.Location.Start.Line);
-            }
-            else if (param is AssignmentExpression assignmentExpression) // Parameter default value set to another variable or static value
-            {
-                if (assignmentExpression.Left.Type != Nodes.Identifier || assignmentExpression.Right.Type != Nodes.Literal)
-                    ThrowCompilationError(parentNode, CompilationMessages.Error_InvalidParameterValueAssignment);
-
-                AdhocSymbol paramSymb = SymbolMap.RegisterSymbol((assignmentExpression.Left as Identifier).Name);
-                subroutine.CodeFrame.FunctionParameters.Add(paramSymb);
-                subroutine.CodeFrame.AddScopeVariable(paramSymb, isAssignment: true, isLocalDeclaration: true);
-
-                // Push default value
-                CompileLiteral(frame, assignmentExpression.Right as Literal);
-            }
-            else if (param.Type == Nodes.AssignmentPattern)
-            {
-                var pattern = param as AssignmentPattern;
-
-                if (pattern.Right.Type != Nodes.Literal &&
-                    (pattern.Right.Type == Nodes.UnaryExpression && (pattern.Right as UnaryExpression).Argument.Type != Nodes.Literal) && // Stuff like -1
-                    pattern.Right.Type != Nodes.Identifier &&
-                    pattern.Right.Type != Nodes.MemberExpression &&
-                    pattern.Right.Type != Nodes.ArrayExpression &&
-                    pattern.Right.Type != Nodes.MapExpression)
-                    ThrowCompilationError(parentNode, "Subroutine default parameter value must be an identifier to a literal or other identifier.");
-
-                AdhocSymbol paramSymb = SymbolMap.RegisterSymbol((pattern.Left as Identifier).Name);
-                subroutine.CodeFrame.FunctionParameters.Add(paramSymb);
-                subroutine.CodeFrame.AddScopeVariable(paramSymb, isAssignment: true, isLocalDeclaration: true);
-
-                // Push default value
-                CompileExpression(frame, pattern.Right);
-            }
-            else if (param.Type == Nodes.RestElement) // Rest element function(args...)
-            {
-                if (subroutine.CodeFrame.HasRestElement)
-                    ThrowCompilationError(parentNode, "Subroutine already has a rest parameter");
-
-                subroutine.CodeFrame.HasRestElement = true;
-                
-                Identifier paramIdent = (param as RestElement).Argument as Identifier;
-                AdhocSymbol paramSymb = SymbolMap.RegisterSymbol(paramIdent.Name);
-                subroutine.CodeFrame.FunctionParameters.Add(paramSymb);
-                subroutine.CodeFrame.AddScopeVariable(paramSymb, isAssignment: true, isLocalDeclaration: true);
-
-                frame.AddInstruction(new InsNilConst(), paramIdent.Location.Start.Line);
+                if (frame.Version >= 7)
+                {
+                    // Subroutine param does not have a default parameter, push nil into current frame
+                    frame.AddInstruction(new InsNilConst(), paramIdent.Location.Start.Line);
+                }
             }
             else
-                ThrowCompilationError(parentNode, "Subroutine definition parameters must all be identifier or assignment to a literal.");
+            {
+                if (frame.Version < 7)
+                    ThrowCompilationError(param, CompilationMessages.Error_DefaultParameterValuesUnsupported);
+
+                if (param is AssignmentExpression assignmentExpression) // Parameter default value set to another variable or static value
+                {
+                    if (assignmentExpression.Left.Type != Nodes.Identifier || assignmentExpression.Right.Type != Nodes.Literal)
+                        ThrowCompilationError(parentNode, CompilationMessages.Error_InvalidParameterValueAssignment);
+
+                    AdhocSymbol paramSymb = SymbolMap.RegisterSymbol((assignmentExpression.Left as Identifier).Name);
+                    subroutine.CodeFrame.FunctionParameters.Add(paramSymb);
+                    subroutine.CodeFrame.AddScopeVariable(paramSymb, isAssignment: true, isLocalDeclaration: true);
+
+                    // Push default value
+                    CompileLiteral(frame, assignmentExpression.Right as Literal);
+                }
+                else if (param.Type == Nodes.AssignmentPattern)
+                {
+                    var pattern = param as AssignmentPattern;
+
+                    if (pattern.Right.Type != Nodes.Literal &&
+                        (pattern.Right.Type == Nodes.UnaryExpression && (pattern.Right as UnaryExpression).Argument.Type != Nodes.Literal) && // Stuff like -1
+                        pattern.Right.Type != Nodes.Identifier &&
+                        pattern.Right.Type != Nodes.MemberExpression &&
+                        pattern.Right.Type != Nodes.ArrayExpression &&
+                        pattern.Right.Type != Nodes.MapExpression)
+                        ThrowCompilationError(parentNode, "Subroutine default parameter value must be an identifier to a literal or other identifier.");
+
+                    AdhocSymbol paramSymb = SymbolMap.RegisterSymbol((pattern.Left as Identifier).Name);
+                    subroutine.CodeFrame.FunctionParameters.Add(paramSymb);
+                    subroutine.CodeFrame.AddScopeVariable(paramSymb, isAssignment: true, isLocalDeclaration: true);
+
+                    // Push default value
+                    CompileExpression(frame, pattern.Right);
+                }
+                else if (param.Type == Nodes.RestElement) // Rest element function(args...)
+                {
+                    if (subroutine.CodeFrame.HasRestElement)
+                        ThrowCompilationError(parentNode, "Subroutine already has a rest parameter");
+
+                    subroutine.CodeFrame.HasRestElement = true;
+
+                    Identifier paramIdent = (param as RestElement).Argument as Identifier;
+                    AdhocSymbol paramSymb = SymbolMap.RegisterSymbol(paramIdent.Name);
+                    subroutine.CodeFrame.FunctionParameters.Add(paramSymb);
+                    subroutine.CodeFrame.AddScopeVariable(paramSymb, isAssignment: true, isLocalDeclaration: true);
+
+                    frame.AddInstruction(new InsNilConst(), paramIdent.Location.Start.Line);
+                }
+                else
+                    ThrowCompilationError(parentNode, "Subroutine definition parameters must all be identifier or assignment to a literal.");
+            }
         }
 
         /// <summary>
@@ -1676,8 +1689,9 @@ namespace GTAdhocToolchain.Compiler
 
                 // attribute definition with no value
 
-                // defaults to nil
-                frame.AddInstruction(new InsNilConst(), ident.Location.Start.Line);
+                // defaults to nil (when default values are supported)
+                if (frame.Version >= 7)
+                    frame.AddInstruction(new InsNilConst(), ident.Location.Start.Line);
 
                 var idSymb = SymbolMap.RegisterSymbol(ident.Name);
                 InsAttributeDefine staticDefine = new InsAttributeDefine(idSymb);
@@ -1690,6 +1704,9 @@ namespace GTAdhocToolchain.Compiler
             }
             else
             {
+                if (frame.Version < 7)
+                    ThrowCompilationError(attrVariableDefinition.VarExpression, CompilationMessages.Error_DefaultAttributeValuesUnsupported);
+
                 if (attrVariableDefinition.VarExpression is not AssignmentExpression)
                     ThrowCompilationError(attrVariableDefinition, "Expected attribute keyword to be a variable assignment.");
 
@@ -2215,7 +2232,7 @@ namespace GTAdhocToolchain.Compiler
                 var indexerIns = new InsBinaryOperator(SymbolMap.RegisterSymbol(AdhocConstants.OPERATOR_SUBSCRIPT, convertToOperand: frame.Version > 10));
 
                 frame.AddInstruction(indexerIns, computedMember.Location.Start.Line);
-                frame.AddInstruction(InsEval.Default, 0);
+                frame.AddInstruction(new InsEval(), 0);
             }
         }
 
@@ -2296,21 +2313,42 @@ namespace GTAdhocToolchain.Compiler
             List<string> pathParts = new(4);
             BuildStaticPath(staticExp, ref pathParts);
 
-            InsVariableEvaluation eval = new InsVariableEvaluation();
-            foreach (string part in pathParts)
-            {
-                AdhocSymbol symb = SymbolMap.RegisterSymbol(part);
-                eval.VariableSymbols.Add(symb);
-            }
-
             string fullPath = string.Join(AdhocConstants.OPERATOR_STATIC, pathParts);
             AdhocSymbol fullPathSymb = SymbolMap.RegisterSymbol(fullPath);
-            eval.VariableSymbols.Add(fullPathSymb);
 
-            int idx = frame.AddScopeVariable(fullPathSymb, isAssignment: false, isStatic: true);
-            eval.VariableStorageIndex = idx;
+            if (frame.Version >= 7)
+            {
+                InsVariableEvaluation eval = new InsVariableEvaluation();
+                foreach (string part in pathParts)
+                {
+                    AdhocSymbol symb = SymbolMap.RegisterSymbol(part);
+                    eval.VariableSymbols.Add(symb);
+                }
 
-            frame.AddInstruction(eval, staticExp.Location.Start.Line);
+
+                eval.VariableSymbols.Add(fullPathSymb);
+
+                int idx = frame.AddScopeVariable(fullPathSymb, isAssignment: false, isStatic: true);
+                eval.VariableStorageIndex = idx;
+                frame.AddInstruction(eval, staticExp.Location.Start.Line);
+            }
+            else
+            {
+                InsVariablePush push = new InsVariablePush();
+                foreach (string part in pathParts)
+                {
+                    AdhocSymbol symb = SymbolMap.RegisterSymbol(part);
+                    push.VariableSymbols.Add(symb);
+                }
+
+
+                push.VariableSymbols.Add(fullPathSymb);
+
+                int idx = frame.AddScopeVariable(fullPathSymb, isAssignment: false, isStatic: true);
+                push.VariableStorageIndex = idx;
+                frame.AddInstruction(push, staticExp.Location.Start.Line);
+                frame.AddInstruction(new InsEval(), staticExp.Location.Start.Line);
+            }
         }
 
         /// <summary>
@@ -2605,7 +2643,7 @@ namespace GTAdhocToolchain.Compiler
                 CompileExpression(frame, unaryExp.Argument);
 
                 // Eval said local
-                frame.AddInstruction(InsEval.Default, 0);
+                frame.AddInstruction(new InsEval(), 0);
             }
             else if (unaryExp.Operator == UnaryOperator.ReferenceOf) // &var - get reference of variable
             {
@@ -2971,9 +3009,19 @@ namespace GTAdhocToolchain.Compiler
         private AdhocSymbol InsertAttributeEval(AdhocCodeFrame frame, Identifier identifier)
         {
             AdhocSymbol symb = SymbolMap.RegisterSymbol(identifier.Name);
-            var attrEval = new InsAttributeEvaluation();
-            attrEval.AttributeSymbols.Add(symb); // Only one
-            frame.AddInstruction(attrEval, identifier.Location.Start.Line);
+            if (frame.Version >= 7)
+            {
+                var attrEval = new InsAttributeEvaluation();
+                attrEval.AttributeSymbols.Add(symb); // Only one
+                frame.AddInstruction(attrEval, identifier.Location.Start.Line);
+            }
+            else
+            {
+                var attrPush = new InsAttributePush();
+                attrPush.AttributeSymbols.Add(symb); // Only one
+                frame.AddInstruction(attrPush, identifier.Location.Start.Line);
+                frame.AddInstruction(new InsEval(), identifier.Location.Start.Line);
+            }
 
             return symb;
         }
@@ -2988,15 +3036,37 @@ namespace GTAdhocToolchain.Compiler
         {
             AdhocSymbol symb = SymbolMap.RegisterSymbol(identifier.Name);
             int idx = frame.AddScopeVariable(symb, isAssignment: false);
-            var varEval = new InsVariableEvaluation(idx);
-            varEval.VariableSymbols.Add(symb); // Only one
-            frame.AddInstruction(varEval, identifier.Location.Start.Line);
+
+            InstructionBase ins;
+            if (frame.Version >= 7)
+            {
+                ins = new InsVariableEvaluation(idx);
+
+                var varEval = ins as InsVariableEvaluation;
+                varEval.VariableSymbols.Add(symb); // Only one
+                frame.AddInstruction(varEval, identifier.Location.Start.Line);
+            }
+            else
+            {
+                ins = new InsVariablePush();
+
+                var varPush = ins as InsVariablePush;
+                varPush.VariableStorageIndex = idx;
+                varPush.VariableSymbols.Add(symb); // Only one
+                frame.AddInstruction(varPush, identifier.Location.Start.Line);
+                frame.AddInstruction(new InsEval(), identifier.Location.Start.Line);
+            }
+
 
             // Static references or pushes always have double their own symbol
             // If its a static reference, do not add it as a declared variable within this scope
             if (frame.IsStaticVariable(symb))
             {
-                varEval.VariableSymbols.Add(symb); // Static, two symbols
+                // Static, two symbols
+                if (frame.Version >= 7)
+                    (ins as InsVariableEvaluation).VariableSymbols.Add(symb);
+                else
+                    (ins as InsVariablePush).VariableSymbols.Add(symb);
 
                 /* HACK (?): Register identifier accesses at the very top level inside modules as new statics so that they can be cleared later. 
                  * This is somewhat of a hack-fix maybe? - spotted for GT4O. This hopefully won't break anything for later versions.
@@ -3065,10 +3135,21 @@ namespace GTAdhocToolchain.Compiler
             LocalVariable taskVariable = frame.Stack.GetLocalVariableBySymbol(symbol);
             int taskVariableStoreIdx = frame.Stack.GetLocalVariableIndex(taskVariable);
 
-            var insVarEval = new InsVariableEvaluation();
-            insVarEval.VariableSymbols.Add(symbol);
-            insVarEval.VariableStorageIndex = taskVariableStoreIdx;
-            frame.AddInstruction(insVarEval, location.Start.Line);
+            if (frame.Version >= 7)
+            {
+                var insVarEval = new InsVariableEvaluation();
+                insVarEval.VariableSymbols.Add(symbol);
+                insVarEval.VariableStorageIndex = taskVariableStoreIdx;
+                frame.AddInstruction(insVarEval, location.Start.Line);
+            }
+            else
+            {
+                var insVarPush = new InsVariablePush();
+                insVarPush.VariableSymbols.Add(symbol);
+                insVarPush.VariableStorageIndex = taskVariableStoreIdx;
+                frame.AddInstruction(insVarPush, location.Start.Line);
+                frame.AddInstruction(new InsEval(), location.Start.Line);
+            }
         }
 
         /// <summary>

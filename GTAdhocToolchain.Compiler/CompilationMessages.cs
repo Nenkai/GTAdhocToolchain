@@ -64,5 +64,8 @@ namespace GTAdhocToolchain.Compiler
         public const string Error_VaCall_MissingArguments = "Missing argument array in variadic function call";
 
         public const string Error_NilNotValidVarialbleName = "nil is not a valid variable name";
+
+        public const string Error_DefaultParameterValuesUnsupported = "Default parameter values are only supported in Adhoc version 7 and above.";
+        public const string Error_DefaultAttributeValuesUnsupported = "Default attribute values are only available in Adhoc version 7 and above.";
     }
 }
