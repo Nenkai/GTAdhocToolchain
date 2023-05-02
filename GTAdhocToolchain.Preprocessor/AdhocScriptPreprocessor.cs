@@ -593,7 +593,7 @@ namespace GTAdhocToolchain.Preprocessor
 
             if (token.Value as string == "__FILE__")
             {
-                return new Token() { Value = $"\"{_currentFileName}\"" };
+                return new Token() { Value = $"\"{_currentFileName.Replace("\\", "\\\\")}\"" }; // Make sure to escape it
             }
 
             if (token.Value as string == "__COUNTER__")
