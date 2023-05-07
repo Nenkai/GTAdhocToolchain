@@ -23,7 +23,7 @@ namespace GTAdhocToolchain.Core.Instructions
         public override void Deserialize(AdhocStream stream)
         {
             CodeFrame.Version = stream.Version;
-            CodeFrame.SetupStack();
+            CodeFrame.CreateStack();
             CodeFrame.Read(stream);
         }
 

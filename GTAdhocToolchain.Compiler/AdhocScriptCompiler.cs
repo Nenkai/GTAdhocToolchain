@@ -59,6 +59,10 @@ namespace GTAdhocToolchain.Compiler
         {
             Logger.Info("Started script compilation.");
 
+            // Always an empty one in old versions (same in subroutines)
+            if (Version <= 10)
+                Stack.AddLocalVariable(null);
+
             EnterScope(this, script);
             CompileScriptBody(this, script);
             LeaveScope(this);
@@ -951,7 +955,7 @@ namespace GTAdhocToolchain.Compiler
             subroutine.CodeFrame.ParentFrame = this;
             subroutine.CodeFrame.CurrentModule = frame.CurrentModule;
             subroutine.CodeFrame.Version = this.Version;
-            subroutine.CodeFrame.SetupStack();
+            subroutine.CodeFrame.CreateStack();
 
             if (isMethod)
             {
@@ -1550,7 +1554,7 @@ namespace GTAdhocToolchain.Compiler
             subroutine.CodeFrame.SourceFilePath = frame.SourceFilePath;
             subroutine.CodeFrame.CurrentModule = frame.CurrentModule;
             subroutine.CodeFrame.Version = this.Version;
-            subroutine.CodeFrame.SetupStack();
+            subroutine.CodeFrame.CreateStack();
 
             /* Unlike JS, adhoc can capture variables from the parent frame
              * Example:

@@ -50,7 +50,7 @@ namespace GTAdhocToolchain.Disasm
 
             adhoc.TopLevelFrame = new AdhocCodeFrame();
             adhoc.TopLevelFrame.Version = version;
-            adhoc.TopLevelFrame.SetupStack();
+            adhoc.TopLevelFrame.CreateStack();
             adhoc.TopLevelFrame.Read(stream);
 
             scripts.Add(adhoc);

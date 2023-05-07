@@ -96,7 +96,10 @@ namespace GTAdhocToolchain.Core
         /// </summary>
         public bool HasRestElement { get; set; }
 
-        public void SetupStack()
+        /// <summary>
+        /// Creates the stack (depending on the adhoc version).
+        /// </summary>
+        public void CreateStack()
         {
             if (Version >= 11)
                 Stack = new AdhocStack();

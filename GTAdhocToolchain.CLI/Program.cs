@@ -224,7 +224,7 @@ namespace GTAdhocToolchain.CLI
                 var compiler = new AdhocScriptCompiler();
                 compiler.SetSourcePath(compiler.SymbolMap, inputPath);
                 compiler.SetVersion(version);
-                compiler.SetupStack();
+                compiler.CreateStack();
 
                 if (debugExceptions)
                     compiler.BuildTryCatchDebugStatements();

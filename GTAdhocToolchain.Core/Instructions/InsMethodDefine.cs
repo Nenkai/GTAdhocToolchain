@@ -26,7 +26,7 @@ namespace GTAdhocToolchain.Core.Instructions
             Name = stream.ReadSymbol();
 
             CodeFrame.Version = stream.Version;
-            CodeFrame.SetupStack();
+            CodeFrame.CreateStack();
             CodeFrame.Read(stream);
         }
 

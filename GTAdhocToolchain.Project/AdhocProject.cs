@@ -172,7 +172,7 @@ namespace GTAdhocToolchain.Project
                 compiler.SetProjectDirectory(ProjectDir);
                 compiler.SetSourcePath(compiler.SymbolMap, ProjectFolder + "/" + tmpFileName);
                 compiler.SetVersion(Version);
-                compiler.SetupStack();
+                compiler.CreateStack();
 
                 if (debug)
                     compiler.BuildTryCatchDebugStatements();
@@ -262,7 +262,7 @@ namespace GTAdhocToolchain.Project
                     compiler.SetProjectDirectory(ProjectDir);
                     compiler.SetSourcePath(compiler.SymbolMap, srcFile.SourcePath);
                     compiler.SetVersion(Version);
-                    compiler.SetupStack();
+                    compiler.CreateStack();
                     compiler.CompileScript(program);
 
                     AdhocCodeGen codeGen = new AdhocCodeGen(compiler, compiler.SymbolMap);
