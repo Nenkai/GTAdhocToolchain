@@ -15,7 +15,16 @@ namespace GTAdhocToolchain.Compiler
     {
         public AdhocSymbolMap SymbolMap { get; set; } = new();
 
+        /// <summary>
+        /// Module stack. Top level is included.
+        /// </summary>
         public Stack<AdhocModule> ModuleStack { get; set; } = new();
+
+        /// <summary>
+        /// Current module/class scopes. Top level is not included.
+        /// </summary>
+        public Stack<ScopeContext> ModuleOrClassScopes { get; set; } = new();
+
         public Dictionary<string, AdhocModule> TopLevelModules { get; set; } = new();
 
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
@@ -2894,7 +2903,7 @@ namespace GTAdhocToolchain.Compiler
         {
             var scope = new ScopeContext(node);
             frame.CurrentScopes.Push(scope);
-            frame.ModuleOrClassScopes.Push(scope);
+            ModuleOrClassScopes.Push(scope);
 
             AdhocModule newModule = new AdhocModule();
             ModuleStack.Push(newModule);
@@ -3090,9 +3099,9 @@ namespace GTAdhocToolchain.Compiler
                    Reuses of someStatic in other modules would be errornous especially in modules defining that stuff through widgets
                  */
 
-                if (frame.ModuleOrClassScopes.Count > 0)
+                if (ModuleOrClassScopes.Count > 0) // Is in a module?
                 {
-                    var moduleScope = frame.ModuleOrClassScopes.Peek();
+                    var moduleScope = ModuleOrClassScopes.Peek();
                     if (frame.ParentFrame is null && !moduleScope.StaticScopeVariables.ContainsKey(symb.Name))
                         moduleScope.StaticScopeVariables.Add(symb.Name, symb);
                 }
