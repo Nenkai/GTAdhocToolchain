@@ -53,7 +53,7 @@ namespace GTAdhocToolchain.Compiler
 
         public const string Error_ForeachUnsupported = "Foreach statements are not supported in Adhoc Versions below 11.";
         public const string Error_MapUnsupported = "Map constants are not supported in Adhoc Versions lower than 11.";
-        public const string Error_SelfUnsupported = "'self is not supported in Adhoc Versions lower than 10.";
+        public const string Error_SelfUnsupported = "'self is not supported in Adhoc Versions lower than 7.";
 
         public const string Error_DelegatesUnsupported = "Delegates are only available starting from Adhoc version 12, starting GT Sport.";
         public const string Error_OptionalComputedMemberUnsupported = "Optional '?[' is only available starting from Adhoc version 12, starting GT Sport.";

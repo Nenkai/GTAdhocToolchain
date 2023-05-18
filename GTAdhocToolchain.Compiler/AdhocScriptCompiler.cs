@@ -1478,7 +1478,7 @@ namespace GTAdhocToolchain.Compiler
         /// <param name="spreadElement"></param>
         private void CompileSelfExpression(AdhocCodeFrame frame, SelfExpression selfExpression)
         {
-            if (frame.Version < 10)
+            if (frame.Version < 7)
                 ThrowCompilationError(selfExpression, CompilationMessages.Error_SelfUnsupported);
 
             AdhocSymbol symb = SymbolMap.RegisterSymbol(AdhocConstants.SELF);

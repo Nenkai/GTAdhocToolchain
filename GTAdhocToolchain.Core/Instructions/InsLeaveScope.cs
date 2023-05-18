@@ -45,6 +45,6 @@ namespace GTAdhocToolchain.Core.Instructions
         }
 
         public override string Disassemble(bool asCompareMode = false)
-           => $"{InstructionType}: Depth:{ModuleOrClassDepthRewindIndex}, SetHeapSize:{VariableStorageRewindIndex}";
+           => $"{InstructionType}: Depth:{ModuleOrClassDepthRewindIndex}, ClearLocalIndex:{VariableStorageRewindIndex}";
     }
 }
