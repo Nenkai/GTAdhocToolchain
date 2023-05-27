@@ -669,7 +669,11 @@ namespace GTAdhocToolchain.Core
                     if (i != FunctionParameters.Count - 1)
                         sb.Append(", ");
                 }
+
+                if (HasRestElement)
+                    sb.Append("...");
             }
+
             sb.Append(")");
             if (CapturedCallbackVariables.Count != 0)
             {
@@ -682,9 +686,6 @@ namespace GTAdhocToolchain.Core
                 }
                 sb.Append("]");
             }
-
-            if (HasRestElement)
-                sb.Append(" params[]");
 
             sb.AppendLine();
 

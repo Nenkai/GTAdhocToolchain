@@ -1106,7 +1106,6 @@ namespace GTAdhocToolchain.Compiler
                 {
                     // Initial return indicates a return value in older versions
                     InsertPop(frame);
-                    InsertSetState(frame, AdhocRunState.RETURN);
                 }
             }
             else
@@ -3260,6 +3259,14 @@ namespace GTAdhocToolchain.Compiler
         /// <param name="frame"></param>
         private void InsertFrameExitIfNeeded(AdhocCodeFrame frame, Node bodyNode)
         {
+            // Older versions's compilers don't check if a return at the top level with an argument was already specified
+            // A return instruction is added anyway
+            if (frame.Version < 10)
+            {
+                InsertSetState(frame, AdhocRunState.RETURN);
+                return;
+            }
+
             // Was a return explicitly specified?
             if (!frame.HasTopLevelReturnValue)
             {
