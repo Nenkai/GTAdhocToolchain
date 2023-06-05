@@ -274,6 +274,9 @@ namespace GTAdhocToolchain.Compiler
 
         public void CompileUndefStatement(AdhocCodeFrame frame, UndefStatement undefStatement)
         {
+            // XX: Undef may refer to a local variable aswell, it's not supported though
+            // GT5 SoundUtil.ad undefs BootInitialize as a local which is a defined user function
+
             InsUndef undefIns = new InsUndef();
             var parts = undefStatement.Symbol.Split("::");
 
@@ -1896,7 +1899,7 @@ namespace GTAdhocToolchain.Compiler
                         }
                     }
                     else
-                        throw new Exception("Unsupported Tagged Template Node");
+                        ThrowCompilationError(node, "Unsupported Tagged Template Node");
                 }
             }
 
@@ -1989,8 +1992,8 @@ namespace GTAdhocToolchain.Compiler
                     // Regular update of left-hand side
                     // Left-hand side needs to be pushed first
 
-                    // Assigning to a reference
-                    if (IsUnaryReferenceOfExpression(assignExpression.Left))
+                    // Assigning to a reference variable
+                    if (IsUnaryIndirection(assignExpression.Left))
                     {
                         // No need to push, eval
                         CompileUnaryExpression(frame, assignExpression.Left as UnaryExpression, asReference: false);
@@ -2019,7 +2022,7 @@ namespace GTAdhocToolchain.Compiler
                         }
                         else if (assignExpression.Left is ObjectSelectorMemberExpression objectSelector)
                         {
-                            throw new NotImplementedException("Unimplemented object selector assignment expression");
+                            ThrowCompilationError(assignExpression, "Unimplemented object selector assignment expression");
                         }
                         else
                         {
@@ -2057,8 +2060,8 @@ namespace GTAdhocToolchain.Compiler
             }
             else if (IsAdhocAssignWithOperandOperator(assignExpression.Operator)) // += -= /= etc..
             {
-                // Assigning to a reference
-                if (IsUnaryReferenceOfExpression(assignExpression.Left))
+                // Assigning to a reference variable
+                if (IsUnaryIndirection(assignExpression.Left))
                 {
                     // No need to push, eval
                     CompileUnaryExpression(frame, assignExpression.Left as UnaryExpression, asReference: false);
@@ -2081,7 +2084,7 @@ namespace GTAdhocToolchain.Compiler
                     }
                     else if (assignExpression.Left is ObjectSelectorMemberExpression objectSelector)
                     {
-                        throw new NotImplementedException("Unimplemented object selector assignment expression");
+                        ThrowCompilationError(assignExpression, "Unimplemented object selector assignment expression");
                     }
                     else
                     {
@@ -2145,7 +2148,7 @@ namespace GTAdhocToolchain.Compiler
                 CompileArrayPatternPush(frame, expression as ArrayPattern, isDeclaration: false);
                 return; // No need for assign pop
             }
-            else if (expression is UnaryExpression unaryExp && (unaryExp.Operator == UnaryOperator.Indirection || unaryExp.Operator == UnaryOperator.ReferenceOf)) // (*/&)hello = world
+            else if (expression is UnaryExpression unaryExp && unaryExp.Operator == UnaryOperator.Indirection) // (*/&)hello = world
             {
                 if (unaryExp.Argument.Type == Nodes.Identifier ||
                     unaryExp.Argument is AttributeMemberExpression ||
@@ -2153,11 +2156,11 @@ namespace GTAdhocToolchain.Compiler
                     unaryExp.Argument is ComputedMemberExpression)
                     CompileExpression(frame, unaryExp.Argument);
                 else
-                    ThrowCompilationError(expression, "Unexpected assignment to unary argument. Only Indirection (*) or Reference (&) is allowed.");
+                    ThrowCompilationError(expression, "Unexpected assignment to unary argument. Only Indirection (*) is allowed.");
             }
             else
             {
-                ThrowCompilationError(expression, $"Unimplemented variable assignment type: '{expression.Type}'");
+                ThrowCompilationError(expression, $"Unimplemented or invalid variable assignment type: '{expression.Type}'");
             }
 
             if (popValue)
@@ -2652,19 +2655,23 @@ namespace GTAdhocToolchain.Compiler
             }
             else if (unaryExp.Operator == UnaryOperator.Indirection) // *var - eval variable
             {
-                CompileExpression(frame, unaryExp.Argument);
-
-                // Eval said local
-                frame.AddInstruction(new InsEval(), 0);
-            }
-            else if (unaryExp.Operator == UnaryOperator.ReferenceOf) // &var - get reference of variable
-            {
                 if (asReference)
                     PushUnaryExpressionArgument(frame, unaryExp.Argument);
                 else if (unaryExp.Argument is UpdateExpression updArg)
                     CompileUnaryExpression(frame, updArg, asReference: true);
                 else
+                {
                     CompileExpression(frame, unaryExp.Argument);
+                    frame.AddInstruction(new InsEval(), 0);
+                }
+                
+            }
+            else if (unaryExp.Operator == UnaryOperator.ReferenceOf) // &var - get reference of variable
+            {
+                if (asReference)
+                    PushUnaryExpressionArgument(frame, unaryExp.Argument);
+                else
+                    ThrowCompilationError(unaryExp, "Not implemented");
             }
             else // -var / +var / ~var
             {
@@ -2681,13 +2688,29 @@ namespace GTAdhocToolchain.Compiler
                 }
 
                 CompileExpression(frame, unaryExp.Argument);
-                string op = unaryExp.Operator switch
+                string op;
+
+                switch (unaryExp.Operator)
                 {
-                    UnaryOperator.LogicalNot => AdhocConstants.UNARY_OPERATOR_LOGICAL_NOT,
-                    UnaryOperator.Minus => AdhocConstants.UNARY_OPERATOR_MINUS,
-                    UnaryOperator.Plus => AdhocConstants.UNARY_OPERATOR_PLUS,
-                    UnaryOperator.BitwiseNot => AdhocConstants.UNARY_OPERATOR_BITWISE_INVERT,
-                    _ => throw new NotImplementedException("TODO"),
+                    case UnaryOperator.LogicalNot:
+                        op = AdhocConstants.UNARY_OPERATOR_LOGICAL_NOT;
+                        break;
+
+                    case UnaryOperator.Minus:
+                        op = AdhocConstants.UNARY_OPERATOR_MINUS;
+                        break;
+
+                    case UnaryOperator.Plus:
+                        op = AdhocConstants.UNARY_OPERATOR_PLUS;
+                        break;
+
+                    case UnaryOperator.BitwiseNot:
+                        op = AdhocConstants.UNARY_OPERATOR_BITWISE_INVERT;
+                        break;
+
+                    default:
+                        ThrowCompilationError(unaryExp, "Invalid operator");
+                        return;
                 };
 
                 bool opToSymbol = frame.Version >= 12;
@@ -2826,7 +2849,8 @@ namespace GTAdhocToolchain.Compiler
                     break;
 
                 default:
-                    throw new NotImplementedException($"Not implemented literal {literal.TokenType}");
+                    ThrowCompilationError(literal, $"Not implemented literal {literal.TokenType}");
+                    break;
             }
         }
 
@@ -3337,6 +3361,16 @@ namespace GTAdhocToolchain.Compiler
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// Returns whether the provided expression is an unary indirection of expression (i.e *myObj).
+        /// </summary>
+        /// <param name="exp"></param>
+        /// <returns></returns>
+        private static bool IsUnaryIndirection(Expression exp)
+        {
+            return exp is UnaryExpression unaryExp && unaryExp.Operator == UnaryOperator.Indirection;
         }
 
         /// <summary>
