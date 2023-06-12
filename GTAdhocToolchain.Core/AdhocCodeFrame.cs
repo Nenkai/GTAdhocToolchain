@@ -73,7 +73,7 @@ namespace GTAdhocToolchain.Core
         /// <summary>
         /// Returns whether the current scope is the top block level.
         /// </summary>
-        public bool IsTopLevel => CurrentScopes.Count == 1;
+        public bool IsCurrentScopeTopScope => CurrentScopes.Count == 1;
 
         /// <summary>
         /// Whether the current block has a return statement, to manually add the return instructions if false.

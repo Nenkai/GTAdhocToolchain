@@ -1121,7 +1121,7 @@ namespace GTAdhocToolchain.Compiler
             InsertSetState(frame, AdhocRunState.RETURN);
 
             // Top level of frame?
-            if (frame.IsTopLevel)
+            if (frame.IsCurrentScopeTopScope)
                 frame.HasTopLevelReturnValue = true;
         }
 
@@ -2981,10 +2981,14 @@ namespace GTAdhocToolchain.Compiler
             {
                 InsLeaveScope leave = new InsLeaveScope();
 
-                if (isModuleLeave)
-                {
+                // Top level is a special "module" frame where it can rewind some variables based on depth
+                // GT5 uses this and every leave in the top level requires this, GT6 and above ignores this altogether.
+
+                if (frame.ParentFrame is null) // Short for "do we have a parent? if not, we're most likely the top level"
                     leave.ModuleOrClassDepthRewindIndex = ModuleStack.Count - 1;
 
+                if (isModuleLeave)
+                {
                     if (isModuleExitFromSubroutine)
                         leave.VariableStorageRewindIndex = frame.Stack.GetLastLocalVariableIndex();
                     else
