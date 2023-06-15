@@ -44,6 +44,7 @@ namespace GTAdhocToolchain.Menu
                 return null;
             }
 
+            
             Version = (byte)Stream.DecodeBitsAndAdvance();
             if (Version != 0 && Version != 1)
             {

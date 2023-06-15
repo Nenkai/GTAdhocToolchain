@@ -67,12 +67,10 @@ namespace GTAdhocToolchain.Menu.Fields
                         string customFieldType = Encoding.UTF8.GetString(typeName);
 
                         field = FromTypeName(customFieldType);
-
-                        if (field is null)
+                        if (field is mNode nodeField)
                         {
-                            field = new mNode();
-                            ((mNode)field).EndScopeOffset = endOffset;
-                            ((mNode)field).TypeName = customFieldType;
+                            nodeField.EndScopeOffset = endOffset;
+                            nodeField.TypeName = customFieldType;
                         }
                     }
 

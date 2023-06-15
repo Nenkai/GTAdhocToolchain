@@ -52,12 +52,12 @@ namespace GTAdhocToolchain.Menu.Fields
                         string customFieldType = Encoding.UTF8.GetString(typeName);
                         element = mTypeBase.FromTypeName(customFieldType);
 
-                        if (element is null)
+                        if (element is mNode nodeElement)
                         {
-                            element = new mNode();
-                            ((mNode)element).EndScopeOffset = endScope;
-                            ((mNode)element).TypeName = customFieldType;
+                            nodeElement.EndScopeOffset = endScope;
+                            nodeElement.TypeName = customFieldType;
                         }
+                        
                     }
 
                     element.Read(io);

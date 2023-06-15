@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "GTAdhocToolchain.CLI": {
+      "commandName": "Project",
+      "commandLineArgs": "mproject-to-text -i \"C:\\Gran_Turismo\\RPCS3\\dev_hdd0\\game\\BCES00569\\USRDIR\\direct\\projects - Copy\\gt5\\gps_replay\\gps_replay.mproject\" -o aa"
+    }
+  }
+}

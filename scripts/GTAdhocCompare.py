@@ -150,6 +150,7 @@ for line in origlines:
         continue
 
     line2 = re.sub(RE_INSTRUCTION_COMPONENTS_TO_DROP, "", re_instr.group(1))
+    
     re_jump = re.search(RE_INSTRUCTION_JUMP, line2)
     if re_jump is not None and out.showjump is False:
         line2 = re.sub(RE_INSTRUCTION_JUMP, f"Jump:UNK", line2) # re_jump.group(1)
@@ -166,7 +167,7 @@ if out.limiter is not None:
 
 print("Building comparison...")
 
-differ = HtmlDiff(4)
+differ = HtmlDiff(4, 120)
 html = differ.make_file(origlines, newlines, ORIG_FILE, NEW_FILE)
 with open(out.output_file or 'comparison.html', "w", encoding= 'utf-8') as f:
     html = html.replace('<style type="text/css">', HTML_STYLING+'<style type="text/css">')
