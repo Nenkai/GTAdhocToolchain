@@ -60,12 +60,12 @@ namespace GTAdhocToolchain.Preprocessor
             _writer = new StringWriter(_sb);
             _time = DateTime.Now;
 
-            _defines.Add("__LINE__", new DefineMacro() { Name = "__LINE__", IsBuiltin = true, Content = new List<Token>() { new Token() { Value = "__LINE__" } } });
-            _defines.Add("__FILE__", new DefineMacro() { Name = "__FILE__", IsBuiltin = true, Content = new List<Token>() { new Token() { Value = "__FILE__" } } });
-            _defines.Add("__DATE__", new DefineMacro() { Name = "__DATE__", IsBuiltin = true, Content = new List<Token>() { new Token() { Value = "__DATE__" } } });
-            _defines.Add("__TIME__", new DefineMacro() { Name = "__TIME__", IsBuiltin = true, Content = new List<Token>() { new Token() { Value = "__TIME__" } } });
-            _defines.Add("__COUNTER__", new DefineMacro() { Name = "__COUNTER__", IsBuiltin = true, Content = new List<Token>() { new Token() { Value = "__COUNTER__" } } });
-            _defines.Add("__TIMESTAMP__", new DefineMacro() { Name = "__TIMESTAMP__", IsBuiltin = true, Content = new List<Token>() { new Token() { Value = "__TIMESTAMP__" } } });
+            AddDefine("__LINE__", "__LINE__", isBuiltIn: true);
+            AddDefine("__FILE__", "__FILE__", isBuiltIn: true);
+            AddDefine("__DATE__", "__DATE__", isBuiltIn: true);
+            AddDefine("__TIME__", "__TIME__", isBuiltIn: true);
+            AddDefine("__COUNTER__", "__COUNTER__", isBuiltIn: true);
+            AddDefine("__TIMESTAMP__", "__TIMESTAMP__", isBuiltIn: true);
 
             foreach (var def in BuiltinDefines.CompilerProvidedConstants)
             {
@@ -79,6 +79,17 @@ namespace GTAdhocToolchain.Preprocessor
                     }
                 });
             }
+        }
+
+        public void AddDefines(Dictionary<string, string> defines)
+        {
+            foreach (var define in defines)
+                AddDefine(define.Key, define.Value);
+        }
+
+        public void AddDefine(string key, string value, bool isBuiltIn = false)
+        {
+            _defines.TryAdd(key, new DefineMacro() { Name = key, IsBuiltin = isBuiltIn, Content = new List<Token>() { new Token() { Value = value } } });
         }
 
         public void SetBaseDirectory(string baseDirectory)

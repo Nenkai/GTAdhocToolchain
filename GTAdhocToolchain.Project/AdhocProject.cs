@@ -76,6 +76,11 @@ namespace GTAdhocToolchain.Project
         /// </summary>
         public int SerializeComponentsVersion { get; set; }
 
+        /// <summary>
+        /// Defines to pass to the preprocessor
+        /// </summary>
+        public Dictionary<string, string> Defines { get; set; } = new();
+
         public static AdhocProject Read(string path)
         {
             var deserializer = new DeserializerBuilder()
@@ -161,6 +166,7 @@ namespace GTAdhocToolchain.Project
                 preprocessor.SetBaseDirectory(BaseIncludeFolder);
                 preprocessor.SetCurrentFileName(Path.Combine(SourceProjectFolder, $"_tmp_{OutputName}.ad").Replace('\\', '/'));
                 preprocessor.SetCurrentFileTimestamp(time);
+                preprocessor.AddDefines(Defines);
 
                 var preprocessed = preprocessor.Preprocess(source);
 
@@ -252,6 +258,8 @@ namespace GTAdhocToolchain.Project
                     preprocessor.SetBaseDirectory(BaseIncludeFolder);
                     preprocessor.SetCurrentFileName(srcFile.SourcePath);
                     preprocessor.SetCurrentFileTimestamp(time);
+                    preprocessor.AddDefines(Defines);
+
                     var preprocessed = preprocessor.Preprocess(source);
 
                     var parser = new AdhocAbstractSyntaxTree(preprocessed);
