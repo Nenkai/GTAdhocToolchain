@@ -1434,6 +1434,9 @@ namespace GTAdhocToolchain.Compiler
                 case Nodes.ChainExpression:
                     CompileChainExpression(frame, exp as ChainExpression);
                     break;
+                case Nodes.SelfFinalizerExpression:
+                    CompileSelfFinalizerExpression(frame, exp as SelfFinalizerExpression);
+                    break;
                 default:
                     ThrowCompilationError(exp, $"Expression {exp.Type} not supported");
                     break;
@@ -2604,6 +2607,34 @@ namespace GTAdhocToolchain.Compiler
             asSubroutine.Location = new Location(finalizer.Location.Start, finalizer.Location.End, finalizer.Location.Source);
 
             CompileAnonymousSubroutine(frame, asSubroutine, finalizer.Body, new NodeList<Expression>());
+
+            // add temp value & set finally
+            InsertVariablePush(frame, new Identifier($"fin#{SymbolMap.TempVariableCounter++}") { Location = finalizer.Body.Location }, true);
+
+            InsAttributePush push = new InsAttributePush();
+            push.AttributeSymbols.Add(SymbolMap.RegisterSymbol("finally"));
+            frame.AddInstruction(push, finalizer.Body.Location.Start.Line);
+            InsertAssignPop(frame);
+        }
+
+        private void CompileSelfFinalizerExpression(AdhocCodeFrame frame, SelfFinalizerExpression finalizer)
+        {
+            // Push self
+            CompileSelfExpression(frame, new SelfExpression());
+
+            var asSubroutine = new MethodDeclaration(null,
+                new NodeList<Expression>(), // No parameters
+                new BlockStatement(NodeList.Create(new Statement[] { finalizer.Body })),
+                generator: false,
+                strict: true,
+                async: false);
+            asSubroutine.Location = new Location(finalizer.Location.Start, finalizer.Location.End, finalizer.Location.Source);
+
+            CompileAnonymousSubroutine(frame, asSubroutine, finalizer.Body, new NodeList<Expression>(), isMethod: true);
+
+            // .* finalizer
+            frame.AddInstruction(new InsObjectSelector(), 0);
+            frame.AddInstruction(new InsEval(), 0);
 
             // add temp value & set finally
             InsertVariablePush(frame, new Identifier($"fin#{SymbolMap.TempVariableCounter++}") { Location = finalizer.Body.Location }, true);
