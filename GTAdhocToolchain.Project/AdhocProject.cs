@@ -490,8 +490,11 @@ namespace GTAdhocToolchain.Project
 
             foreach (AdhocProjectFile srcFile in FilesToCompile)
             {
-                mergedFile.WriteLine($"#define ROOT {Path.ChangeExtension(srcFile.Name, null)}");
-                mergedFile.WriteLine($"#define IMPL ROOT.getImpl()"); // GT Sport
+                if (!srcFile.IsMain || this.Version < 10) // HACK: do not define ROOT for main project files (except files as old as GT4 which are always inserted anyway)
+                {
+                    mergedFile.WriteLine($"#define ROOT {Path.ChangeExtension(srcFile.Name, null)}");
+                    mergedFile.WriteLine($"#define IMPL ROOT.getImpl()"); // GT Sport
+                }
 
                 if (!srcFile.IsMain)
                 {
@@ -505,8 +508,11 @@ namespace GTAdhocToolchain.Project
                     mergedFile.WriteLine($"#include \"{srcFile.SourcePath}\"");
                 }
 
-                mergedFile.WriteLine($"#undef ROOT");
-                mergedFile.WriteLine($"#undef IMPL");
+                if (!srcFile.IsMain || this.Version < 10)
+                {
+                    mergedFile.WriteLine($"#undef ROOT");
+                    mergedFile.WriteLine($"#undef IMPL");
+                }
 
                 mergedFile.WriteLine();
             }
