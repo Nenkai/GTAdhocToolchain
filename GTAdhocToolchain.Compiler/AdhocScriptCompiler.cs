@@ -11,14 +11,29 @@ namespace GTAdhocToolchain.Compiler
     /// <summary>
     /// Adhoc script compiler.
     /// </summary>
-    public class AdhocScriptCompiler : AdhocCodeFrame
+    public class AdhocScriptCompiler
     {
+        private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
+
+        /// <summary>
+        /// All the symbols defined for the current compilation unit.
+        /// </summary>
         public AdhocSymbolMap SymbolMap { get; set; } = new();
 
         /// <summary>
-        /// Module stack. Top level is included.
+        /// Main code frame.
         /// </summary>
-        public Stack<AdhocModule> ModuleStack { get; set; } = new();
+        public AdhocCodeFrame MainFrame { get; set; } = new();
+
+        /// <summary>
+        /// FULL Module stack. Top level is included.
+        /// </summary>
+        public Stack<AdhocModule> Modules { get; set; } = new();
+
+        /// <summary>
+        /// Current operating module.
+        /// </summary>
+        public AdhocModule CurrentModule => Modules.Peek();
 
         /// <summary>
         /// Current module/class scopes. Top level is not included.
@@ -27,23 +42,27 @@ namespace GTAdhocToolchain.Compiler
 
         public Dictionary<string, AdhocModule> TopLevelModules { get; set; } = new();
 
-        private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
-
         public HashSet<string> PostCompilationWarnings = new();
 
         private Script _debugPrintException;
         private Script _debugThrow;
 
+        private bool _setup;
+
         public AdhocScriptCompiler()
         {
             var topLevelModule = new AdhocModule();
-            ModuleStack.Push(topLevelModule); // Top Level Module
-            this.CurrentModule = topLevelModule;
+            Modules.Push(topLevelModule); // Top Level Module
         }
 
         public string BaseIncludeFolder { get; set; }
         public string ProjectDirectory { get; set; }
         public string BaseDirectory { get; set; }
+
+        public void SetSourcePath(string path)
+        {
+            MainFrame.SetSourcePath(SymbolMap, path);
+        }
 
         public void SetBaseIncludeFolder(string dir)
         {
@@ -55,9 +74,15 @@ namespace GTAdhocToolchain.Compiler
             ProjectDirectory = dir;
         }
 
-        public void SetVersion(int version)
+        /// <summary>
+        /// Setups the compiler's version and the stack along with it.
+        /// </summary>
+        /// <param name="version"></param>
+        public void Setup(int version)
         {
-            Version = version;
+            MainFrame.Version = version;
+            MainFrame.CreateStack();
+            _setup = true;
         }
 
         /// <summary>
@@ -66,18 +91,21 @@ namespace GTAdhocToolchain.Compiler
         /// <param name="script"></param>
         public void CompileScript(Script script)
         {
+            if (!_setup)
+                throw new InvalidOperationException("Compiler was not yet set up.");
+
             Logger.Info("Started script compilation.");
 
             // Always an empty one in old versions (same in subroutines)
-            if (Version <= 10)
-                Stack.AddLocalVariable(null);
+            if (MainFrame.Version <= 10)
+                MainFrame.Stack.AddLocalVariable(null);
 
-            EnterScope(this, script);
-            CompileScriptBody(this, script);
-            LeaveScope(this);
+            EnterScope(MainFrame, script);
+            CompileScriptBody(MainFrame, script);
+            LeaveScope(MainFrame);
 
             // Script done.
-            InsertSetState(this, AdhocRunState.EXIT);
+            InsertSetState(MainFrame, AdhocRunState.EXIT);
 
             PrintPostCompilationWarnings();
 
@@ -274,7 +302,7 @@ namespace GTAdhocToolchain.Compiler
 
         public void CompileUndefStatement(AdhocCodeFrame frame, UndefStatement undefStatement)
         {
-            // XX: Undef may refer to a local variable aswell, it's not supported though
+            // XX/FIXME: Undef may refer to a local variable aswell, it's not supported though
             // GT5 SoundUtil.ad undefs BootInitialize as a local which is a defined user function
 
             InsUndef undefIns = new InsUndef();
@@ -525,7 +553,7 @@ namespace GTAdhocToolchain.Compiler
             // Compile statements directly, we don't need a regular leave.
             CompileStatements(frame, body as BlockStatement);
 
-            LeaveModuleOrClass(frame, fromSubroutine: frame is not AdhocScriptCompiler);
+            LeaveModuleOrClass(frame, fromSubroutine: frame.ParentFrame is not null);
 
             // Exit class or module scope. Important.
             InsertSetState(frame, AdhocRunState.EXIT);
@@ -964,14 +992,13 @@ namespace GTAdhocToolchain.Compiler
             if (id is not null)
                 subroutine.Name = SymbolMap.RegisterSymbol(id.Name);
             subroutine.CodeFrame.SourceFilePath = frame.SourceFilePath;
-            subroutine.CodeFrame.ParentFrame = this;
-            subroutine.CodeFrame.CurrentModule = frame.CurrentModule;
-            subroutine.CodeFrame.Version = this.Version;
+            subroutine.CodeFrame.ParentFrame = frame;
+            subroutine.CodeFrame.Version = frame.Version;
             subroutine.CodeFrame.CreateStack();
 
             if (isMethod)
             {
-                if (!frame.CurrentModule.DefineMethod(subroutine.Name))
+                if (!CurrentModule.DefineMethod(subroutine.Name))
                     ThrowCompilationError(id, $"Method name '{subroutine.Name}' already defined in this scope.");
             }
 
@@ -1457,7 +1484,7 @@ namespace GTAdhocToolchain.Compiler
             InsDelegateDefine ins = new InsDelegateDefine(idSymb);
             frame.AddInstruction(ins, delegateDefinition.Location.Start.Line);
 
-            if (!frame.CurrentModule.DefineStatic(idSymb))
+            if (!CurrentModule.DefineStatic(idSymb))
                 ThrowCompilationError(delegateDefinition, $"Member {idSymb.Name} was already declared in this module.");
 
             frame.AddAttributeOrStaticMemberVariable(idSymb);
@@ -1560,14 +1587,10 @@ namespace GTAdhocToolchain.Compiler
         /// <param name="arrowFuncExpr"></param>
         private void CompileAnonymousSubroutine(AdhocCodeFrame frame, Node parentNode, Node body, NodeList<Expression> funcParams, bool isMethod = false, bool isAsync = false)
         {
-
-            
-
             SubroutineBase subroutine = isMethod ? new InsMethodConst() : new InsFunctionConst();
             subroutine.CodeFrame.ParentFrame = frame;
             subroutine.CodeFrame.SourceFilePath = frame.SourceFilePath;
-            subroutine.CodeFrame.CurrentModule = frame.CurrentModule;
-            subroutine.CodeFrame.Version = this.Version;
+            subroutine.CodeFrame.Version = frame.Version;
             subroutine.CodeFrame.CreateStack();
 
             /* Unlike JS, adhoc can capture variables from the parent frame
@@ -1622,7 +1645,7 @@ namespace GTAdhocToolchain.Compiler
                 InsStaticDefine staticDefine = new InsStaticDefine(idSymb);
                 frame.AddInstruction(staticDefine, staticExpression.Location.Start.Line);
 
-                if (!frame.CurrentModule.DefineStatic(idSymb))
+                if (!CurrentModule.DefineStatic(idSymb))
                     ThrowCompilationError(staticExpression, $"Static member {idSymb.Name} was already declared in this module.");
 
                 frame.AddAttributeOrStaticMemberVariable(idSymb);
@@ -1661,7 +1684,7 @@ namespace GTAdhocToolchain.Compiler
                 // This was previously an error
                 // But it turns out that you can define statics within function scopes, so they actually can be redefined (GT6 garage project)
                 // Will leave it as a warning from now on
-                if (!frame.CurrentModule.DefineStatic(idSymb))
+                if (!CurrentModule.DefineStatic(idSymb))
                     PrintCompilationWarning(staticExpression, $"Static member '{idSymb.Name}' was already declared in this module.");
 
                 frame.AddAttributeOrStaticMemberVariable(idSymb);
@@ -1715,7 +1738,7 @@ namespace GTAdhocToolchain.Compiler
                 InsAttributeDefine staticDefine = new InsAttributeDefine(idSymb);
                 frame.AddInstruction(staticDefine, attrVariableDefinition.Location.Start.Line);
 
-                if (!frame.CurrentModule.DefineAttribute(idSymb))
+                if (!CurrentModule.DefineAttribute(idSymb))
                     ThrowCompilationError(attrVariableDefinition, "Attribute is already defined.");
 
                 frame.AddAttributeOrStaticMemberVariable(idSymb);
@@ -1742,7 +1765,7 @@ namespace GTAdhocToolchain.Compiler
                 InsAttributeDefine attrDefine = new InsAttributeDefine(idSymb);
                 frame.AddInstruction(attrDefine, identifier.Location.Start.Line);
 
-                if (!frame.CurrentModule.DefineAttribute(idSymb))
+                if (!CurrentModule.DefineAttribute(idSymb))
                     ThrowCompilationError(attrVariableDefinition, "Attribute is already defined.");
 
                 frame.AddAttributeOrStaticMemberVariable(idSymb);
@@ -2900,7 +2923,7 @@ namespace GTAdhocToolchain.Compiler
             varPush.VariableSymbols.Add(varSymb);
 
             // Refer to comment in InsertVariableEval
-            if (frame.IsStaticVariable(varSymb))
+            if (frame.IsStaticVariable(varSymb, CurrentModule))
                 varPush.VariableSymbols.Add(varSymb);
                 
             varPush.VariableStorageIndex = idx;
@@ -2946,6 +2969,12 @@ namespace GTAdhocToolchain.Compiler
             return scope;
         }
 
+        /// <summary>
+        /// Enters a new scope.
+        /// </summary>
+        /// <param name="frame"></param>
+        /// <param name="node"></param>
+        /// <returns></returns>
         private ScopeContext EnterScope(AdhocCodeFrame frame, Node node)
         {
             var scope = new ScopeContext(node);
@@ -2953,6 +2982,12 @@ namespace GTAdhocToolchain.Compiler
             return scope;
         }
 
+        /// <summary>
+        /// Enters and defines new module/class.
+        /// </summary>
+        /// <param name="frame"></param>
+        /// <param name="node"></param>
+        /// <returns></returns>
         private AdhocModule EnterModuleOrClass(AdhocCodeFrame frame, Node node)
         {
             var scope = new ScopeContext(node);
@@ -2960,10 +2995,10 @@ namespace GTAdhocToolchain.Compiler
             ModuleOrClassScopes.Push(scope);
 
             AdhocModule newModule = new AdhocModule();
-            ModuleStack.Push(newModule);
+            newModule.ParentModule = CurrentModule;
+            Modules.Push(newModule);
 
-            newModule.ParentModule = frame.CurrentModule;
-            frame.CurrentModule = newModule;
+            frame.Modules.Push(CurrentModule);
 
             return newModule;
         }
@@ -2979,7 +3014,7 @@ namespace GTAdhocToolchain.Compiler
         }
 
         /// <summary>
-        /// Leaves a scope for the frame, inserts a leave scope instruction.
+        /// Leaves a scope for the frame, inserts a leave scope instruction (if supported).
         /// </summary>
         /// <param name="frame"></param>
         /// <param name="insertLeaveInstruction"></param>
@@ -3015,8 +3050,7 @@ namespace GTAdhocToolchain.Compiler
                 // Top level is a special "module" frame where it can rewind some variables based on depth
                 // GT5 uses this and every leave in the top level requires this, GT6 and above ignores this altogether.
 
-                if (frame.ParentFrame is null) // Short for "do we have a parent? if not, we're most likely the top level"
-                    leave.ModuleOrClassDepthRewindIndex = ModuleStack.Count - 1;
+                leave.ModuleOrClassDepthRewindIndex = frame.Modules.Count;
 
                 if (isModuleLeave)
                 {
@@ -3039,8 +3073,8 @@ namespace GTAdhocToolchain.Compiler
             LeaveScope(frame, isModuleLeave: true, isModuleExitFromSubroutine: fromSubroutine);
 
             ModuleOrClassScopes.Pop();
-            ModuleStack.Pop();
-            frame.CurrentModule = ModuleStack.Peek();
+            Modules.Pop();
+            frame.Modules.Pop();
         }
         #endregion
 
@@ -3131,7 +3165,7 @@ namespace GTAdhocToolchain.Compiler
 
             // Static references or pushes always have double their own symbol
             // If its a static reference, do not add it as a declared variable within this scope
-            if (frame.IsStaticVariable(symb))
+            if (frame.IsStaticVariable(symb, CurrentModule))
             {
                 // Static, two symbols
                 if (frame.Version >= 7)
@@ -3139,7 +3173,7 @@ namespace GTAdhocToolchain.Compiler
                 else
                     (ins as InsVariablePush).VariableSymbols.Add(symb);
 
-                /* HACK (?): Register identifier accesses at the very top level inside modules as new statics so that they can be cleared later. 
+                /* HACK/FIXME!: Register identifier accesses at the very top level inside modules as new statics so that they can be cleared later. 
                  * This is somewhat of a hack-fix maybe? - spotted for GT4O. This hopefully won't break anything for later versions.
                    
                    Example code (pretend this is at the very top level)

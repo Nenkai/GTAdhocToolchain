@@ -15,14 +15,14 @@ namespace GTAdhocToolchain.CodeGen
     {
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
-        public AdhocCodeFrame MainBlock { get; set; }
+        public AdhocCodeFrame Frame { get; set; }
         public AdhocSymbolMap SymbolMap { get; set; }
 
         private AdhocStream stream;
 
-        public AdhocCodeGen(AdhocCodeFrame mainBlock, AdhocSymbolMap symbols)
+        public AdhocCodeGen(AdhocCodeFrame frame, AdhocSymbolMap symbols)
         {
-            MainBlock = mainBlock;
+            Frame = frame;
             SymbolMap = symbols;
         }
 
@@ -30,18 +30,18 @@ namespace GTAdhocToolchain.CodeGen
         {
             Logger.Info("Generating code...");
             var ms = new MemoryStream();
-            stream = new AdhocStream(ms, MainBlock.Version);
+            stream = new AdhocStream(ms, Frame.Version);
 
             // ADhoc Compiled Header?
-            stream.WriteString($"ADCH{MainBlock.Version:D3}", StringCoding.ZeroTerminated); // ADCH012
+            stream.WriteString($"ADCH{Frame.Version:D3}", StringCoding.ZeroTerminated); // ADCH012
 
-            if (MainBlock.Version >= 9)
+            if (Frame.Version >= 9)
                 SerializeSymbolTable();
 
-            MainBlock.Write(stream);
+            Frame.Write(stream);
 
-            Logger.Info($"Code generated (Size: {stream.Length} bytes, {MainBlock.Instructions.Count} main instructions)");
-            Logger.Debug($"[Stack] Stack Size: {MainBlock.Stack.GetStackSize()} - Locals: {MainBlock.Stack.GetLocalVariableStorageSize()}");
+            Logger.Info($"Code generated (Size: {stream.Length} bytes, {Frame.Instructions.Count} main instructions)");
+            Logger.Debug($"[Stack] Stack Size: {Frame.Stack.GetStackSize()} - Locals: {Frame.Stack.GetLocalVariableStorageSize()}");
         }
 
         public void SaveTo(string path)

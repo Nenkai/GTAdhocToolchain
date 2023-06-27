@@ -222,16 +222,15 @@ namespace GTAdhocToolchain.CLI
                 var program = parser.ParseScript();
 
                 var compiler = new AdhocScriptCompiler();
-                compiler.SetSourcePath(compiler.SymbolMap, inputPath);
-                compiler.SetVersion(version);
-                compiler.CreateStack();
+                compiler.SetSourcePath(inputPath);
+                compiler.Setup(version);
 
                 if (debugExceptions)
                     compiler.BuildTryCatchDebugStatements();
 
                 compiler.CompileScript(program);
 
-                AdhocCodeGen codeGen = new AdhocCodeGen(compiler, compiler.SymbolMap);
+                AdhocCodeGen codeGen = new AdhocCodeGen(compiler.MainFrame, compiler.SymbolMap);
                 codeGen.Generate();
                 codeGen.SaveTo(output);
 

@@ -17,7 +17,7 @@ namespace GTAdhocToolchain.Core
 
 
         /// <summary>
-        /// Adds a new symbol to the map if it doesn't already exists.
+        /// Adds a new symbol to the map if it doesn't already exist.
         /// </summary>
         /// <param name="symbolName"></param>
         /// <returns>Symbol entity.</returns>

@@ -11,34 +11,22 @@ namespace GTAdhocToolchain.Core
     /// </summary>
     public class AdhocCodeFrame
     {
-        public const int ADHOC_VERSION_CURRENT = 12;
-
-        public int Version { get; set; } = ADHOC_VERSION_CURRENT;
+        /// <summary>
+        /// GT7.
+        /// </summary>
+        public const int ADHOC_VERSION_LATEST = 15;
 
         /// <summary>
-        /// Parent frame for this frame, if exists.
+        /// Default adhoc version, 12. Compatible with GT5P, GT5, GTPSP, GT6, GT7SP.
         /// </summary>
-        public AdhocCodeFrame ParentFrame { get; set; }
+        public const int ADHOC_VERSION_DEFAULT = 12;
 
-        /// <summary>
-        /// Module for this frame.
-        /// </summary>
-        public AdhocModule CurrentModule { get; set; }
-
-        /// <summary>
-        /// Used for function variables/callbacks. Should be true for function consts.
-        /// </summary>
-        public bool ContextAllowsVariableCaptureFromParentFrame { get; set; }
+        public int Version { get; set; } = ADHOC_VERSION_DEFAULT;
 
         /// <summary>
         /// Current instructions for this block.
         /// </summary>
         public List<InstructionBase> Instructions { get; set; } = new();
-
-        /// <summary>
-        /// Source file for this block.
-        /// </summary>
-        public AdhocSymbol SourceFilePath { get; set; }
 
         /// <summary>
         /// Function or method parameters
@@ -54,6 +42,26 @@ namespace GTAdhocToolchain.Core
         /// Current stack for the block.
         /// </summary>
         public IAdhocStack Stack { get; set; }
+
+        /// <summary>
+        /// Parent frame for this frame, if exists.
+        /// </summary>
+        public AdhocCodeFrame ParentFrame { get; set; }
+
+        /// <summary>
+        /// Modules defined within this frame.
+        /// </summary>
+        public Stack<AdhocModule> Modules { get; set; } = new();
+
+        /// <summary>
+        /// Used for function variables/callbacks. Should be true for function consts.
+        /// </summary>
+        public bool ContextAllowsVariableCaptureFromParentFrame { get; set; }
+
+        /// <summary>
+        /// Source file for this block.
+        /// </summary>
+        public AdhocSymbol SourceFilePath { get; set; }
 
         /// <summary>
         /// To keep track of the current loops, to compile continue and break statements at the end of one.
@@ -314,6 +322,15 @@ namespace GTAdhocToolchain.Core
             Stack.FreeStaticVariable(staticVarToRemove);
         }
 
+        /// <summary>
+        /// Adds a new scope variable to this frame.
+        /// </summary>
+        /// <param name="symbol"></param>
+        /// <param name="isAssignment"></param>
+        /// <param name="isStatic"></param>
+        /// <param name="isLocalDeclaration"></param>
+        /// <returns></returns>
+        /// <exception cref="Exception"></exception>
         public int AddScopeVariable(AdhocSymbol symbol,
             bool isAssignment = false, 
             bool isStatic = false, 
@@ -444,7 +461,7 @@ namespace GTAdhocToolchain.Core
             return -(CapturedCallbackVariables.IndexOf(symbol) + 1); // 0 -> -1, 1 -> -2 etc
         }
 
-        public bool IsStaticModuleFieldOrAttribute(AdhocSymbol symbol)
+        public bool IsStaticModuleFieldOrAttribute(AdhocSymbol symbol, AdhocModule relativeTo)
         {
             // Recursively check all modules
             bool HasStatic(AdhocSymbol symbol, AdhocModule module)
@@ -457,7 +474,7 @@ namespace GTAdhocToolchain.Core
                     return false;
             }
 
-            return HasStatic(symbol, CurrentModule);
+            return HasStatic(symbol, relativeTo);
         }
 
         public void AddAttributeOrStaticMemberVariable(AdhocSymbol symbol)
@@ -469,15 +486,21 @@ namespace GTAdhocToolchain.Core
             CurrentScope.StaticScopeVariables.TryAdd(symbol.Name, symbol);
         }
 
-        public bool IsStaticVariable(AdhocSymbol symb)
+        /// <summary>
+        /// Returns whether a symbol is a static variable for this frame and module context.
+        /// </summary>
+        /// <param name="symb"></param>
+        /// <param name="relativeTo"></param>
+        /// <returns></returns>
+        public bool IsStaticVariable(AdhocSymbol symb, AdhocModule relativeTo)
         {
-            if (symb.Name == "self")
+            if (symb.Name == AdhocConstants.SELF)
                 return false;
 
             if (Stack.HasLocalVariable(symb))
                 return false; // Priorize local variables
 
-            if (IsStaticModuleFieldOrAttribute(symb))
+            if (IsStaticModuleFieldOrAttribute(symb, relativeTo))
                 return true;
 
             return true;
