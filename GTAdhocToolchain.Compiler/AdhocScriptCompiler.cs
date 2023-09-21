@@ -2018,7 +2018,7 @@ namespace GTAdhocToolchain.Compiler
                     // Regular update of left-hand side
                     // Left-hand side needs to be pushed first
 
-                    // Assigning to a reference variable (&var = 1)
+                    // Assigning to a reference variable (*var = 1)
                     if (IsUnaryIndirection(assignExpression.Left))
                     {
                         // Trivially compile left reference
