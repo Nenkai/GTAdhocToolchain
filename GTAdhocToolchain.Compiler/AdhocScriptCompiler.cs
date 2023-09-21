@@ -2018,11 +2018,11 @@ namespace GTAdhocToolchain.Compiler
                     // Regular update of left-hand side
                     // Left-hand side needs to be pushed first
 
-                    // Assigning to a reference variable
+                    // Assigning to a reference variable (&var = 1)
                     if (IsUnaryIndirection(assignExpression.Left))
                     {
-                        // No need to push, eval
-                        CompileUnaryExpression(frame, assignExpression.Left as UnaryExpression, asReference: false);
+                        // Trivially compile left reference
+                        CompileUnaryExpression(frame, assignExpression.Left as UnaryExpression);
                     }
                     else
                     {
@@ -2716,7 +2716,9 @@ namespace GTAdhocToolchain.Compiler
                 else
                 {
                     CompileExpression(frame, unaryExp.Argument);
-                    frame.AddInstruction(new InsEval(), 0);
+
+                    if (frame.Version >= 11)
+                        frame.AddInstruction(new InsEval(), 0);
                 }
                 
             }
