@@ -70,11 +70,17 @@ ORIG_FILE = out.original_file # type: str
 
 if NEW_FILE.endswith(".ad"):
     try:
-        subprocess.run(
+        compileroutput = subprocess.run(
             ["adhoc.exe", "build", "-i", NEW_FILE],
             capture_output=True,
+            text=True,
             check=True,
         )
+        # adhoc.exe doesn't use stderr or return non-zero codes, so parse the output for ERROR log lines
+        if "ERROR " in compileroutput.stdout:
+            print("Compilation error while running adhoc.exe to turn 'new_file' .ad into a .adc:")
+            print("\r\n".join(filter(lambda line: "ERROR " in line, compileroutput.stdout.splitlines())))
+            exit(1)
         print("Ran adhoc.exe to turn 'new_file' .ad into a .adc")
     except FileNotFoundError:
         print("==> When providing an .ad file, adhoc.exe must be on the $PATH or in cwd.")
