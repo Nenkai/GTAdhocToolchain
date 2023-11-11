@@ -41,18 +41,21 @@ namespace GTAdhocToolchain.CLI
                     catch (Exception e)
                     {
                         Console.WriteLine($"Errored while reading: {e.Message}");
+                        Environment.ExitCode = -1;
+                        return;
                     }
 
                     foreach (var adc in scripts)
                     {
-
                         adc.Disassemble(Path.ChangeExtension(args[0], ".ad.diss"));
 
                         if (adc.Version == 12)
                             adc.PrintStrings(Path.ChangeExtension(args[0], ".strings"));
                     }
 
+                    Environment.ExitCode = 0;
                     return;
+
                 }
                 else if (args[0].ToLower().EndsWith(".gpb"))
                 {
@@ -60,6 +63,7 @@ namespace GTAdhocToolchain.CLI
                     if (gpb is null)
                     {
                         Console.WriteLine("Could not parse GPB Header.");
+                        Environment.ExitCode = -1;
                         return;
                     }
 
@@ -67,6 +71,7 @@ namespace GTAdhocToolchain.CLI
                     string dir = Path.GetDirectoryName(args[0]);
 
                     gpb.Unpack(Path.GetFileNameWithoutExtension(args[0]), null);
+                    Environment.ExitCode = 0;
                     return;
                 }
             }
@@ -103,6 +108,7 @@ namespace GTAdhocToolchain.CLI
             if (!File.Exists(buildVerbs.InputPath))
             {
                 Logger.Error($"File {buildVerbs.InputPath} does not exist.");
+                Environment.ExitCode = -1;
                 return;
             }
 
@@ -118,6 +124,7 @@ namespace GTAdhocToolchain.CLI
             else
             {
                 Logger.Error("Input File is not a project or script.");
+                Environment.ExitCode = -1;
             }
         }
 
@@ -125,51 +132,98 @@ namespace GTAdhocToolchain.CLI
         {
             if (packVerbs.OutputPath.ToLower().EndsWith("gpb"))
             {
-                var gpb = new GpbData3();
-                gpb.AddFilesFromFolder(packVerbs.InputPath, packVerbs.GT5PackMode);
-                gpb.Pack(packVerbs.OutputPath, !packVerbs.LittleEndian);
+                try
+                {
+                    var gpb = new GpbData3();
+                    gpb.AddFilesFromFolder(packVerbs.InputPath, packVerbs.GT5PackMode);
+                    gpb.Pack(packVerbs.OutputPath, !packVerbs.LittleEndian);
+                    Environment.ExitCode = 0;
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine($"Failed to pack gpb - {e.Message}");
+                    Environment.ExitCode = -1;
+                }
             }
             else if (packVerbs.OutputPath.EndsWith("mpackage"))
             {
-                AdhocPackage.PackFromFolder(packVerbs.InputPath, packVerbs.OutputPath);
+                try
+                {
+                    AdhocPackage.PackFromFolder(packVerbs.InputPath, packVerbs.OutputPath);
+                    Environment.ExitCode = 0;
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine($"Failed to pack mpackage - {e.Message}");
+                    Environment.ExitCode = -1;
+                }
             }
             else
             {
                 Console.WriteLine("Found nothing to pack - ensure the provided output path has the proper file extension (gpb/mpackage)");
+                Environment.ExitCode = -1;
             }
         }
 
         public static void Unpack(UnpackVerbs unpackVerbs)
         {
+            if (!File.Exists(unpackVerbs.InputPath))
+            {
+                Console.WriteLine("File does not exist.");
+                Environment.ExitCode = -1;
+                return;
+            }
+
             if (unpackVerbs.InputPath.ToLower().EndsWith("gpb"))
             {
                 Console.WriteLine("Assuming input is GPB");
+                
                 var gpb = GpbBase.ReadFile(unpackVerbs.InputPath);
                 if (gpb is null)
                 {
                     Console.WriteLine("Could not parse GPB Header.");
+                    Environment.ExitCode = -1;
                     return;
                 }
 
                 if (string.IsNullOrEmpty(unpackVerbs.OutputPath))
                     unpackVerbs.OutputPath = Path.GetDirectoryName(unpackVerbs.InputPath);
 
-                gpb.Unpack(Path.GetFileNameWithoutExtension(unpackVerbs.InputPath), unpackVerbs.OutputPath, unpackVerbs.ConvertGPBFiles);
+                try
+                {
+                    gpb.Unpack(Path.GetFileNameWithoutExtension(unpackVerbs.InputPath), unpackVerbs.OutputPath, unpackVerbs.ConvertGPBFiles);
+                    Environment.ExitCode = 0;
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine($"Failed to unpack gpb - {e.Message}.");
+                    Environment.ExitCode = -1;
+                }
             }
             else if (unpackVerbs.InputPath.EndsWith("mpackage"))
             {
                 Console.WriteLine("Assuming input is MPackage");
-                AdhocPackage.ExtractPackage(unpackVerbs.InputPath);
+                try
+                {
+                    AdhocPackage.ExtractPackage(unpackVerbs.InputPath);
+                    Environment.ExitCode = 0;
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine($"Failed to unpack mpackage - {e.Message}.");
+                    Environment.ExitCode = -1;
+                }
             }
             else
             {
                 Console.WriteLine("Found nothing to unpack - ensure the provided input file has the proper file extension (gpb/mpackage)");
+                Environment.ExitCode = -1;
             }
         }
 
         public static void HandleNotParsedArgs(IEnumerable<Error> errors)
         {
-
+            Environment.ExitCode = -1;
         }
 
         private static void BuildProject(BuildVerbs buildVerbs)
@@ -182,18 +236,24 @@ namespace GTAdhocToolchain.CLI
             catch (Exception e)
             {
                 Logger.Error($"Failed to load project file - {e.Message}");
+                Environment.ExitCode = -1;
                 return;
             }
 
             Logger.Info($"Project file: {buildVerbs.InputPath}");
             prj.PrintInfo();
 
-
             Logger.Info("Started project build.");
             if (!prj.Build(buildVerbs.WriteExceptionsToFile))
+            {
                 Logger.Error("Project build failed.");
+                Environment.ExitCode = -1;
+            }
             else
+            {
                 Logger.Info("Project build successful.");
+                Environment.ExitCode = 0;
+            }
         }
 
         private static void BuildScript(string inputPath, string output, int version = 12, bool debugExceptions = false, bool preprocessOnly = false)
@@ -212,6 +272,7 @@ namespace GTAdhocToolchain.CLI
                 if (preprocessOnly)
                 {
                     Console.Write(preprocessed);
+                    Environment.ExitCode = 0;
                     return;
                 }
 
@@ -229,6 +290,8 @@ namespace GTAdhocToolchain.CLI
                 {
                     foreach (ParseError error in errorHandler.Errors)
                         Logger.Error($"Syntax error: {error.Description} at {error.Source}:{error.LineNumber}");
+
+                    Environment.ExitCode = -1;
                     return;
                 }
 
@@ -250,6 +313,7 @@ namespace GTAdhocToolchain.CLI
                 codeGen.SaveTo(output);
 
                 Logger.Info($"Script build successful.");
+                Environment.ExitCode = 0;
                 return;
             }
             catch (PreprocessorException preprocessException)
@@ -270,6 +334,7 @@ namespace GTAdhocToolchain.CLI
             }
 
             Logger.Error("Script build failed.");
+            Environment.ExitCode = -1;
         }
 
         public static void MProjectToBin(MProjectToBinVerbs verbs)
@@ -277,11 +342,13 @@ namespace GTAdhocToolchain.CLI
             if (verbs.Version == 0)
             {
                 Console.WriteLine("Version 0 is not currently supported.");
+                Environment.ExitCode = -1;
                 return;
             }
             else if (verbs.Version > 1 || verbs.Version < 0)
             {
                 Console.WriteLine("Version must be 0 or 1. (0 not current supported).");
+                Environment.ExitCode = -1;
                 return;
             }
 
@@ -300,11 +367,20 @@ namespace GTAdhocToolchain.CLI
                 }
             }
 
-            MBinaryWriter writer = new MBinaryWriter(verbs.OutputPath);
-            writer.Version = verbs.Version;
-            writer.WriteNode(rootNode);
+            try
+            {
+                MBinaryWriter writer = new MBinaryWriter(verbs.OutputPath);
+                writer.Version = verbs.Version;
+                writer.WriteNode(rootNode);
 
-            Console.WriteLine($"Done. Exported to '{verbs.OutputPath}'.");
+                Console.WriteLine($"Done. Exported to '{verbs.OutputPath}'.");
+                Environment.ExitCode = 0;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"Failed to export - {e.Message}");
+                Environment.ExitCode = -1;
+            }
         }
 
         public static void MProjectToText(MProjectToTextVerbs verbs)
@@ -324,11 +400,20 @@ namespace GTAdhocToolchain.CLI
                 }
             }
 
-            using MTextWriter writer = new MTextWriter(verbs.OutputPath);
-            writer.Debug = verbs.Debug;
-            writer.WriteNode(rootNode);
+            try
+            {
+                using MTextWriter writer = new MTextWriter(verbs.OutputPath);
+                writer.Debug = verbs.Debug;
+                writer.WriteNode(rootNode);
 
-            Console.WriteLine($"Done. Exported to '{verbs.OutputPath}'.");
+                Console.WriteLine($"Done. Exported to '{verbs.OutputPath}'.");
+                Environment.ExitCode = 0;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"Failed to export - {e.Message}");
+                Environment.ExitCode = -1;
+            }
         }
     }
 
