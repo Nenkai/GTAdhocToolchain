@@ -1,0 +1,13 @@
+﻿; Registering the package
+[$RootKey$\InstalledProducts\AdhocLanguagePackage]
+"Package"="{5576e347-b799-456b-9692-058cf7e26457}"
+[$RootKey$\BindingPaths\{5576e347-b799-456b-9692-058cf7e26457}]
+"$PackageFolder$"=""
+
+; Registering the TextMate grammar
+[$RootKey$\TextMate\Repositories]
+"AdhocLanguage"="$PackageFolder$\Syntaxes"
+
+; Match file extensions with icons. See full icon list at https://glyphlist.azurewebsites.net/knownmonikers/
+[$RootKey$\ShellFileAssociations\.ad]
+"DefaultIconMoniker"="c1d9a25d-64aa-411d-bf70-aed57282d942:0"
