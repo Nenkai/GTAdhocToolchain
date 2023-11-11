@@ -277,6 +277,7 @@ namespace GTAdhocToolchain.CLI
                 }
 
                 Logger.Info($"Started script build ({inputPath}).");
+                Logger.Info($"NOTE: Compiling for Adhoc Version {version}");
 
                 var errorHandler = new AdhocErrorHandler();
                 var parser = new AdhocAbstractSyntaxTree(preprocessed, new ParserOptions()
@@ -294,10 +295,6 @@ namespace GTAdhocToolchain.CLI
                     Environment.ExitCode = -1;
                     return;
                 }
-
-                var analyzer = new AdhocScriptAnalyzer(parser);
-                analyzer.ParseScript(program);
-                analyzer.GetScopesFromPosition(47);
 
                 var compiler = new AdhocScriptCompiler();
                 compiler.SetSourcePath(inputPath);

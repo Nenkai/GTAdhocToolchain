@@ -140,6 +140,8 @@ namespace GTAdhocToolchain.Project
             string tmpFilePath = string.Empty;
             string pkgPath = Path.Combine(ProjectDir, "pkg_tmp");
 
+            Logger.Info($"NOTE: Compiling for Adhoc Version {Version}");
+
             try
             {
                 if (BuildPackage)
