@@ -17,7 +17,7 @@ using GTAdhocToolchain.Packaging;
 using GTAdhocToolchain.Core.Instructions;
 using GTAdhocToolchain.Menu.Fields;
 using GTAdhocToolchain.Preprocessor;
-using YamlDotNet.Core.Tokens;
+using GTAdhocToolchain.Analyzer;
 
 namespace GTAdhocToolchain.CLI
 {
@@ -217,9 +217,24 @@ namespace GTAdhocToolchain.CLI
 
                 Logger.Info($"Started script build ({inputPath}).");
 
-                var parser = new AdhocAbstractSyntaxTree(preprocessed);
+                var errorHandler = new AdhocErrorHandler();
+                var parser = new AdhocAbstractSyntaxTree(preprocessed, new ParserOptions()
+                {
+                    ErrorHandler = errorHandler
+                });
                 parser.SetFileName(inputPath);
+
                 var program = parser.ParseScript();
+                if (errorHandler.HasErrors())
+                {
+                    foreach (ParseError error in errorHandler.Errors)
+                        Logger.Error($"Syntax error: {error.Description} at {error.Source}:{error.LineNumber}");
+                    return;
+                }
+
+                var analyzer = new AdhocScriptAnalyzer(parser);
+                analyzer.ParseScript(program);
+                analyzer.GetScopesFromPosition(47);
 
                 var compiler = new AdhocScriptCompiler();
                 compiler.SetSourcePath(inputPath);

@@ -203,6 +203,12 @@ namespace GTAdhocToolchain.Compiler
                 case Nodes.VariableDeclaration:
                     CompileVariableDeclaration(frame, node as VariableDeclaration);
                     break;
+                case Nodes.StaticDeclaration:
+                    CompileStaticDeclaration(frame, node as StaticDeclaration);
+                    break;
+                case Nodes.AttributeDeclaration:
+                    CompileAttributeDeclaration(frame, node as AttributeDeclaration);
+                    break;
                 case Nodes.ReturnStatement:
                     CompileReturnStatement(frame, node as ReturnStatement);
                     break;
@@ -254,8 +260,8 @@ namespace GTAdhocToolchain.Compiler
                 case Nodes.PrintStatement:
                     CompilePrintStatement(frame, node as PrintStatement);
                     break;
-                case Nodes.DelegateDefinition:
-                    CompileDelegateDefinition(frame, node as DelegateDefinition);
+                case Nodes.DelegateDeclaration:
+                    CompileDelegateDefinition(frame, node as DelegateDeclaration);
                     break;
                 case Nodes.EmptyStatement:
                     break;
@@ -1431,12 +1437,6 @@ namespace GTAdhocToolchain.Compiler
                 case Nodes.TaggedTemplateExpression:
                     CompileTaggedTemplateExpression(frame, exp as TaggedTemplateExpression);
                     break;
-                case Nodes.StaticDeclaration:
-                    CompileStaticVariableDefinition(frame, exp as StaticVariableDefinition);
-                    break;
-                case Nodes.AttributeDeclaration:
-                    CompileAttributeDefinition(frame, exp as AttributeVariableDefinition);
-                    break;
                 case Nodes.ClassExpression:
                     CompileClassExpression(frame, exp as ClassExpression);
                     break;
@@ -1475,7 +1475,7 @@ namespace GTAdhocToolchain.Compiler
         /// </summary>
         /// <param name="frame"></param>
         /// <param name="chainExpression"></param>
-        private void CompileDelegateDefinition(AdhocCodeFrame frame, DelegateDefinition delegateDefinition)
+        private void CompileDelegateDefinition(AdhocCodeFrame frame, DelegateDeclaration delegateDefinition)
         {
             if (frame.Version < 12)
                 ThrowCompilationError(delegateDefinition, CompilationMessages.Error_DelegatesUnsupported);
@@ -1634,19 +1634,19 @@ namespace GTAdhocToolchain.Compiler
             CompileNewClass(frame, classExpression.Id, classExpression.SuperClass, classExpression.Body, classExpression.IsModule);
         }
 
-        private void CompileStaticVariableDefinition(AdhocCodeFrame frame, StaticVariableDefinition staticExpression)
+        private void CompileStaticDeclaration(AdhocCodeFrame frame, StaticDeclaration staticDeclaration)
         {
-            if (staticExpression.VarExpression.Type == Nodes.Identifier)
+            if (staticDeclaration.Expression.Type == Nodes.Identifier)
             {
-                var ident = staticExpression.VarExpression as Identifier;
+                var ident = staticDeclaration.Expression as Identifier;
 
                 // static definition with no value
                 var idSymb = SymbolMap.RegisterSymbol(ident.Name);
                 InsStaticDefine staticDefine = new InsStaticDefine(idSymb);
-                frame.AddInstruction(staticDefine, staticExpression.Location.Start.Line);
+                frame.AddInstruction(staticDefine, staticDeclaration.Location.Start.Line);
 
                 if (!CurrentModule.DefineStatic(idSymb))
-                    ThrowCompilationError(staticExpression, $"Static member {idSymb.Name} was already declared in this module.");
+                    ThrowCompilationError(staticDeclaration, $"Static member {idSymb.Name} was already declared in this module.");
 
                 frame.AddAttributeOrStaticMemberVariable(idSymb);
                 
@@ -1658,7 +1658,7 @@ namespace GTAdhocToolchain.Compiler
                     InsertAssignPop(frame);
                 }
             }
-            else if (staticExpression.VarExpression is ClassExpression classExp) // Static Modules/Absolute
+            else if (staticDeclaration.Expression is ClassExpression classExp) // Static Modules/Absolute
             {
                 if (!classExp.IsModule)
                     ThrowCompilationError(classExp, "Static class declarations are not supported.");
@@ -1668,10 +1668,10 @@ namespace GTAdhocToolchain.Compiler
             else
             {
                 // static definition with value
-                if (staticExpression.VarExpression.Type != Nodes.AssignmentExpression)
-                    ThrowCompilationError(staticExpression, "Expected static keyword to be a variable assignment.");
+                if (staticDeclaration.Expression.Type != Nodes.AssignmentExpression)
+                    ThrowCompilationError(staticDeclaration, "Expected static keyword to be a variable assignment.");
 
-                AssignmentExpression assignmentExpression = staticExpression.VarExpression as AssignmentExpression;
+                AssignmentExpression assignmentExpression = staticDeclaration.Expression as AssignmentExpression;
                 if (assignmentExpression.Left is not Identifier)
                     ThrowCompilationError(assignmentExpression, "Expected static declaration to be an identifier.");
 
@@ -1679,13 +1679,13 @@ namespace GTAdhocToolchain.Compiler
                 var idSymb = SymbolMap.RegisterSymbol(identifier.Name);
 
                 InsStaticDefine staticDefine = new InsStaticDefine(idSymb);
-                frame.AddInstruction(staticDefine, staticExpression.Location.Start.Line);
+                frame.AddInstruction(staticDefine, staticDeclaration.Location.Start.Line);
 
                 // This was previously an error
                 // But it turns out that you can define statics within function scopes, so they actually can be redefined (GT6 garage project)
                 // Will leave it as a warning from now on
                 if (!CurrentModule.DefineStatic(idSymb))
-                    PrintCompilationWarning(staticExpression, $"Static member '{idSymb.Name}' was already declared in this module.");
+                    PrintCompilationWarning(staticDeclaration, $"Static member '{idSymb.Name}' was already declared in this module.");
 
                 frame.AddAttributeOrStaticMemberVariable(idSymb);
 
@@ -1722,7 +1722,7 @@ namespace GTAdhocToolchain.Compiler
         }
 
 
-        private void CompileAttributeDefinition(AdhocCodeFrame frame, AttributeVariableDefinition attrVariableDefinition)
+        private void CompileAttributeDeclaration(AdhocCodeFrame frame, AttributeDeclaration attrVariableDefinition)
         {
             if (attrVariableDefinition.VarExpression.Type == Nodes.Identifier)
             {
@@ -2044,7 +2044,7 @@ namespace GTAdhocToolchain.Compiler
                         }
                         else if (assignExpression.Left is StaticMemberExpression staticMember)
                         {
-                            CompileStaticMemberExpressionAssignment(frame, staticMember);
+                            CompileStaticMemberExpressionPush(frame, staticMember);
                         }
                         else if (assignExpression.Left is ObjectSelectorMemberExpression objectSelector)
                         {
@@ -2163,7 +2163,7 @@ namespace GTAdhocToolchain.Compiler
                 }
                 else if (expression is StaticMemberExpression staticMembExpression) // main::hello = hi
                 {
-                    CompileStaticMemberExpressionAssignment(frame, staticMembExpression);
+                    CompileStaticMemberExpressionPush(frame, staticMembExpression);
                 }
                 else
                     ThrowCompilationError(expression, $"Unimplemented member expression assignment type: '{expression.Type}'");
@@ -2397,7 +2397,7 @@ namespace GTAdhocToolchain.Compiler
         /// </summary>
         /// <param name="frame"></param>
         /// <param name="staticExp"></param>
-        private void CompileStaticMemberExpressionAssignment(AdhocCodeFrame frame, StaticMemberExpression staticExp)
+        private void CompileStaticMemberExpressionPush(AdhocCodeFrame frame, StaticMemberExpression staticExp)
         {
             // Recursively build the namespace path
             List<string> pathParts = new(4);
@@ -2724,10 +2724,7 @@ namespace GTAdhocToolchain.Compiler
             }
             else if (unaryExp.Operator == UnaryOperator.ReferenceOf) // &var - get reference of variable
             {
-                if (asReference)
-                    PushUnaryExpressionArgument(frame, unaryExp.Argument);
-                else
-                    ThrowCompilationError(unaryExp, "Not implemented");
+                PushUnaryExpressionArgument(frame, unaryExp.Argument);
             }
             else // -var / +var / ~var
             {
@@ -2804,7 +2801,7 @@ namespace GTAdhocToolchain.Compiler
                 else if (expression is StaticMemberExpression staticMemberExpression)
                 {
                     // ++GameParameterUtil::loaded_time;
-                    CompileStaticMemberExpressionAssignment(frame, staticMemberExpression);
+                    CompileStaticMemberExpressionPush(frame, staticMemberExpression);
                 }
                 else
                     ThrowCompilationError(expression, CompilationMessages.Error_UnsupportedUnaryOprationOnMemberExpression);

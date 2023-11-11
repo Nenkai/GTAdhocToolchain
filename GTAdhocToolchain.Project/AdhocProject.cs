@@ -170,8 +170,20 @@ namespace GTAdhocToolchain.Project
 
                 var preprocessed = preprocessor.Preprocess(source);
 
-                var parser = new AdhocAbstractSyntaxTree(preprocessed);
+
+                var errorHandler = new AdhocErrorHandler();
+                var parser = new AdhocAbstractSyntaxTree(preprocessed, new ParserOptions()
+                {
+                    ErrorHandler = errorHandler
+                });
                 var program = parser.ParseScript();
+
+                if (errorHandler.HasErrors())
+                {
+                    foreach (var error in errorHandler.Errors)
+                        Logger.Error($"Syntax error: {error.Description} at {error.Source}:{error.LineNumber}");
+                    return false;
+                }
 
                 var compiler = new AdhocScriptCompiler();
                 compiler.SetBaseIncludeFolder(BaseIncludeFolder);
