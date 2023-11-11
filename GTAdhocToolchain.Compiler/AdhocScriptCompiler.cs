@@ -659,7 +659,9 @@ namespace GTAdhocToolchain.Compiler
                     case Nodes.Identifier:
                         CompileIdentifier(frame, forStatement.Init as Identifier); break;
                     case Nodes.CallExpression:
-                        CompileCall(frame, forStatement.Init as CallExpression); break;
+                        CompileCall(frame, forStatement.Init as CallExpression);
+                        InsertPop(frame);
+                        break;
                     default:
                         ThrowCompilationError(forStatement.Init, CompilationMessages.Error_ForLoopInitializationType);
                         break;
