@@ -658,6 +658,8 @@ namespace GTAdhocToolchain.Compiler
                         CompileAssignmentExpression(frame, forStatement.Init as AssignmentExpression); break;
                     case Nodes.Identifier:
                         CompileIdentifier(frame, forStatement.Init as Identifier); break;
+                    case Nodes.CallExpression:
+                        CompileCall(frame, forStatement.Init as CallExpression); break;
                     default:
                         ThrowCompilationError(forStatement.Init, CompilationMessages.Error_ForLoopInitializationType);
                         break;
