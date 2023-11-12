@@ -486,48 +486,57 @@ namespace GTAdhocToolchain.Compiler
             CompileNewClass(frame, classDecl.Id, classDecl.SuperClass, classDecl.Body, classDecl.IsModule);
         }
 
-        private void CompileNewClass(AdhocCodeFrame frame, Identifier id, Node superClass, Statement body, bool isModule = false, bool isStaticModule = false)
+        private void CompileNewClass(AdhocCodeFrame frame, Expression id, Node superClass, Statement body, bool isModule = false)
         {
-            if (id is null || id.Type != Nodes.Identifier)
+            if (id is null)
             {
                 ThrowCompilationError(id, CompilationMessages.Error_ModuleOrClassNameInvalid);
                 return;
             }
+            else if (!isModule && id.Type == Nodes.StaticIdentifier)
+            {
+                ThrowCompilationError(id, "Class name cannot be static.");
+                return;
+            }
 
-            Logger.Debug($"L{id.Location.Start.Line} - Compiling {(isModule ? "module" : "class")} '{id.Name}'");
+            bool isStatic = id.Type == Nodes.StaticIdentifier;
+            string name = id.Type == Nodes.StaticIdentifier ? (id as StaticIdentifier).Id.Name :
+                                                              (id as Identifier).Name;
+
+            Logger.Debug($"L{id.Location.Start.Line} - Compiling {(isModule ? "module" : "class")} '{name}'");
             AdhocModule moduleOrClass = EnterModuleOrClass(frame, body);
-            TopLevelModules.TryAdd(id.Name, moduleOrClass);
+            TopLevelModules.TryAdd(name, moduleOrClass);
 
             if (isModule)
             {
                 InsModuleDefine mod = new InsModuleDefine();
 
-                if (id.Name.Contains(AdhocConstants.OPERATOR_STATIC))
+                if (name.Contains(AdhocConstants.OPERATOR_STATIC))
                 {
-                    foreach (string identifier in id.Name.Split(AdhocConstants.OPERATOR_STATIC))
+                    foreach (string identifier in name.Split(AdhocConstants.OPERATOR_STATIC))
                         mod.Names.Add(SymbolMap.RegisterSymbol(identifier));
-                    mod.Names.Add(SymbolMap.RegisterSymbol(id.Name)); // Full
+                    mod.Names.Add(SymbolMap.RegisterSymbol(name)); // Full
                 }
                 else
                 {
-                    mod.Names.Add(SymbolMap.RegisterSymbol(id.Name));
+                    mod.Names.Add(SymbolMap.RegisterSymbol(name));
 
                     // Static modules mean they belong to strictly one path, so main,main in any module context is absolute
-                    if (isStaticModule)
-                        mod.Names.Add(SymbolMap.RegisterSymbol(id.Name));
+                    if (isStatic)
+                        mod.Names.Add(SymbolMap.RegisterSymbol(name));
                 }
 
                 frame.AddInstruction(mod, id.Location.Start.Line);
-                moduleOrClass.Name = id.Name;
+                moduleOrClass.Name = name;
             }
             else
             {
-                if (id.Name.Contains(AdhocConstants.OPERATOR_STATIC))
+                if (name.Contains(AdhocConstants.OPERATOR_STATIC))
                     ThrowCompilationError(superClass, CompilationMessages.Error_ClassNameIsStatic);
 
                 InsClassDefine @class = new InsClassDefine();
-                @class.Name = SymbolMap.RegisterSymbol(id.Name);
-                moduleOrClass.Name = id.Name;
+                @class.Name = SymbolMap.RegisterSymbol(name);
+                moduleOrClass.Name = name;
 
                 var superClassIdent = superClass as Identifier;
                 if (superClass is not null)
@@ -1391,6 +1400,9 @@ namespace GTAdhocToolchain.Compiler
                 case Nodes.Identifier:
                     CompileIdentifier(frame, exp as Identifier);
                     break;
+                case Nodes.StaticIdentifier:
+                    CompileStaticIdentifier(frame, exp as StaticIdentifier);
+                    break;
                 case Nodes.FunctionExpression:
                     CompileFunctionExpression(frame, exp as FunctionExpression);
                     break;
@@ -1640,9 +1652,9 @@ namespace GTAdhocToolchain.Compiler
 
         private void CompileStaticDeclaration(AdhocCodeFrame frame, StaticDeclaration staticDeclaration)
         {
-            if (staticDeclaration.Expression.Type == Nodes.Identifier)
+            if (staticDeclaration.Declaration.Init is null)
             {
-                var ident = staticDeclaration.Expression as Identifier;
+                var ident = staticDeclaration.Declaration.Id as Identifier;
 
                 // static definition with no value
                 var idSymb = SymbolMap.RegisterSymbol(ident.Name);
@@ -1662,24 +1674,13 @@ namespace GTAdhocToolchain.Compiler
                     InsertAssignPop(frame);
                 }
             }
-            else if (staticDeclaration.Expression is ClassExpression classExp) // Static Modules/Absolute
-            {
-                if (!classExp.IsModule)
-                    ThrowCompilationError(classExp, "Static class declarations are not supported.");
-
-                CompileNewClass(frame, classExp.Id, classExp.SuperClass, classExp.Body, isModule: true, isStaticModule: true);
-            }
             else
             {
-                // static definition with value
-                if (staticDeclaration.Expression.Type != Nodes.AssignmentExpression)
-                    ThrowCompilationError(staticDeclaration, "Expected static keyword to be a variable assignment.");
+                if (staticDeclaration.Declaration.Id.Type != Nodes.Identifier)
+                    ThrowCompilationError(staticDeclaration.Declaration.Id, "Expected static declaration to be an identifier.");
 
-                AssignmentExpression assignmentExpression = staticDeclaration.Expression as AssignmentExpression;
-                if (assignmentExpression.Left is not Identifier)
-                    ThrowCompilationError(assignmentExpression, "Expected static declaration to be an identifier.");
-
-                Identifier identifier = assignmentExpression.Left as Identifier;
+                var declValue = staticDeclaration.Declaration.Init;
+                Identifier identifier = staticDeclaration.Declaration.Id as Identifier;
                 var idSymb = SymbolMap.RegisterSymbol(identifier.Name);
 
                 InsStaticDefine staticDefine = new InsStaticDefine(idSymb);
@@ -1693,34 +1694,18 @@ namespace GTAdhocToolchain.Compiler
 
                 frame.AddAttributeOrStaticMemberVariable(idSymb);
 
-                if (assignmentExpression.Operator == AssignmentOperator.Assign)
+                // Assigning to something new
+                if (frame.Version > 10)
                 {
-                    // Assigning to something new
-                    if (frame.Version > 10)
-                    {
-                        CompileExpression(frame, assignmentExpression.Right);
-                        CompileVariableAssignment(frame, assignmentExpression.Left);
-                    }
-                    else
-                    {
-                        InsertVariablePush(frame, assignmentExpression.Left as Identifier, isVariableDeclaration: false);
-                        CompileExpression(frame, assignmentExpression.Right);
-
-                        InsertAssignPop(frame);
-                    }
-                }
-                else if (IsAdhocAssignWithOperandOperator(assignmentExpression.Operator))
-                {
-                    // Assigning to self (+=)
-                    InsertVariablePush(frame, assignmentExpression.Left as Identifier, false); // Push current value first
-                    CompileExpression(frame, assignmentExpression.Right);
-
-                    InsertBinaryAssignOperator(frame, assignmentExpression, assignmentExpression.Operator, assignmentExpression.Location.Start.Line);
-                    InsertPop(frame);
+                    CompileExpression(frame, declValue);
+                    CompileVariableAssignment(frame, staticDeclaration.Declaration.Id);
                 }
                 else
                 {
-                    ThrowCompilationError(assignmentExpression, $"Unimplemented operator assignment {assignmentExpression.Operator}");
+                    InsertVariablePush(frame, staticDeclaration.Declaration.Id as Identifier, isVariableDeclaration: false);
+                    CompileExpression(frame, declValue);
+
+                    InsertAssignPop(frame);
                 }
             }
         }
@@ -2149,7 +2134,7 @@ namespace GTAdhocToolchain.Compiler
         {
             if (expression.Type == Nodes.Identifier) // hello = world
             {
-                InsertVariablePush(frame, expression as Identifier, false);
+                InsertVariablePush(frame, expression as Identifier, isVariableDeclaration: false);
             }
             else if (expression.Type == Nodes.MemberExpression)
             {
@@ -2246,6 +2231,15 @@ namespace GTAdhocToolchain.Compiler
                 InsertAttributeEval(frame, identifier);
             else
                 InsertVariableEval(frame, identifier);
+        }
+
+        /// <summary>
+        /// Compiles an identifier. var test = otherVariable;
+        /// </summary>
+        /// <param name="identifier"></param>
+        private void CompileStaticIdentifier(AdhocCodeFrame frame, StaticIdentifier identifier, bool attribute = false)
+        {
+            InsertVariableEval(frame, identifier.Id, forceStatic: true);
         }
 
 
@@ -3140,7 +3134,7 @@ namespace GTAdhocToolchain.Compiler
         /// <param name="frame"></param>
         /// <param name="identifier"></param>
         /// <returns></returns>
-        private void InsertVariableEval(AdhocCodeFrame frame, Identifier identifier)
+        private void InsertVariableEval(AdhocCodeFrame frame, Identifier identifier, bool forceStatic = false)
         {
             AdhocSymbol symb = SymbolMap.RegisterSymbol(identifier.Name);
             int idx = frame.AddScopeVariable(symb, isAssignment: false);
@@ -3168,7 +3162,7 @@ namespace GTAdhocToolchain.Compiler
 
             // Static references or pushes always have double their own symbol
             // If its a static reference, do not add it as a declared variable within this scope
-            if (frame.IsStaticVariable(symb, CurrentModule))
+            if (forceStatic || frame.IsStaticVariable(symb, CurrentModule))
             {
                 // Static, two symbols
                 if (frame.Version >= 7)

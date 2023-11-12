@@ -156,17 +156,10 @@ namespace GTAdhocToolchain.Analyzer
 
         private void ParseStaticDeclaration(StaticDeclaration staticDecl)
         {
-            var node = staticDecl.Expression;
-            if (node is AssignmentExpression assignment)
-            {
-                var identifier = assignment.Left.As<Identifier>();
-                CurrentScope.DefinedStatics.Add(new Symbol(identifier, identifier.Name));
-            }
-            else if (node.Type == Nodes.Identifier)
-            {
-                var identifier = node.As<Identifier>();
-                CurrentScope.DefinedStatics.Add(new Symbol(identifier, identifier.Name));
-            }
+            var decl = staticDecl.Declaration;
+
+            var identifier = decl.Id.As<Identifier>();
+            CurrentScope.DefinedStatics.Add(new Symbol(identifier, identifier.Name));
         }
 
         private void ParseAttributeDeclaration(AttributeDeclaration attributeDecl)
@@ -235,7 +228,11 @@ namespace GTAdhocToolchain.Analyzer
 
         private void ParseClassDeclaration(ClassDeclaration classDecl)
         {
-            CurrentScope.DefinedModules.Add(new Symbol(classDecl, classDecl.Id.Name));
+            if (classDecl.Id.Type != Nodes.StaticIdentifier) // Not static
+            {
+                Identifier id = classDecl.Id as Identifier;
+                CurrentScope.DefinedModules.Add(new Symbol(classDecl, id.Name));
+            }
 
             ParseStatement(classDecl.Body);
         }

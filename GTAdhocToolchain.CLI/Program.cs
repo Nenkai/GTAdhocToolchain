@@ -18,6 +18,7 @@ using GTAdhocToolchain.Core.Instructions;
 using GTAdhocToolchain.Menu.Fields;
 using GTAdhocToolchain.Preprocessor;
 using GTAdhocToolchain.Analyzer;
+using Esprima.Ast;
 
 namespace GTAdhocToolchain.CLI
 {
@@ -31,49 +32,24 @@ namespace GTAdhocToolchain.CLI
 
             if (args.Length == 1)
             {
-                if (args[0].ToLower().EndsWith(".adc"))
+                if (Directory.Exists(args[0]))
                 {
-                    List<AdhocFile> scripts = null;
-                    try
+                    int exitCode = 0;
+                    foreach (var file in Directory.GetFiles(args[0], "*", SearchOption.AllDirectories))
                     {
-                        scripts = AdhocFile.ReadFromFile(args[0]);
-                    }
-                    catch (Exception e)
-                    {
-                        Console.WriteLine($"Errored while reading: {e.Message}");
-                        Environment.ExitCode = -1;
-                        return;
+                        exitCode = ProcessFile(file);
+                        if (exitCode == -1)
+                            break;
                     }
 
-                    foreach (var adc in scripts)
-                    {
-                        adc.Disassemble(Path.ChangeExtension(args[0], ".ad.diss"));
-
-                        if (adc.Version == 12)
-                            adc.PrintStrings(Path.ChangeExtension(args[0], ".strings"));
-                    }
-
-                    Environment.ExitCode = 0;
-                    return;
-
+                    Environment.ExitCode = exitCode;
                 }
-                else if (args[0].ToLower().EndsWith(".gpb"))
+                else
                 {
-                    var gpb = GpbBase.ReadFile(args[0]);
-                    if (gpb is null)
-                    {
-                        Console.WriteLine("Could not parse GPB Header.");
-                        Environment.ExitCode = -1;
-                        return;
-                    }
-
-                    string fileName = Path.GetFileNameWithoutExtension(args[0]);
-                    string dir = Path.GetDirectoryName(args[0]);
-
-                    gpb.Unpack(Path.GetFileNameWithoutExtension(args[0]), null);
-                    Environment.ExitCode = 0;
-                    return;
+                    Environment.ExitCode = ProcessFile(args[0]);
                 }
+
+                return;
             }
 
             Parser.Default.ParseArguments<BuildVerbs, PackVerbs, UnpackVerbs, MProjectToBinVerbs, MProjectToTextVerbs>(args)
@@ -83,6 +59,55 @@ namespace GTAdhocToolchain.CLI
                 .WithParsed<MProjectToBinVerbs>(MProjectToBin)
                 .WithParsed<MProjectToTextVerbs>(MProjectToText)
                 .WithNotParsed(HandleNotParsedArgs);
+        }
+
+        private static int ProcessFile(string file)
+        {
+            try
+            {
+                if (file.ToLower().EndsWith(".adc"))
+                {
+                    List<AdhocFile> scripts = null;
+                    try
+                    {
+                        scripts = AdhocFile.ReadFromFile(file);
+                    }
+                    catch (Exception e)
+                    {
+                        Console.WriteLine($"Errored while reading: {e.Message}");
+                        return -1;
+                    }
+
+                    foreach (var adc in scripts)
+                    {
+                        adc.Disassemble(Path.ChangeExtension(file, ".ad.diss"));
+
+                        if (adc.Version == 12)
+                            adc.PrintStrings(Path.ChangeExtension(file, ".strings"));
+                    }
+                }
+                else if (file.ToLower().EndsWith(".gpb"))
+                {
+                    var gpb = GpbBase.ReadFile(file);
+                    if (gpb is null)
+                    {
+                        Console.WriteLine("Could not parse GPB Header.");
+                        return -1;
+                    }
+
+                    string fileName = Path.GetFileNameWithoutExtension(file);
+                    string dir = Path.GetDirectoryName(file);
+
+                    gpb.Unpack(Path.GetFileNameWithoutExtension(file), null);
+                }
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"Error: {e}");
+                return -1;
+            }
+
+            return 0;
         }
 
         public static void WatchAndCompile(string projectDir, string input, string output)
