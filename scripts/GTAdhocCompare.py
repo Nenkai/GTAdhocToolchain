@@ -1,5 +1,5 @@
 #/usr/bin/env python3
-import argparse, re, subprocess
+import argparse, re, subprocess, os, tempfile, shutil
 from difflib import HtmlDiff
 from typing import List
 
@@ -50,6 +50,19 @@ def check_re(regex:str, prettyName:List[str], shouldError:bool=False):
     newfile = newfile[new_re.end():]
     origfile = origfile[orig_re.end():]
 
+def get_temp_path(path:str, subdirectory:str):
+    directory = os.path.join(tempfile.gettempdir(), "GTAdhocCompare")
+    try:
+        os.mkdir(directory)
+    except FileExistsError:
+        pass
+    try:
+        directory = os.path.join(directory, subdirectory)
+        os.mkdir(directory)
+    except FileExistsError:
+        pass
+    return os.path.join(directory, os.path.basename(path))
+
 ##########
 # main
 
@@ -63,15 +76,22 @@ parser.add_argument("original_file", help="Original PDI file (.ad.diss, .adc)")
 parser.add_argument("output_file", nargs='?', help="Output HTML file (default is 'comparison.html')")
 parser.add_argument("-L", "--limiter", type=int, help="Amount of line difference to limit (useful for testing while writing)")
 parser.add_argument("-j", "--showjump", action="store_true", help="When set, doesn't obfuscate jump instructions (can cause lots of 'differences' due to LEAVE instructions)")
-parser.add_argument("-l", "--showleave", action="store_true", help="When set, leaves LEAVE instructions in the output (will cause a lot of 'differences').")
+parser.add_argument("-l", "--showleave", action="store_true", help="When set, leaves LEAVE instructions in the output (will cause a lot of 'differences')")
+parser.add_argument("-t", "--tempdir", action="store_true", help="When set, uses the system temporary directory for all files generated.")
 out = parser.parse_args()
 NEW_FILE = out.new_file # type: str
 ORIG_FILE = out.original_file # type: str
+NEW_FILE_TEMP = NEW_FILE
+ORIG_FILE_TEMP = ORIG_FILE
+
+if out.tempdir:
+    NEW_FILE_TEMP = get_temp_path(NEW_FILE, "NEW_FILE")
+    ORIG_FILE_TEMP = get_temp_path(ORIG_FILE, "ORIG_FILE")
 
 if NEW_FILE.endswith(".ad"):
     try:
         compileroutput = subprocess.run(
-            ["adhoc.exe", "build", "-i", NEW_FILE],
+            ["adhoc.exe", "build", "-i", NEW_FILE, "-o", NEW_FILE_TEMP],
             capture_output=True,
             text=True,
             check=True,
@@ -85,9 +105,13 @@ if NEW_FILE.endswith(".ad"):
     except FileNotFoundError:
         print("==> When providing an .ad file, adhoc.exe must be on the $PATH or in cwd.")
         exit(1)
-    NEW_FILE = NEW_FILE[:-3]+".adc"
+    NEW_FILE_TEMP = NEW_FILE_TEMP[:-3]+".adc"
+    NEW_FILE = NEW_FILE_TEMP
 
 if NEW_FILE.endswith(".adc"):
+    if NEW_FILE != NEW_FILE_TEMP:
+        shutil.copyfile(NEW_FILE, NEW_FILE_TEMP)
+        NEW_FILE = NEW_FILE_TEMP
     try:
         subprocess.run(
             ["adhoc.exe", NEW_FILE],
@@ -101,6 +125,9 @@ if NEW_FILE.endswith(".adc"):
     NEW_FILE = NEW_FILE[:-4]+".ad.diss"
 
 if ORIG_FILE.endswith(".adc"):
+    if ORIG_FILE != ORIG_FILE_TEMP:
+        shutil.copyfile(ORIG_FILE, ORIG_FILE_TEMP)
+        ORIG_FILE = ORIG_FILE_TEMP
     try:
         subprocess.run(
             ["adhoc.exe", ORIG_FILE],
