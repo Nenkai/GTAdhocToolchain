@@ -90,20 +90,19 @@ if out.tempdir:
 
 if NEW_FILE.endswith(".ad"):
     try:
-        compileroutput = subprocess.run(
+        subprocess.run(
             ["adhoc.exe", "build", "-i", NEW_FILE, "-o", NEW_FILE_TEMP],
             capture_output=True,
             text=True,
             check=True,
         )
-        # adhoc.exe doesn't use stderr or return non-zero codes, so parse the output for ERROR log lines
-        if "ERROR " in compileroutput.stdout:
-            print("Compilation error while running adhoc.exe to turn 'new_file' .ad into a .adc:")
-            print("\r\n".join(filter(lambda line: "ERROR " in line, compileroutput.stdout.splitlines())))
-            exit(1)
         print("Ran adhoc.exe to turn 'new_file' .ad into a .adc")
     except FileNotFoundError:
         print("==> When providing an .ad file, adhoc.exe must be on the $PATH or in cwd.")
+        exit(1)
+    except subprocess.CalledProcessError as exception:
+        print("Compilation error while running adhoc.exe to turn 'new_file' .ad into a .adc:")
+        print("\r\n".join(filter(lambda line: "ERROR " in line, exception.output.splitlines())))
         exit(1)
     NEW_FILE_TEMP = NEW_FILE_TEMP[:-3]+".adc"
     NEW_FILE = NEW_FILE_TEMP
