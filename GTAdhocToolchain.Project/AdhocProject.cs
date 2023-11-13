@@ -129,7 +129,7 @@ namespace GTAdhocToolchain.Project
         /// Builds the project.
         /// </summary>
         /// <returns></returns>
-        public bool Build(bool debug = false)
+        public bool Build(bool debug = false, string customOutputDir = "")
         {
             if (!Directory.Exists(ProjectDir))
             {
@@ -200,11 +200,13 @@ namespace GTAdhocToolchain.Project
 
                 AdhocCodeGen codeGen = new AdhocCodeGen(compiler.MainFrame, compiler.SymbolMap);
                 codeGen.Generate();
-                codeGen.SaveTo(Path.Combine(ProjectDir, OutputName + ".adc"));
+                customOutputDir = string.IsNullOrWhiteSpace(customOutputDir) ? "" : Path.GetDirectoryName(customOutputDir);
+                var outputPath = Path.Combine(string.IsNullOrWhiteSpace(customOutputDir) ? ProjectDir : customOutputDir, OutputName) + ".adc";
+                codeGen.SaveTo(outputPath);
 
                 if (MergeWidget)
                 {
-                    bool res = MergeRootWidgets(Path.ChangeExtension(Path.Combine(ProjectDir, OutputName), ".mproject"), SerializeComponents);
+                    bool res = MergeRootWidgets(Path.ChangeExtension(outputPath, ".mproject"), SerializeComponents);
                     return res;
                 }
 
