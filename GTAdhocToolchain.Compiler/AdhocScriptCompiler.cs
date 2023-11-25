@@ -2075,11 +2075,11 @@ namespace GTAdhocToolchain.Compiler
             }
             else if (IsAdhocAssignWithOperandOperator(assignExpression.Operator)) // += -= /= etc..
             {
-                // Assigning to a reference variable
+                // Assigning to a reference variable? (*a += b)
                 if (IsUnaryIndirection(assignExpression.Left))
                 {
                     // No need to push, eval
-                    CompileUnaryExpression(frame, assignExpression.Left as UnaryExpression, asReference: false);
+                    CompileUnaryExpression(frame, assignExpression.Left as UnaryExpression, asReference: false, isIndirectionBinaryAssignment: true);
                 }
                 else
                 {
@@ -2674,7 +2674,7 @@ namespace GTAdhocToolchain.Compiler
         /// <param name="popResult">Whether to pop after the expression to not reuse the result.</param>
         /// <param name="asReference">Whether to treat the expression as a reference, result may or may not be pushed to the reference variable.</param>
         /// <exception cref="NotImplementedException"></exception>
-        private void CompileUnaryExpression(AdhocCodeFrame frame, UnaryExpression unaryExp, bool popResult = false, bool asReference = false)
+        private void CompileUnaryExpression(AdhocCodeFrame frame, UnaryExpression unaryExp, bool popResult = false, bool asReference = false, bool isIndirectionBinaryAssignment = false)
         {
             if (unaryExp is UpdateExpression upd) // ++var / --var etc
             {
@@ -2715,7 +2715,7 @@ namespace GTAdhocToolchain.Compiler
                 {
                     CompileExpression(frame, unaryExp.Argument);
 
-                    if (frame.Version >= 11)
+                    if (!isIndirectionBinaryAssignment && frame.Version >= 11)
                         frame.AddInstruction(new InsEval(), 0);
                 }
                 
