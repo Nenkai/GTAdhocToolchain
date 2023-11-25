@@ -269,7 +269,7 @@ namespace GTAdhocToolchain.CLI
             prj.PrintInfo();
 
             Logger.Info("Started project build.");
-            if (!prj.Build(buildVerbs.WriteExceptionsToFile))
+            if (!prj.Build(buildVerbs.WriteExceptionsToFile, buildVerbs.OutputPath))
             {
                 Logger.Error("Project build failed.");
                 Environment.ExitCode = -1;
@@ -445,7 +445,7 @@ namespace GTAdhocToolchain.CLI
         [Option('i', "input", Required = true, HelpText = "Input project file or source script.")]
         public string InputPath { get; set; }
 
-        [Option('o', "output", Required = false, HelpText = "Output compiled scripts when compiling standalone scripts (not projects).")]
+        [Option('o', "output", Required = false, HelpText = "Output compiled scripts when compiling standalone scripts or projects.")]
         public string OutputPath { get; set; }
 
         [Option('v', "version", Required = false, Default = 12, HelpText = "Adhoc compile version (for files, not projects).")]
