@@ -144,7 +144,7 @@ namespace GTAdhocToolchain.CLI
             else if (Path.GetExtension(buildVerbs.InputPath) == ".ad")
             {
                 string output = !string.IsNullOrEmpty(buildVerbs.OutputPath) ? buildVerbs.OutputPath : buildVerbs.InputPath;
-                BuildScript(buildVerbs.InputPath, Path.ChangeExtension(output, ".adc"), buildVerbs.Version, buildVerbs.WriteExceptionsToFile, buildVerbs.PreprocessOnly);
+                BuildScript(buildVerbs.InputPath, Path.ChangeExtension(output, ".adc"), buildVerbs.Version, buildVerbs.WriteExceptionsToFile, buildVerbs.PreprocessOnly, buildVerbs.BaseIncludeFolder);
             }
             else
             {
@@ -281,16 +281,24 @@ namespace GTAdhocToolchain.CLI
             }
         }
 
-        private static void BuildScript(string inputPath, string output, int version = 12, bool debugExceptions = false, bool preprocessOnly = false)
+        private static void BuildScript(string inputPath, string output, int version = 12, bool debugExceptions = false, bool preprocessOnly = false, string baseIncludeFolder = "")
         {
             var source = File.ReadAllText(inputPath);
             var time = new FileInfo(inputPath).LastWriteTime;
 
             try
             {
+                string absoluteIncludePath = Path.GetDirectoryName(inputPath);
+                string sourceFile = inputPath;
+                if (!string.IsNullOrWhiteSpace(baseIncludeFolder))
+                {
+                    absoluteIncludePath = Path.GetFullPath(Path.Combine(absoluteIncludePath, baseIncludeFolder)); // Returns baseIncludeFolder if it's absolute, otherwise applies it to the source file's location
+                    sourceFile = Path.GetRelativePath(absoluteIncludePath, inputPath).Replace('\\', '/'); // Rewrite the path to be relative to the base folder, and normalise to forward slashes
+                }
+
                 var preprocessor = new AdhocScriptPreprocessor();
-                preprocessor.SetBaseDirectory(Path.GetDirectoryName(inputPath));
-                preprocessor.SetCurrentFileName(inputPath);
+                preprocessor.SetBaseDirectory(absoluteIncludePath);
+                preprocessor.SetCurrentFileName(sourceFile);
                 preprocessor.SetCurrentFileTimestamp(time);
 
                 string preprocessed = preprocessor.Preprocess(source);
@@ -322,6 +330,10 @@ namespace GTAdhocToolchain.CLI
                 }
 
                 var compiler = new AdhocScriptCompiler();
+                if (!string.IsNullOrWhiteSpace(baseIncludeFolder))
+                {
+                    compiler.SetBaseIncludeFolder(absoluteIncludePath);
+                }
                 compiler.SetSourcePath(inputPath);
                 compiler.Setup(version);
 
@@ -458,6 +470,9 @@ namespace GTAdhocToolchain.CLI
 
         [Option('e', Required = false, HelpText = "Preprocess only and output to stdout. Only for compiling scripts.")]
         public bool PreprocessOnly { get; set; }
+
+        [Option('b', "base-include-folder", Required = false, HelpText = "Set the root path for #include statements (for files, not projects).")]
+        public string BaseIncludeFolder { get; set; }
     }
 
     [Verb("pack", HelpText = "Pack files like gpb's, or mpackage's.")]
