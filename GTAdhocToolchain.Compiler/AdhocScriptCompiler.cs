@@ -1553,7 +1553,19 @@ namespace GTAdhocToolchain.Compiler
 
         private void CompileYield(AdhocCodeFrame frame, YieldExpression yield)
         {
-            frame.AddInstruction(new InsVoidConst(), yield.Location.Start.Line);
+            if (yield.Argument is not null)
+            {
+                CompileExpression(frame, yield.Argument);
+                if (yield.Argument is AssignmentExpression)
+                {
+                    ThrowCompilationError(yield.Argument, $"Assignment expressions are not yet supported in yield statements.");
+                }
+            }
+            else
+            {
+                frame.AddInstruction(new InsVoidConst(), yield.Location.Start.Line);
+            }
+
             InsertSetState(frame, AdhocRunState.YIELD);
         }
 
