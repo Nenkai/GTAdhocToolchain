@@ -24,11 +24,16 @@ namespace GTAdhocToolchain.CLI
 {
     public class Program
     {
+        public const string Version = "1.0.0";
         private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
         public static void Main(string[] args)
         {
-            Console.WriteLine("[-- GTAdhocToolchain by Nenkai#9075 -- ]");
+            Console.WriteLine("---------------------------------------------");
+            Console.WriteLine($"- GTAdhocToolchain {Version} by Nenkai");
+            Console.WriteLine("---------------------------------------------");
+            Console.WriteLine("- https://github.com/Nenkai");
+            Console.WriteLine("---------------------------------------------");
 
             if (args.Length == 1)
             {
