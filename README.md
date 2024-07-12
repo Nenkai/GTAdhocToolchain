@@ -15,6 +15,9 @@ The toolchain contains the following:
 * Script Disassembler (`.adc` to assembly-like syntax)
 * Compare scripts for dissasembly matching
 
+## Wiki
+Refer to the [Wiki](https://github.com/Nenkai/GTAdhocToolchain/wiki) for more information.
+
 ## Current State
 The toolchain is capable of compiling fully working original and custom projects (see [OpenAdhoc](https://github.com/Nenkai/OpenAdhoc)).
 
