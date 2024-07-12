@@ -43,6 +43,6 @@ namespace GTAdhocToolchain.Core.Instructions
         }
 
         public override string Disassemble(bool asCompareMode = false)
-            => $"{InstructionType}: {Value})";
+            => $"{InstructionType}: {Value}";
     }
 }

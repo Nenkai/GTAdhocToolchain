@@ -79,7 +79,7 @@ namespace GTAdhocToolchain.Project
         /// <summary>
         /// Defines to pass to the preprocessor
         /// </summary>
-        public Dictionary<string, string> Defines { get; set; } = new();
+        public List<string> Macros { get; set; } = new();
 
         public static AdhocProject Read(string path)
         {
@@ -168,7 +168,7 @@ namespace GTAdhocToolchain.Project
                 preprocessor.SetBaseDirectory(BaseIncludeFolder);
                 preprocessor.SetCurrentFileName(Path.Combine(SourceProjectFolder, $"_tmp_{OutputName}.ad").Replace('\\', '/'));
                 preprocessor.SetCurrentFileTimestamp(time);
-                preprocessor.AddDefines(Defines);
+                preprocessor.AddMacros(Macros);
 
                 var preprocessed = preprocessor.Preprocess(source);
 
@@ -273,7 +273,7 @@ namespace GTAdhocToolchain.Project
                     preprocessor.SetBaseDirectory(BaseIncludeFolder);
                     preprocessor.SetCurrentFileName(srcFile.SourcePath);
                     preprocessor.SetCurrentFileTimestamp(time);
-                    preprocessor.AddDefines(Defines);
+                    preprocessor.AddMacros(Macros);
 
                     var preprocessed = preprocessor.Preprocess(source);
 
