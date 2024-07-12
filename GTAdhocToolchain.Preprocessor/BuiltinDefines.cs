@@ -133,5 +133,21 @@ public class BuiltinMacros
         $"SQLITE_WARNING    {28}",   /* Warnings from sqlite3_log() */
         $"SQLITE_ROW        {100}",  /* sqlite3_step() has another row ready */
         $"SQLITE_DONE       {101}",  /* sqlite3_step() has finished executing */
+
+        // UI Components
+        """
+        SCALE_WIDGET_SDTV(module_name, sdtv_scale_value) \
+        module module_name \
+        { \
+            method onRealize() \
+            { \
+                if (pdiext::MSystemConfiguration::isSDTV()) \
+                { \
+                    self.scale_x = scale_value; \
+                    self.scale_y = scale_value; \
+                } \
+            } \
+        }
+        """,
     };
 }
