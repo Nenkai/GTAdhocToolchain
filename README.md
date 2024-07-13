@@ -16,13 +16,10 @@ The toolchain contains the following:
 * Compare scripts for dissasembly matching
 
 ## Wiki
-Refer to the [Wiki](https://github.com/Nenkai/GTAdhocToolchain/wiki) for more information.
+Refer to the [Wiki](https://github.com/Nenkai/GTAdhocToolchain/wiki) for more information (compiler, language features, etc).
 
 ## Current State
 The toolchain is capable of compiling fully working original and custom projects (see [OpenAdhoc](https://github.com/Nenkai/OpenAdhoc)).
-
-## Adhoc Language Specifications
-Adhoc is very similar to javascript but with a few changes and additions. Refer to the [language spec](LANGUAGE_SPECIFICATION.md).
 
 ## TODOs
 * Improve syntatic analysis during compilation.
