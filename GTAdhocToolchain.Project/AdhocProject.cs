@@ -44,14 +44,7 @@ namespace GTAdhocToolchain.Project
         /// </summary>
         public string ProjectFolder { get; set; }
 
-        /// <summary>
-        /// projects/<code>/<project_name>
-        /// </summary>
-        public string SourceProjectFolder { get; set; }
-
         public string ProjectDir { get; set; }
-
-        public string ProjectFilePath { get; set; }
 
         public string BaseIncludeFolder { get; set; }
 
@@ -80,6 +73,13 @@ namespace GTAdhocToolchain.Project
         /// Defines to pass to the preprocessor
         /// </summary>
         public List<string> Macros { get; set; } = new();
+
+        /// <summary>
+        /// projects/<code>/<project_name>
+        /// </summary>
+        private string SourceProjectFolder { get; set; }
+
+        private string ProjectFilePath { get; set; }
 
         public static AdhocProject Read(string path)
         {

@@ -83,7 +83,7 @@ public class AdhocScriptPreprocessor
 
         Macro define = ParseMacro();
         define.IsBuiltin = isBuiltIn;
-        define.IsSpecialMacro = true;
+        define.IsSpecialMacro = isSpecial;
         _definedMacros.TryAdd(define.Name, define);
 
         _state = old;

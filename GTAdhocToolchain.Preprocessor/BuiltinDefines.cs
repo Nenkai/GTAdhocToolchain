@@ -64,8 +64,8 @@ public class BuiltinMacros
         $"PS2_PAD_CTRL_TRIANGLE {0xFFBE}",
         $"PS2_PAD_CTRL_CIRCLE {0xFF1B}",
 
-        $"PS2_PAD_CTRL_SELECT", $"{0xFF63}",
-        $"PS2_PAD_CTRL_START", $"{0xFF8D}",
+        $"PS2_PAD_CTRL_SELECT {0xFF63}",
+        $"PS2_PAD_CTRL_START {0xFF8D}",
 
         $"PS2_PAD_CTRL_L1 {0xFFC8}",
         $"PS2_PAD_CTRL_L2 {0xFFC9}",
