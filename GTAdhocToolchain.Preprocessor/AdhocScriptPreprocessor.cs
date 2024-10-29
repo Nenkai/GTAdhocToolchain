@@ -1022,25 +1022,25 @@ public class Macro
     public bool IsBuiltin { get; set; }
 
     /// <summary>
-    /// Whether this macro is special. That means that the preprocessor will dynamic provide its contents.
+    /// Whether this macro is special. That means that the preprocessor will dynamically provide its contents.
     /// </summary>
     public bool IsSpecialMacro { get; set; }
 
     /// <summary>
     /// Argument names (if macro function).
     /// </summary>
-    public List<MacroArgument> Arguments { get; set; } = new List<MacroArgument>();
+    public List<MacroArgument> Arguments { get; set; } = [];
 
     /// <summary>
     /// Tokens for the macro's content.
     /// </summary>
-    public List<Token> Content { get; set; } = new List<Token>();
+    public List<Token> Content { get; set; } = [];
 }
 
 public class MacroArgument
 {
     public string Name { get; set; }
-    public List<Token> Arguments { get; set; } = new List<Token>();
+    public List<Token> Arguments { get; set; } = [];
 
     public override string ToString()
     {
