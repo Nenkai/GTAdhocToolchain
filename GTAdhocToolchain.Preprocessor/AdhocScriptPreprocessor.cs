@@ -924,7 +924,7 @@ public class AdhocScriptPreprocessor
         if (!_state.Writing)
             return;
 
-        _writer.Write(str);
+        _writer.Write(str + '\n');
     }
 
     private void WriteTokens(IEnumerable<Token> tokens)
