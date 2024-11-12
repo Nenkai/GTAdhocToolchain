@@ -24,7 +24,7 @@ namespace GTAdhocToolchain.CLI;
 
 public class Program
 {
-    public static readonly Version Version = new(1, 0, 2);
+    public static readonly Version Version = new(1, 0, 3);
 
     private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
