@@ -608,7 +608,7 @@ public class AdhocScriptPreprocessor
         switch (define.Name)
         {
             case "__LINE__":
-                return new Token() { Value = $"{token.Location.Start.Line}u" };
+                return new Token() { Value = $"{_state.Lookahead.Location.Start.Line}u" }; // Since we aren't reading when expanding, it's fine to use the lookahead.
 
             case "__FILE__":
                 return new Token() { Value = $"\"{_state.CurrentFileName.Replace("\\", "\\\\")}\"" }; // Make sure to escape it
@@ -693,8 +693,15 @@ public class AdhocScriptPreprocessor
                 }
                 else
                 {
-                    List<Token> expanded = ExpandTokens(def.Content);
-                    list.AddRange(expanded);
+                    if (def.IsSpecialMacro)
+                    {
+                        list.Add(ExpandSpecialMacro(def, token));
+                    }
+                    else
+                    {
+                        List<Token> expanded = ExpandTokens(def.Content);
+                        list.AddRange(expanded);
+                    }
                 }
                 
             }
@@ -714,7 +721,7 @@ public class AdhocScriptPreprocessor
     /// <returns></returns>
     private List<Token> ExpandTokens(List<Token> inputTokens)
     {
-        List<Token> tokens = new List<Token>();
+        List<Token> tokens = [];
 
         for (var currentIndex = 0; currentIndex < inputTokens.Count; currentIndex++)
         {

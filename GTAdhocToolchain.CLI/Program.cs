@@ -474,7 +474,7 @@ public class BuildVerbs
         "This will only work for GT5 and above. Use carefully. Not entirely tested, may break or not work at all.")]
     public bool WriteExceptionsToFile { get; set; }
 
-    [Option('e', Required = false, HelpText = "Preprocess only and output to stdout. Only for compiling scripts.")]
+    [Option("preprocess-only", Required = false, HelpText = "Preprocess only and output to stdout. Only for compiling scripts.")]
     public bool PreprocessOnly { get; set; }
 
     [Option('b', "base-include-folder", Required = false, HelpText = "Set the root path for #include statements (for files, not projects).")]
