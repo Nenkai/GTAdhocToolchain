@@ -10,8 +10,10 @@ namespace GTAdhocToolchain.Preprocessor;
 
 public class BuiltinMacros
 {
-    public static List<string> CompilerProvidedConstants = new()
-    {
+    public static List<string> CompilerProvidedConstants =
+    [
+        "ASSERT(condition) if (!(condition)) System::ErrorAbort(\"!(\" + #condition + \") assert has been called\");",
+
         // Numeric min/max
         $"INT_MIN {int.MinValue}",
         $"INT_MAX {int.MaxValue}",
@@ -149,5 +151,5 @@ public class BuiltinMacros
             } \
         }
         """,
-    };
+    ];
 }
