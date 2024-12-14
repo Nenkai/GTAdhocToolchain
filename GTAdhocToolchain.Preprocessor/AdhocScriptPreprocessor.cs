@@ -656,17 +656,16 @@ public class AdhocScriptPreprocessor
                     ThrowPreprocessorError(token, "\'#\' is not followed by a macro parameter");
 
                 string str = "";
-                var expanded = ExpandTokens(tokens);
-                for (int j = 0; j < expanded.Count; j++)
+                for (int j = 0; j < tokens.Count; j++)
                 {
-                    Token expandedToken = expanded[j];
-                    str += ((string)expandedToken.Value).Replace("\\", "\\\\").Replace("\"", "\\\"");
+                    Token toks = tokens[j];
+                    str += ((string)toks.Value).Replace("\\", "\\\\").Replace("\"", "\\\"");
 
                     // Insert a single whitespace only when tokens are separated by one (or more) whitespaces.
-                    if (j < expanded.Count - 1)
+                    if (j < tokens.Count - 1)
                     {
-                        var nextToken = expanded[j + 1];
-                        if (expandedToken.Location.End.Column != nextToken.Location.Start.Column)
+                        var nextToken = tokens[j + 1];
+                        if (toks.Location.End.Column != nextToken.Location.Start.Column)
                             str += ' ';
                     }
                 }
