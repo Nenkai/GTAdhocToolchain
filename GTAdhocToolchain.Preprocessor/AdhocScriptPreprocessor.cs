@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using System.Xml.Linq;
 using System.IO;
 using Esprima.Ast;
+using System.Reflection.Metadata;
 
 namespace GTAdhocToolchain.Preprocessor;
 
@@ -569,6 +570,9 @@ public class AdhocScriptPreprocessor
     /// <exception cref="Exception"></exception>
     private void ProcessSourceIdentifier(Token token)
     {
+        if ((string)token.Value == "#")
+            ;
+
         if (_definedMacros.TryGetValue(token.Value as string, out Macro define))
         {
             if (define.IsFunction)
@@ -640,6 +644,42 @@ public class AdhocScriptPreprocessor
         for (int i = 0; i < define.Content.Count; i++)
         {
             Token? token = define.Content[i];
+
+            // Stringification?
+            if (token.Type == TokenType.Punctuator && (string)token.Value == "#")
+            {
+                if (i >= define.Content.Count - 1)
+                    ThrowPreprocessorError(token, "\'#\' is not followed by a macro parameter");
+
+                var next = define.Content[i + 1];
+                if (next.Type != TokenType.Identifier)
+                    ThrowPreprocessorError(token, "\'#\' is not followed by a macro parameter");
+
+                if (!callArgs.TryGetValue((string)next.Value, out List<Token> tokens))
+                    ThrowPreprocessorError(token, "\'#\' is not followed by a macro parameter");
+
+                string str = "";
+                var expanded = ExpandTokens(tokens);
+                for (int j = 0; j < expanded.Count; j++)
+                {
+                    Token expandedToken = expanded[j];
+                    str += ((string)expandedToken.Value).Replace("\\", "\\\\").Replace("\"", "\\\"");
+
+                    // Insert a single whitespace only when tokens are separated by one (or more) whitespaces.
+                    if (j < expanded.Count - 1)
+                    {
+                        var nextToken = expanded[j + 1];
+                        if (expandedToken.Location.End.Column != nextToken.Location.Start.Column)
+                            str += ' ';
+                    }
+                }
+
+                list.Add(new Token() { Value = $"\"{str}\"" });
+
+                i++;
+                continue;
+            }
+
             if (token.Type != TokenType.Identifier)
             {
                 list.Add(token);
