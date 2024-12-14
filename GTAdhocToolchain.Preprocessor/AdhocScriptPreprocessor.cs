@@ -570,9 +570,6 @@ public class AdhocScriptPreprocessor
     /// <exception cref="Exception"></exception>
     private void ProcessSourceIdentifier(Token token)
     {
-        if ((string)token.Value == "#")
-            ;
-
         if (_definedMacros.TryGetValue(token.Value as string, out Macro define))
         {
             if (define.IsFunction)
