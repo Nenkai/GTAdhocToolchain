@@ -145,8 +145,8 @@ public class BuiltinMacros
             { \
                 if (pdiext::MSystemConfiguration::isSDTV()) \
                 { \
-                    self.scale_x = scale_value; \
-                    self.scale_y = scale_value; \
+                    self.scale_x = sdtv_scale_value; \
+                    self.scale_y = sdtv_scale_value; \
                 } \
             } \
         }
