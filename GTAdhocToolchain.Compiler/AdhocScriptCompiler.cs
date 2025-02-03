@@ -1191,15 +1191,15 @@ namespace GTAdhocToolchain.Compiler
                     {
                         if (initValue.Type == Nodes.UpdateExpression)
                         {
-                            CompileUnaryExpression(frame, initValue as UpdateExpression, popResult: false); // var a = ++b; - Do not discard b
+                            CompileUnaryExpression(frame, initValue.As<UpdateExpression>(), popResult: false); // var a = ++b; - Do not discard b
                         }
                         else if (IsUnaryReferenceOfExpression(initValue))
                         {
-                            CompileUnaryExpression(frame, initValue as UnaryExpression, popResult: false, asReference: true); // var a = &b;
+                            CompileUnaryExpression(frame, initValue.As<UnaryExpression>(), popResult: false, asReference: true); // var a = &b;
                         }
                         else if (initValue.Type == Nodes.AssignmentExpression)
                         {
-                            CompileAssignmentExpression(frame, initValue as AssignmentExpression, popResult: false); // var a = b = c; - Do not discard b
+                            CompileAssignmentExpression(frame, initValue.As<AssignmentExpression>(), popResult: false); // var a = b = c; - Do not discard b
                         }
                         else
                         {
@@ -1571,27 +1571,44 @@ namespace GTAdhocToolchain.Compiler
 
         private void CompileAwait(AdhocCodeFrame frame, AwaitExpression awaitExpr)
         {
-            var awaitStart = new StaticMemberExpression(new Identifier(AdhocConstants.SYSTEM), new Identifier("AwaitTaskStart"), false);
-            CompileExpression(frame, awaitStart);
-
             // Awaiting bare call?
             if (awaitExpr.Argument is CallExpression call)
             {
-                // Wrap it into a subroutine (maybe move this to an util at the bottom) 
-                var subroutine = new FunctionDeclaration(null, 
-                    new NodeList<Expression>(), // No parameters
-                    new BlockStatement(NodeList.Create(new Statement[] { new ExpressionStatement(call) })),
-                    generator: false,
-                    strict: true,
-                    async: false);
-                subroutine.Location = new Location(call.Location.Start, call.Location.End, call.Location.Source);
+                var awaitStart = new StaticMemberExpression(new Identifier(AdhocConstants.SYSTEM), new Identifier("AwaitTaskStart"), false);
+                CompileExpression(frame, awaitStart);
+                bool isAwaitTask = IsNewTaskCall(call);
 
-                CompileAnonymousSubroutine(frame, subroutine, call, new NodeList<Expression>());
+                if (!isAwaitTask)
+                {
+                    // Wrap it into a subroutine (maybe move this to an util at the bottom) 
+                    var subroutine = new FunctionDeclaration(null,
+                        new NodeList<Expression>(), // No parameters
+                        new BlockStatement(NodeList.Create(new Statement[] { new ExpressionStatement(call) })),
+                        generator: false,
+                        strict: true,
+                        async: false);
+                    subroutine.Location = new Location(call.Location.Start, call.Location.End, call.Location.Source);
+
+                    CompileAnonymousSubroutine(frame, subroutine, call, new NodeList<Expression>());
+                }
+                else
+                {
+                    if (call.Arguments.Count != 1)
+                        ThrowCompilationError(call, "AwaitTask expects 1 argument");
+
+                    if (call.Arguments[0].Type != Nodes.FunctionExpression && call.Arguments[0].Type != Nodes.ArrowFunctionExpression)
+                        ThrowCompilationError(call, "AwaitTask expects a function as argument");
+
+                    CompileExpression(frame, call.Arguments[0]);
+                }
             }
             else
             {
+                var awaitStart = new StaticMemberExpression(new Identifier(AdhocConstants.SYSTEM), new Identifier("AwaitTaskStart"), false);
+                CompileExpression(frame, awaitStart);
                 CompileExpression(frame, awaitExpr.Argument);
             }
+
 
             // Get task - <task> = System::AwaitTaskStart(<func>);
             frame.AddInstruction(new InsCall(1), 0);
@@ -1606,6 +1623,26 @@ namespace GTAdhocToolchain.Compiler
             frame.AddInstruction(new InsCall(1), 0);
 
             AddPostCompilationWarning(CompilationMessages.Warning_UsingAwait_Code);
+        }
+
+        private static bool IsNewTaskCall(CallExpression call)
+        {
+            if (call.Callee is StaticMemberExpression staticMemberExp)
+            {
+                if (staticMemberExp.Object is Identifier objIdentifier && staticMemberExp.Property is Identifier propIdent)
+                {
+                    if (objIdentifier.Name == AdhocConstants.SYSTEM && propIdent.Name == "AwaitTaskStart")
+                        return true;
+                }
+            }
+            else if (call.Callee is Identifier ident)
+            {
+                if (ident.Name == "AwaitTask")
+                    return true;
+            }
+
+            return false;
+                                
         }
 
         /// <summary>
@@ -2477,7 +2514,19 @@ namespace GTAdhocToolchain.Compiler
             }
             else
             {
-                CompileExpression(frame, call.Callee);
+                if (call.Callee is Identifier awaitTaskIdentifier && awaitTaskIdentifier.Name == "AwaitTask")
+                {
+                    if (call.Arguments.Count != 1)
+                        ThrowCompilationError(call, "AwaitTask expects 1 argument");
+
+                    if (call.Arguments[0].Type != Nodes.FunctionExpression && call.Arguments[0].Type != Nodes.ArrowFunctionExpression)
+                        ThrowCompilationError(call, "AwaitTask expects a function as argument");
+
+                    var awaitStart = new StaticMemberExpression(new Identifier(AdhocConstants.SYSTEM), new Identifier("AwaitTaskStart"), false);
+                    CompileExpression(frame, awaitStart);
+                }
+                else
+                    CompileExpression(frame, call.Callee);
 
                 for (int i = 0; i < call.Arguments.Count; i++)
                 {
