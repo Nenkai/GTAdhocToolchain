@@ -8,11 +8,11 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         submodules: 'recursive'
 
-    - uses: actions/setup-dotnet@v2
+    - uses: actions/setup-dotnet@v3
       with:
         dotnet-version: '6.0.x'
         include-prerelease: true
@@ -37,7 +37,7 @@ jobs:
       working-directory: ./GTAdhocToolchain.CLI
       continue-on-error: true
 
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       with:
         name: GTAdhocToolchain-win-framework
         path: |
@@ -46,7 +46,7 @@ jobs:
         if-no-files-found: error
       continue-on-error: true
 
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       with:
         name: GTAdhocToolchain-win-x86
         path: |
@@ -55,7 +55,7 @@ jobs:
         if-no-files-found: error
       continue-on-error: true
 
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       with:
         name: GTAdhocToolchain-linux-x64
         path: |
@@ -64,7 +64,7 @@ jobs:
         if-no-files-found: error
       continue-on-error: true
 
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       with:
         name: GTAdhocToolchain-osx-x64
         path: |
