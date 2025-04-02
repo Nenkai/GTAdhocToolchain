@@ -9,12 +9,12 @@ jobs:
 
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       # get npm
-      - uses: actions/setup-node@v3
+      - uses: actions/setup-node@v4
         with:
-          node-version: 14
+          node-version: 20
 
       - name: Install Visual Studio Code Extension Manager
         run: npm install -g vsce
@@ -30,7 +30,7 @@ jobs:
         run: vsce package
         working-directory: ./vscode-extension
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: adhoc-vscode-extension
           path: vscode-extension/adhoc-*.vsix
