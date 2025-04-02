@@ -15,7 +15,6 @@ jobs:
     - uses: actions/setup-dotnet@v3
       with:
         dotnet-version: '6.0.x'
-        include-prerelease: true
 
     - name: Publish GTAdhocToolchain.CLI for Windows (framework dependent)
       run: dotnet publish --configuration Release
