@@ -361,4 +361,9 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
-/GTAdhocCompiler/Properties/launchSettings.json
+
+# VS launch settings
+launchSettings.json
+
+# Adhoc comparison output
+/scripts/comparison.html

@@ -264,11 +264,17 @@ namespace GTAdhocToolchain.Compiler
                     CompileDelegateDefinition(frame, node as DelegateDeclaration);
                     break;
                 case Nodes.EmptyStatement:
+                    CompileEmptyStatement(frame, node);
                     break;
                 default:
                     ThrowCompilationError(node, $"Unsupported statement: {node.Type}");
                     break;
             }
+        }
+
+        private void CompileEmptyStatement(AdhocCodeFrame frame, Node node)
+        {
+            InsertNopAtScopeChangeIfNeeded(frame, node.Location.Start.Line);
         }
 
         public void CompilePrintStatement(AdhocCodeFrame frame, PrintStatement printStatement)
@@ -566,7 +572,7 @@ namespace GTAdhocToolchain.Compiler
             }
 
             // Compile statements directly, we don't need a regular leave.
-            CompileStatements(frame, body as BlockStatement);
+            CompileStatementWithScope(frame, body as BlockStatement);
 
             LeaveModuleOrClass(frame, fromSubroutine: frame.ParentFrame is not null);
 
@@ -615,10 +621,9 @@ namespace GTAdhocToolchain.Compiler
 
                 skipAlternateJmp.JumpInstructionIndex = frame.GetLastInstructionIndex();
             }
-            else
+            else // No else block
             {
-                
-                if (frame.Version >= 7 && frame.Version < 11) // Version 7-10 and under has an implicit, alternate jump anyway
+                if (frame.Version >= 7 && frame.Version < 11) // Version 7-10 and under has an implicit, alternate jump instruction anyway
                 {
                     InsJump skipAlternateJmp = new InsJump();
                     frame.AddInstruction(skipAlternateJmp, 0);
@@ -1715,8 +1720,8 @@ namespace GTAdhocToolchain.Compiler
 
                 frame.AddAttributeOrStaticMemberVariable(idSymb);
                 
-                // Statics in < V10 are always set to a nil if not explicitly set to a value
-                if (frame.Version < 10)
+                // Statics starting V7 until V10 are always set to a nil if not explicitly set to a value
+                if (frame.Version >= 7 && frame.Version < 10)
                 {
                     InsertVariablePush(frame, ident, isVariableDeclaration: false);
                     frame.AddInstruction(new InsNilConst(), ident.Location.Start.Line);
@@ -1881,7 +1886,8 @@ namespace GTAdhocToolchain.Compiler
             if (expStatement.Expression.Type != Nodes.AssignmentExpression
                 && expStatement.Expression.Type != Nodes.StaticDeclaration
                 && expStatement.Expression.Type != Nodes.AttributeDeclaration
-                && expStatement.Expression.Type != Nodes.YieldExpression)
+                && expStatement.Expression.Type != Nodes.YieldExpression
+                && expStatement.Expression.Type != Nodes.SelfFinalizerExpression)
                 InsertPop(frame);
         }
 
@@ -3145,7 +3151,11 @@ namespace GTAdhocToolchain.Compiler
         {
             if (statement is BlockStatement)
             {
-                CompileStatement(frame, statement);
+                InsertNopAtScopeChangeIfNeeded(frame, statement.Location.Start.Line);
+
+                CompileStatements(frame, statement);
+
+                InsertNopAtScopeChangeIfNeeded(frame, statement.Location.End.Line);
             }
             else if (statement is ContinueStatement
                 || statement is BreakStatement)
@@ -3433,16 +3443,22 @@ namespace GTAdhocToolchain.Compiler
         }
 
         /// <summary>
-        /// For debugging, inserts a nop for new scopes - not used for now
+        /// For debugging, inserts a nop for scope start/end
         /// </summary>
         /// <param name="frame"></param>
         /// <param name="bodyNode"></param>
-        private void InsertNopForNewScopeIfNeeded(AdhocCodeFrame frame, Node bodyNode)
+        private void InsertNopAtScopeChangeIfNeeded(AdhocCodeFrame frame, int line)
         {
-            // This was used for debugging on their end (breakpoint on scope tokens with an adhoc debugger) - it's not needed so don't emit it
+            // This was used for debugging on their end (breakpoint on scope tokens with an adhoc debugger)
             // Older versions (< 7) and release scripts just had it not stripped
 
-            // frame.AddInstruction(new InsNop(), bodyNode.Location.Start.Line);
+            // It is known to be emitted for any { } block except function start/end
+
+            // TODO: Have some sort of system to compile as DEBUG, which would emit these anyway
+            // It'd then be useful to make a debugger
+
+            if (frame.Version < 7)
+                frame.AddInstruction(new InsNop(), line);
         }
 
         #endregion

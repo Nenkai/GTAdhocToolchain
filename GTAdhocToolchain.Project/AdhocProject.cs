@@ -172,7 +172,6 @@ namespace GTAdhocToolchain.Project
 
                 var preprocessed = preprocessor.Preprocess(source);
 
-
                 var errorHandler = new AdhocErrorHandler();
                 var parser = new AdhocAbstractSyntaxTree(preprocessed, new ParserOptions()
                 {
