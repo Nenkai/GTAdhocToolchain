@@ -16,7 +16,7 @@ namespace GTAdhocToolchain.Disasm
     public class AdhocFile
     {
         public const string MAGIC = "ADCH";
-        public List<AdhocSymbol> SymbolTable { get; private set; }
+        public List<AdhocSymbol> SymbolTable { get; private set; } = [];
         public byte[] _buffer;
 
         public AdhocCodeFrame TopLevelFrame { get; set; }
@@ -41,19 +41,53 @@ namespace GTAdhocToolchain.Disasm
             byte version = (byte)int.Parse(magic.AsSpan(4, 3));
             stream.Version = version;
 
-            var adhoc = new AdhocFile(version);
-            if (version >= 9 && version <= 12)
+            if (version >= 13)
             {
-                stream.ReadSymbolTable();
-                adhoc.SymbolTable = stream.Symbols;
+                byte[] wholeHash = stream.ReadBytes(0x10); // MD5
+
+                if (version >= 15)
+                    stream.InitScrambler(wholeHash);
+
+                int symbolsTableSize = (int)stream.DecodeBitsAndAdvance();
+
+                // Whole file hash is calculated from here
+                int scriptCount = (int)stream.DecodeBitsAndAdvance();
+
+                for (var i = 0; i < scriptCount; i++)
+                {
+                    // Current hash is calculated starting from here
+                    var adhoc = new AdhocFile(version);
+
+                    adhoc.TopLevelFrame = new AdhocCodeFrame();
+                    adhoc.TopLevelFrame.Version = version;
+                    adhoc.TopLevelFrame.CreateStack();
+                    adhoc.TopLevelFrame.Read(stream);
+
+                    byte[] currentScriptMD5Hash = stream.ReadBytes(0x10); // Also MD5
+                    Console.WriteLine(adhoc.TopLevelFrame.SourceFilePath);
+
+                    adhoc.SymbolTable.AddRange(stream.Symbols);
+                    scripts.Add(adhoc);
+                    stream.Reset();
+                }
             }
+            else
+            {
 
-            adhoc.TopLevelFrame = new AdhocCodeFrame();
-            adhoc.TopLevelFrame.Version = version;
-            adhoc.TopLevelFrame.CreateStack();
-            adhoc.TopLevelFrame.Read(stream);
+                var adhoc = new AdhocFile(version);
+                if (version >= 9 && version <= 12)
+                {
+                    stream.ReadSymbolTable();
+                    adhoc.SymbolTable = stream.Symbols;
+                }
 
-            scripts.Add(adhoc);
+                adhoc.TopLevelFrame = new AdhocCodeFrame();
+                adhoc.TopLevelFrame.Version = version;
+                adhoc.TopLevelFrame.CreateStack();
+                adhoc.TopLevelFrame.Read(stream);
+
+                scripts.Add(adhoc);
+            }
 
             return scripts;
         }
