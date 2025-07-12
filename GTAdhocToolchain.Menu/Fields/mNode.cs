@@ -21,7 +21,7 @@ namespace GTAdhocToolchain.Menu.Fields
         public bool IsRoot { get; set; }
 
         public static HashSet<string> mStrings = new HashSet<string>();
-
+        public static SortedSet<string> mStrings2 = new SortedSet<string>();
 
         public override void Read(MBinaryIO io)
         {
@@ -83,7 +83,7 @@ namespace GTAdhocToolchain.Menu.Fields
 
                 Debug.Assert(io.Stream.ReadInt16() == 0x18d, "Scope terminator did not match");
             }
-            else if (io.Version == 1)
+            else if (io.Version >= 1)
             {
                 TypeName = io.Stream.Read7BitString();
 
@@ -106,6 +106,11 @@ namespace GTAdhocToolchain.Menu.Fields
                     {
                         io.CurrentKeyName = str.String;
                         field = io.ReadNext();
+
+                        if (field is mString)
+                        {
+                            mStrings2.Add((field as mString).String);
+                        }
 
                         // Grab roots
                         if (TypeName == "RootWindow" && field is mString)
