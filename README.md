@@ -1,10 +1,5 @@
 # GTAdhocToolchain
 
-Branch with support for dissasembling and compiling for V13/14/15
-
-Note: script files for these versions may contain more than one scripts, compiler currently only produces one
-
----
 A toolchain for the Gran Turismo scripting language, Adhoc, from C#. 
 
 Adhoc is a scripting language that is used for roughly 99% of the entire games's logic, the native code serving mostly solely as the engine.
