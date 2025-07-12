@@ -34,6 +34,7 @@ namespace GTAdhocToolchain.CodeGen
             Logger.Info("Generating code...");
             var ms = new MemoryStream();
             stream = new AdhocStream(ms, Frame.Version);
+            stream.SetupEncodingFromVersion();
 
             // ADhoc Compiled Header?
             stream.WriteString($"ADCH{Frame.Version:D3}", StringCoding.ZeroTerminated); // ADCH012

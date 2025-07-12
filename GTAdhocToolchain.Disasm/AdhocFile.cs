@@ -33,6 +33,7 @@ namespace GTAdhocToolchain.Disasm
 
             using var fs = new FileStream(path, FileMode.Open);
             using var stream = new AdhocStream(fs, 12);
+            stream.SetupEncodingFromVersion();
 
             string magic = stream.ReadString(StringCoding.ZeroTerminated);
             if (magic.AsSpan(0, 4).ToString() != MAGIC)

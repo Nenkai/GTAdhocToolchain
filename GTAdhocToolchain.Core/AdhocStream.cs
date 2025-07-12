@@ -27,6 +27,8 @@ namespace GTAdhocToolchain.Core
 
         public override long Position { get => BaseStream.Position; set => BaseStream.Position = value; }
 
+        public Encoding Encoding { get; set; } = Encoding.UTF8;
+
         public bool BigEndian { get; set; }
 
         // V12 = GT5-Sport
@@ -34,7 +36,7 @@ namespace GTAdhocToolchain.Core
         // V15 = GT7 1.29+, encrypted
         public int Version { get; set; }
 
-        public List<AdhocSymbol> Symbols { get; set; } = new();
+        public List<AdhocSymbol> Symbols { get; set; } = [];
 
         public ChaCha20 ChachaScramblerState { get; private set; }
 
@@ -43,10 +45,28 @@ namespace GTAdhocToolchain.Core
         public Stream BaseStream { get; }
         private long _cryptStartOffset { get; set; }
 
+        static AdhocStream()
+        {
+            // Needed for EUC-JP encoding
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        }
+
         public AdhocStream(Stream baseStream, int version)
         {
             BaseStream = baseStream;
             Version = version;
+        }
+
+        public void SetupEncodingFromVersion()
+        {
+            /* In GT4, the encoding for the compiler is set to EUC-JP
+             * "ぐわあああ\n" in boot/CheckRoot.ad
+             * 
+             * So set the encoding to it if it's earlier than EUC-JP */
+            if (Version < 10)
+                Encoding = Encoding.GetEncoding("EUC-JP");
+            else
+                Encoding = Encoding.UTF8;
         }
 
         public override void Flush()
@@ -216,6 +236,11 @@ namespace GTAdhocToolchain.Core
             }
         }
 
+        public void Reset()
+        {
+            Symbols.Clear();
+        }
+
         public void ReadSymbolTable()
         {
             uint entryCount = (uint)DecodeBitsAndAdvance();
@@ -226,7 +251,7 @@ namespace GTAdhocToolchain.Core
 
                 var strBytes = new byte[strLen];
                 ReadExactly(strBytes);
-                Symbols.Add(new AdhocSymbol(Encoding.UTF8.GetString(strBytes)));
+                Symbols.Add(new AdhocSymbol(Encoding.GetString(strBytes)));
             }
         }
 
@@ -380,10 +405,16 @@ namespace GTAdhocToolchain.Core
                     WriteVarString(symbol.Name);
                 }
             }
-            else if (Version <= 8)
-                this.Write(Encoding.UTF8.GetBytes(symbol.Name));
-            else
+            else if (Version >= 9)
+            {
                 WriteVarInt(symbol.Id);
+            }
+            else
+            {
+                WriteInt16((short)Encoding.GetByteCount(symbol.Name));
+                Write(Encoding.GetBytes(symbol.Name));
+            }
+
 
         }
 
@@ -411,10 +442,7 @@ namespace GTAdhocToolchain.Core
         }
 
 
-        public void Reset()
-        {
-            Symbols.Clear();
-        }
+
 
         public bool IsAscii(string str)
         {
