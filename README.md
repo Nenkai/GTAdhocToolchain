@@ -28,5 +28,8 @@ The toolchain is capable of compiling fully working original and custom projects
 * Possibly tests
 * API Documentation
 
+### Compiler accuracy
+* Implement [short-circuit evaluation](https://en.wikipedia.org/wiki/Short-circuit_evaluation) optimization such that `LOGICAL_OR` and `LOGICAL_AND` jump to the end of a statement rather than jump to the next `LOGICAL_*` instruction
+
 ## Compiler
 A fork of [esprima-dotnet](https://github.com/Nenkai/esprima-dotnet) is used to lex and parse the Adhoc code into an abstract syntax tree prior to compiling.
