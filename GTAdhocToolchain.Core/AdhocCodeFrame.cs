@@ -519,17 +519,25 @@ namespace GTAdhocToolchain.Core
 
         public void Write(AdhocStream stream)
         {
-            if (Version >= 8 && Version <= 12)
+            if (Version >= 13)
             {
-                stream.WriteBoolean(HasDebuggingInformation);
-                stream.WriteByte((byte)Version);
-            }
-
-            if (SourceFilePath != null)
                 stream.WriteSymbol(SourceFilePath);
+                stream.WriteByte(0);
+            }
+            else
+            {
+                if (Version >= 8 && Version <= 12)
+                {
+                    stream.WriteBoolean(HasDebuggingInformation);
+                    stream.WriteByte((byte)Version);
+                }
 
-            if (Version >= 12)
-                stream.WriteBoolean(HasRestElement); // Not sure for Version 14
+                if (SourceFilePath != null)
+                    stream.WriteSymbol(SourceFilePath);
+
+                if (Version >= 12)
+                    stream.WriteBoolean(HasRestElement); // Not sure for Version 14
+            }
 
             if (Version > 3)
             {
@@ -597,20 +605,29 @@ namespace GTAdhocToolchain.Core
             }
             else
             {
-
-                HasDebuggingInformation = stream.ReadBoolean();
-                Version = stream.ReadByte();
-
-
-                if (Version != 8) // Why PDI? Changed your mind after 8?
+                if (Version >= 13)
                 {
-                    if (HasDebuggingInformation)
-                        SourceFilePath = stream.ReadSymbol();
+                    HasDebuggingInformation = true;
+
+                    SourceFilePath = stream.ReadSymbol();
+                    stream.ReadByte();
                 }
+                else
+                {
+                    HasDebuggingInformation = stream.ReadBoolean();
+                    Version = stream.ReadByte();
 
 
-                if (Version >= 12)
-                    HasRestElement = stream.ReadBoolean();
+                    if (Version != 8) // Why PDI? Changed your mind after 8?
+                    {
+                        if (HasDebuggingInformation)
+                            SourceFilePath = stream.ReadSymbol();
+                    }
+
+
+                    if (Version >= 12)
+                        HasRestElement = stream.ReadBoolean();
+                }
 
                 uint argCount = stream.ReadUInt32();
 

@@ -18,7 +18,7 @@ namespace GTAdhocToolchain.Menu
 
         public bool Debug { get; set; }
 
-        public BinaryStream Stream { get; set; }
+        public AdhocStream Stream { get; set; }
 
         public int Version { get; set; }
 
@@ -31,7 +31,7 @@ namespace GTAdhocToolchain.Menu
         {
             using var fs = new FileStream(OutputFileName, FileMode.Create);
 
-            Stream = new BinaryStream(fs, ByteConverter.Big);
+            Stream = new AdhocStream(fs, 1) { BigEndian = true };
             Stream.WriteString("MPRJ", StringCoding.Raw);
             Stream.WriteVarInt(Version);
 
