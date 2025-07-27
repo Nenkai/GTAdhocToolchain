@@ -695,7 +695,7 @@ namespace GTAdhocToolchain.Compiler
                 frame.AddInstruction(jumpIfFalse, 0);
             }
 
-            CompileStatement(frame, forStatement.Body);
+            CompileStatementWithScope(frame, forStatement.Body);
 
             // Reached bottom, proceed to do update
             // But first, process continue if any
