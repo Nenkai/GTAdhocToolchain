@@ -67,7 +67,7 @@ public class AdhocScriptPreprocessor
         }
     }
 
-    public void AddMacros(List<string> macros)
+    public void AddDefines(List<string> macros)
     {
         foreach (var define in macros)
             AddMacro(define);
@@ -350,9 +350,21 @@ public class AdhocScriptPreprocessor
             ThrowPreprocessorError(ifToken, "#if with no expression");
 
         var expanded = ExpandTokens(cond);
+        if (expanded.Count == 0)
+            ThrowPreprocessorError(ifToken, "#if with no expression");
 
-        var evaluator = new AdhocExpressionEvaluator(expanded);
-        int res = evaluator.Evaluate();
+        int res;
+        try
+        {
+            var evaluator = new AdhocExpressionEvaluator(expanded);
+            res = evaluator.Evaluate();
+        }
+        catch (Exception e)
+        {
+            ThrowPreprocessorError(_state.Lookahead, e.Message);
+            return;
+        }
+
         DoConditional(res != 0);
     }
 
@@ -473,9 +485,18 @@ public class AdhocScriptPreprocessor
                         ThrowPreprocessorError(_state.Lookahead, "#elif with no expression");
 
                     List<Token> expanded = ExpandTokens(cond);
-                    var evaluator = new AdhocExpressionEvaluator(expanded);
+                    bool elif_res;
+                    try
+                    {
+                        var evaluator = new AdhocExpressionEvaluator(expanded);
+                        elif_res = evaluator.Evaluate() != 0;
+                    }
+                    catch (Exception e)
+                    {
+                        ThrowPreprocessorError(_state.Lookahead, e.Message);
+                        return;
+                    }
 
-                    var elif_res = evaluator.Evaluate() != 0;
                     if (elif_res)
                         _Preprocess(elif_res);
                     else
@@ -795,6 +816,9 @@ public class AdhocScriptPreprocessor
             else
             {
                 int idx = 0;
+                if (define.Content.Count == 0)
+                    return output;
+
                 output.AddRange(Evaluate(define.Content, ref idx));
             }
         }
