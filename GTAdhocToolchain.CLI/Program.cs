@@ -36,7 +36,7 @@ public class Program
         Console.WriteLine("- https://github.com/Nenkai");
         Console.WriteLine("---------------------------------------------");
 
-        if (args.Length == 1)
+        if (args.Length == 1 && args[0] != "build")
         {
             if (Directory.Exists(args[0]))
             {
@@ -136,11 +136,31 @@ public class Program
 
     public static void Build(BuildVerbs buildVerbs)
     {
-        if (!File.Exists(buildVerbs.InputPath))
+        if (!string.IsNullOrWhiteSpace(buildVerbs.InputPath) && File.Exists(buildVerbs.InputPath))
         {
-            Logger.Error($"File {buildVerbs.InputPath} does not exist.");
-            Environment.ExitCode = -1;
-            return;
+            buildVerbs.InputPath = buildVerbs.InputPath;
+        }
+        else
+        {
+            string[] files = Directory.GetFiles(Directory.GetCurrentDirectory(), "*.yaml", SearchOption.AllDirectories);
+            if (files.Length == 0)
+            {
+                Logger.Error("No target project to compile in the current directory and no script file was specified. Specify the project (or script) to compile.");
+                Environment.ExitCode = -1;
+                return;
+            }
+
+            if (files.Length > 1)
+            {
+                Logger.Error("More than one target project in the current directory. Specify the project (or script) to compile.");
+                foreach (var file in files)
+                    Logger.Error($"- {Path.GetFileName(file)}");
+
+                Environment.ExitCode = -1;
+                return;
+            }
+
+            buildVerbs.InputPath = files[0];
         }
 
         if (Path.GetExtension(buildVerbs.InputPath) == ".yaml")
@@ -460,7 +480,7 @@ public class Program
 [Verb("build", HelpText = "Builds/Compiles a project or script file.")]
 public class BuildVerbs
 {
-    [Option('i', "input", Required = true, HelpText = "Input project file or source script.")]
+    [Option('i', "input", HelpText = "Input project file or source script. If not specified, attempts to find a .yaml file from the current directory.")]
     public string InputPath { get; set; }
 
     [Option('o', "output", Required = false, HelpText = "Output compiled scripts when compiling standalone scripts or projects.")]
