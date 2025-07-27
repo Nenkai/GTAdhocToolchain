@@ -783,12 +783,8 @@ namespace GTAdhocToolchain.Compiler
 
             if (whileStatement.Test is not null)
             {
-                Literal literal = whileStatement.Test as Literal;
-                if (literal is null || literal.TokenType != TokenType.BooleanLiteral || (literal.Value as bool?) == false)
-                {
-                    CompileTestStatement(frame, whileStatement.Test);
-                    frame.AddInstruction(jumpIfFalse, 0);
-                }
+                CompileTestStatement(frame, whileStatement.Test);
+                frame.AddInstruction(jumpIfFalse, 0);
             }
 
 
