@@ -336,7 +336,7 @@ public class Program
             }
 
             Logger.Info($"Started script build ({inputPath}).");
-            Logger.Info($"NOTE: Compiling for Adhoc Version {version}");
+            Logger.Warn($"NOTE: Compiling for Adhoc Version {version}");
 
             var errorHandler = new AdhocErrorHandler();
             var parser = new AdhocAbstractSyntaxTree(preprocessed, new ParserOptions()
