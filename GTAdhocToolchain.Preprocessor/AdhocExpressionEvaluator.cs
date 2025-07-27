@@ -125,6 +125,9 @@ public class AdhocExpressionEvaluator
 
     public int EvalUnary()
     {
+        if (_lookahead is null)
+            throw new Exception("operator '!' has no right operand");
+
         if (UnaryOperations.TryGetValue(_lookahead.Value as string, out Func<int, int> op))
         {
             NextToken();
