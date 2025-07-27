@@ -790,7 +790,7 @@ namespace GTAdhocToolchain.Compiler
                     frame.AddInstruction(jumpIfFalse, 0);
                 }
             }
-                
+
 
             CompileStatementWithScope(frame, whileStatement.Body);
 
@@ -1990,9 +1990,9 @@ namespace GTAdhocToolchain.Compiler
                 TemplateElement strElement = templateLiteral.Quasis[0];
 
                 // On later versions, empty strings are always a string push with 0 args, which is a short hand for a static empty string
+                // It also works on earlier versions, but that's just how they compiled it
                 if (string.IsNullOrEmpty(strElement.Value.Cooked) && frame.Version > 10)
                 {
-                    
                     InsStringPush strPush = new InsStringPush(0);
                     frame.AddInstruction(strPush, strElement.Location.Start.Line);
                 }
@@ -2030,8 +2030,25 @@ namespace GTAdhocToolchain.Compiler
                 }
 
                 // Link strings together
-                InsStringPush strPush = new InsStringPush(literalNodes.Count);
-                frame.AddInstruction(strPush, templateLiteral.Location.Start.Line);
+                if (literalNodes.Count > 0)
+                {
+                    InsStringPush strPush = new InsStringPush(literalNodes.Count);
+                    frame.AddInstruction(strPush, templateLiteral.Location.Start.Line);
+                }
+                else
+                {
+                    if (frame.Version > 10)
+                    {
+                        InsStringPush strPush = new InsStringPush(0);
+                        frame.AddInstruction(strPush, templateLiteral.Location.Start.Line);
+                    }
+                    else
+                    { 
+                        AdhocSymbol valSymb = SymbolMap.RegisterSymbol("");
+                        InsStringConst strConst = new InsStringConst(valSymb);
+                        frame.AddInstruction(strConst, templateLiteral.Location.Start.Line);
+                    }
+                }
             }
         }
 
