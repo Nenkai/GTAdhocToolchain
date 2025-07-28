@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\esprima-dotnet\src\Esprima\Esprima.csproj" />
+    <ProjectReference Include="..\PDTools\PDTools.Crypto\PDTools.Crypto.csproj" />
   </ItemGroup>
 
 </Project>

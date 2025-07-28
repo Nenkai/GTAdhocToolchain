@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\GTAdhocToolchain.Core\GTAdhocToolchain.Core.csproj" />
+    <ProjectReference Include="..\PDTools\PDTools.Crypto\PDTools.Crypto.csproj" />
   </ItemGroup>
 
 </Project>
