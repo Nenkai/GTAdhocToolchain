@@ -1,11 +1,156 @@
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+from tkinter import ttk, filedialog, messagebox, simpledialog
 import os
 import ast
 import subprocess
 import shutil
+import platform
 
-CONFIG_FILE = "config.txt"
+def launch_main_app(config_file):
+    app = CommandLineWrapperApp(config_file)
+    app.mainloop()
+
+def select_config_profile():
+    profile_window = tk.Tk()
+    profile_window.title("Select Profile")
+    profile_window.geometry("400x150")
+    profile_window.eval('tk::PlaceWindow . center')
+    profile_window.resizable(False, False)
+
+    ttk.Label(profile_window, text="Select or create a profile:", font=("Arial", 12)).pack(pady=10)
+
+    config_files = [f for f in os.listdir() if f.startswith("adhocguiconfig_") and f.endswith(".txt")]
+    if not config_files:
+        config_files.append("")  # force dropdown to exist, placeholder until user creates one
+    profile_map = {f.replace("adhocguiconfig_", "").replace(".txt", ""): f for f in config_files}
+    display_names = list(profile_map.keys())
+    selected_profile = tk.StringVar(value=display_names[0])
+    dropdown = ttk.Combobox(profile_window, textvariable=selected_profile, values=display_names, state="readonly", width=35)
+    dropdown.pack(pady=5)
+
+    def use_selected():
+        selected = profile_map[selected_profile.get()]
+        if selected and os.path.isfile(selected):
+            profile_window.destroy()
+            launch_main_app(selected)
+        else:
+            messagebox.showerror("No Profile Selected", "Please select a valid profile.")
+
+    def create_new():
+        def save_new():
+            name = name_var.get().strip()
+            if not name:
+                messagebox.showerror("Invalid Name", "Please enter a valid profile name.")
+                return
+            filename = f"adhocguiconfig_{name}.txt"
+            if os.path.exists(filename):
+                messagebox.showerror("Already Exists", "A profile with this name already exists.")
+                return
+            with open(filename, "w", encoding="utf-8") as f:
+                f.write("// New profile\n")
+            profile_window.destroy()
+            launch_main_app(filename)
+
+        new_win = tk.Toplevel(profile_window)
+        new_win.title("Create New Profile")
+        new_win.geometry("300x120")
+        center_window_top(new_win)
+
+        ttk.Label(new_win, text="Enter profile name:").pack(pady=10)
+        name_var = tk.StringVar()
+        ttk.Entry(new_win, textvariable=name_var).pack(pady=5)
+        ttk.Button(new_win, text="Create", command=save_new).pack(pady=10)
+
+    bottom_frame = ttk.Frame(profile_window)
+    bottom_frame.pack(pady=10)
+
+    ttk.Button(bottom_frame, text="Start", command=use_selected).pack(side="left", padx=5)
+    ttk.Button(bottom_frame, text="Create New Profile", command=create_new).pack(side="right", padx=5)
+
+    profile_window.mainloop()
+    
+def _create_new_config_profile():
+    import tkinter.simpledialog as simpledialog
+    while True:
+        profile_name = simpledialog.askstring("New Profile", "Enter a name for your new profile:")
+        if profile_name is None:
+            return None  # Cancelled
+        profile_name = profile_name.strip()
+        if profile_name == "":
+            continue
+        filename = f"adhocguiconfig_{profile_name}.txt"
+        if os.path.exists(filename):
+            messagebox.showwarning("File Exists", "That profile already exists. Choose another name.")
+            continue
+        return _validate_and_initialize_config(filename)
+        
+def _validate_and_initialize_config(filename):
+    config_path = os.path.abspath(filename)
+    config_data = {}
+
+    # Read existing if present
+    if os.path.exists(config_path):
+        with open(config_path, "r", encoding="utf-8") as f:
+            for line in f:
+                if "=" in line:
+                    key, val = line.strip().split("=", 1)
+                    config_data[key.strip()] = val.strip().strip('"')
+
+    # Prompt for adhoc.exe if not defined
+    if "ADHOC_DIR" not in config_data:
+        messagebox.showinfo(
+            "First-Time Setup",
+            "Please locate the Adhoc Toolchain executable for this profile."
+        )
+        initial_dir = os.path.dirname(os.path.abspath(__file__))
+        adhoc_path = filedialog.askopenfilename(
+            title="Select Adhoc Toolchain Executable",
+            filetypes=[("Executable", "*.exe")],
+            initialdir=initial_dir
+        )
+        if not adhoc_path:
+            messagebox.showerror("Error", "No executable selected. Exiting.")
+            return None
+
+        config_data["ADHOC_DIR"] = adhoc_path
+        config_data.setdefault("DEFAULT_TAB", "yaml")
+        config_data.setdefault("INPUT_DIR", "")
+        config_data.setdefault("OUTPUT_DIR", "")
+
+        try:
+            with open(config_path, "w", encoding="utf-8") as f:
+                for key, val in config_data.items():
+                    f.write(f'{key} = "{val}"\n')
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to write config file:\n{e}")
+            return None
+
+    return config_path
+
+def _prompt_user_to_select_config(config_files):
+    selected_file = {"value": None}
+
+    def confirm_selection():
+        selected_file["value"] = dropdown.get()
+        root.destroy()
+
+    root = tk.Tk()
+    root.title("Select Adhoc Config Profile")
+    root.geometry("400x120")
+    root.resizable(False, False)
+    root.eval('tk::PlaceWindow . center')
+
+    ttk.Label(root, text="Select a configuration profile to load:", font=("Arial", 11)).pack(pady=10)
+
+    dropdown = ttk.Combobox(root, values=config_files, state="readonly", width=40)
+    dropdown.current(0)
+    dropdown.pack()
+
+    ttk.Button(root, text="OK", command=confirm_selection).pack(pady=10)
+
+    root.mainloop()
+    return selected_file["value"]
+    
 TAB_KEYS = {
     "yaml": "YAML",
     "single": "Single ad",
@@ -58,6 +203,88 @@ def parse_config(filepath):
                 config[key] = val.strip('"').strip("'")
 
     return config
+    
+def center_window_top(win, parent=None):
+    win.update_idletasks()
+
+    if parent:
+        parent_x = parent.winfo_rootx()
+        parent_y = parent.winfo_rooty()
+        parent_width = parent.winfo_width()
+        parent_height = parent.winfo_height()
+
+        window_width = win.winfo_width()
+        window_height = win.winfo_height()
+
+        x = parent_x + (parent_width // 2) - (window_width // 2)
+        y = parent_y + (parent_height // 2) - (window_height // 2)
+    else:
+        screen_width = win.winfo_screenwidth()
+        screen_height = win.winfo_screenheight()
+
+        window_width = win.winfo_width()
+        window_height = win.winfo_height()
+
+        x = (screen_width // 2) - (window_width // 2)
+        y = (screen_height // 2) - (window_height // 2)
+
+    win.geometry(f"+{x}+{y}")
+    
+def add_adhoc_to_path(adhoc_exe_path, parent_frame):
+    adhoc_dir = os.path.dirname(adhoc_exe_path)
+    if not os.path.exists(adhoc_dir):
+        messagebox.showerror("Invalid Path", "Adhoc toolchain path is invalid.")
+        return
+
+    confirm = messagebox.askokcancel(
+        "Add to PATH?",
+        "This will add the Adhoc toolchain directory to your user PATH environment variable.\n\n"
+        "Are you sure you want to continue?"
+    )
+    if not confirm:
+        return
+
+    current_path = os.environ.get("PATH", "")
+    path_parts = current_path.split(os.pathsep)
+
+    if adhoc_dir in path_parts:
+        proceed = messagebox.askokcancel(
+            "Already in PATH",
+            "Adhoc toolchain path is already in your PATH.\nDo you want to add it again anyway?"
+        )
+        if not proceed:
+            return
+
+    # Create modal wait window
+    wait_win = tk.Toplevel(parent_frame)
+    wait_win.title("Please Wait")
+    wait_win.resizable(False, False)
+    wait_win.transient(parent_frame.winfo_toplevel())  # Set transient to root
+    wait_win.grab_set()
+
+    tk.Label(wait_win, text="Updating PATH, please wait...").pack(padx=20, pady=20)
+
+    # Center relative to the settings tab frame
+    center_window_top(wait_win, parent_frame)
+
+    parent_frame.update()
+
+    try:
+        subprocess.run(
+            ["setx", "PATH", current_path + os.pathsep + adhoc_dir],
+            shell=True,
+            check=True
+        )
+        wait_win.destroy()
+        messagebox.showinfo(
+            "Success",
+            "Adhoc toolchain path was added to your PATH.\n"
+            "Restart your terminal or PC for changes to take effect."
+        )
+    except subprocess.CalledProcessError as e:
+        wait_win.destroy()
+        messagebox.showerror("Error", f"Failed to add to PATH:\n{e}")
+    
 
 class QuickBuildTab(ttk.Frame):
     def __init__(self, parent, config, config_path):
@@ -65,6 +292,7 @@ class QuickBuildTab(ttk.Frame):
         self.quick_build_entries = []
         self.auto_diss_var = tk.BooleanVar(value=config.get("AUTO_DISS_ON_QUICKBUILD", False))
         self.config_path = config_path
+        self.config_data = config
         self._load_from_config(config)
         self._build_ui()
 
@@ -140,8 +368,14 @@ class QuickBuildTab(ttk.Frame):
             down_btn = ttk.Button(row, text="↓", width=2, command=lambda i=index: self._move_entry(i, 1))
             down_btn.pack(side="left", padx=2)
     
-            run_btn = ttk.Button(row, text="Build", width=50, command=lambda i=index: self._run_entry(i))
-            run_btn.pack(side="left", padx=2)
+            run_btn = ttk.Button(row, text="Build", width=16, command=lambda i=index: self._run_entry(i))
+            run_btn.pack(side="left", padx=20)
+            
+            openInput_btn = ttk.Button(row, text="Input Dir", command=lambda i=index: self._openInput(i))
+            openInput_btn.pack(side="left", padx=2)
+            
+            openOutput_btn = ttk.Button(row, text="Output Dir", command=lambda i=index: self._openOutput(i))
+            openOutput_btn.pack(side="left", padx=2)
     
             config_btn = ttk.Button(row, text="Configure", command=lambda i=index: self._open_config(i))
             config_btn.pack(side="left", padx=2)
@@ -214,6 +448,21 @@ class QuickBuildTab(ttk.Frame):
         win.geometry("500x450")
         win.grab_set()
     
+        def center_window(win, parent):
+            win.update_idletasks()
+            parent_x = parent.winfo_rootx()
+            parent_y = parent.winfo_rooty()
+            parent_width = parent.winfo_width()
+            parent_height = parent.winfo_height()
+        
+            window_width = win.winfo_width()
+            window_height = win.winfo_height()
+        
+            x = parent_x + (parent_width // 2) - (window_width // 2)
+            y = parent_y + (parent_height // 2) - (window_height // 2)
+        
+            win.geometry(f"+{x}+{y}")
+    
         mode_var = tk.StringVar(value=entry['mode'])
     
         label_var = tk.StringVar(value=entry['label'])
@@ -249,10 +498,38 @@ class QuickBuildTab(ttk.Frame):
             ad_browse_btn.config(state="normal" if not is_yaml else "disabled")
             yaml_browse_btn.config(state="normal" if is_yaml else "disabled")
     
+        # dunno if i still need this
         def browse_file(var):
             path = filedialog.askopenfilename(title="Select File")
             if path:
                 var.set(path)
+                
+                
+        def browse_input():
+            initial_dir = self.config_data.get("INPUT_DIR", "")
+            if not os.path.isdir(initial_dir):
+                initial_dir = os.path.dirname(ad_input_var.get() or yaml_input_var.get())
+            filetypes = [("All files", "*.*")]
+            if mode_var.get() == "YAML":
+                filetypes = [("YAML Files", "*.yaml")]
+            else:
+                filetypes = [("AD Files", "*.ad")]
+            path = filedialog.askopenfilename(title="Select Input File", initialdir=initial_dir, filetypes=filetypes)
+            if path:
+                if mode_var.get() == "YAML":
+                    yaml_input_var.set(path)
+                else:
+                    ad_input_var.set(path)
+                    
+                    
+        def browse_output():
+            initial_dir = self.config_data.get("OUTPUT_DIR", "")
+            if not os.path.isdir(initial_dir):
+                initial_dir = os.path.dirname(output_adc_var.get())
+            path = filedialog.asksaveasfilename(title="Select Output .adc File", initialdir=initial_dir,
+                                                defaultextension=".adc", filetypes=[("ADC Files", "*.adc")])
+            if path:
+                output_adc_var.set(path)
     
         # --- Build Mode ---
         mode_frame = ttk.LabelFrame(win, text="Build Mode")
@@ -267,7 +544,7 @@ class QuickBuildTab(ttk.Frame):
         ad_row.pack(fill="x", padx=10, pady=2)
         ad_input_entry = ttk.Entry(ad_row, textvariable=ad_input_var)
         ad_input_entry.pack(side="left", fill="x", expand=True)
-        ad_browse_btn = ttk.Button(ad_row, text="Browse", command=lambda: browse_file(ad_input_var))
+        ad_browse_btn = ttk.Button(ad_row, text="Browse", command=lambda: browse_input())
         ad_browse_btn.pack(side="left", padx=5)
     
         # --- Adhoc Version ---
@@ -304,7 +581,7 @@ class QuickBuildTab(ttk.Frame):
         yaml_row.pack(fill="x", padx=10, pady=2)
         yaml_input_entry = ttk.Entry(yaml_row, textvariable=yaml_input_var)
         yaml_input_entry.pack(side="left", fill="x", expand=True)
-        yaml_browse_btn = ttk.Button(yaml_row, text="Browse", command=lambda: browse_file(yaml_input_var))
+        yaml_browse_btn = ttk.Button(yaml_row, text="Browse", command=lambda: browse_input())
         yaml_browse_btn.pack(side="left", padx=5)
     
         # --- Output .adc ---
@@ -313,7 +590,7 @@ class QuickBuildTab(ttk.Frame):
         out_row.pack(fill="x", padx=10, pady=2)
         output_adc_entry = ttk.Entry(out_row, textvariable=output_adc_var)
         output_adc_entry.pack(side="left", fill="x", expand=True)
-        out_browse_btn = ttk.Button(out_row, text="Browse", command=lambda: browse_file(output_adc_var))
+        out_browse_btn = ttk.Button(out_row, text="Browse", command=lambda: browse_output())
         out_browse_btn.pack(side="left", padx=5)
     
         # --- Label ---
@@ -336,6 +613,7 @@ class QuickBuildTab(ttk.Frame):
         ttk.Button(win, text="Save", command=save_config).pack(pady=15)
     
         update_fields()
+        center_window(win, self.winfo_toplevel())
 
     def save_to_config(self):
         try:
@@ -371,37 +649,94 @@ class QuickBuildTab(ttk.Frame):
         except Exception as e:
             print(f"[Config] Failed to save: {e}")
             
+            
+    def _openInput(self, index):
+        entry = self.quick_build_entries[index]
+        path = entry["yaml_input"] if entry["mode"] == "YAML" else entry["ad_input"]
+        folder = os.path.dirname(path)
+        if folder and os.path.exists(folder):
+            self._open_folder(folder)
+        else:
+            messagebox.showwarning("Invalid Path", "Input file path is empty or does not exist.")
+        
+    def _openOutput(self, index):
+        entry = self.quick_build_entries[index]
+        folder = os.path.dirname(entry["output_adc"])
+        if folder and os.path.exists(folder):
+            self._open_folder(folder)
+        else:
+            messagebox.showwarning("Invalid Path", "Output file path is empty or does not exist.")
+            
+    def _open_folder(self, path):
+        try:
+            if platform.system() == "Windows":
+                os.startfile(path)
+            elif platform.system() == "Darwin":
+                subprocess.Popen(["open", path])
+            else:
+                subprocess.Popen(["xdg-open", path])
+        except Exception as e:
+            messagebox.showerror("Error", f"Could not open folder:\n{e}")
+            
 class CommandLineWrapperApp(tk.Tk):
-    def __init__(self):
+    def __init__(self, config_path):
         super().__init__()
         self.title("Adhoc Toolchain GUI Wrapper")
-        self.geometry("750x550")
-        self.config_path = CONFIG_FILE
+        self.geometry("800x600")
+        # Load config
+        self.config_path = config_path
         self.config_data = parse_config(self.config_path)
-        
-        # First-time boot logic
-        if not os.path.exists(self.config_path) or not self.config_data or "ADHOC_DIR" not in self.config_data:
-            self._first_time_setup()
-
+    
+        # First-time setup: No config or missing ADHOC_DIR
+        if not self.config_data or "ADHOC_DIR" not in self.config_data:
+            messagebox.showinfo(
+                "First-Time Setup",
+                "This appears to be your first time using this profile.\nPlease locate the Adhoc Toolchain executable."
+            )
+            adhoc_path = filedialog.askopenfilename(
+                title="Select Adhoc Toolchain Executable",
+                filetypes=[("Executable", "*.exe")],
+                initialdir=os.path.dirname(os.path.abspath(__file__)),
+            )
+    
+            if not adhoc_path:
+                messagebox.showerror("Error", "Adhoc executable was not selected. Exiting.")
+                self.destroy()
+                return
+    
+            self.config_data["ADHOC_DIR"] = adhoc_path
+            self._write_initial_config()
+    
         self.create_tabs()
-
+    
         # Select default tab
-        tab_key = self.config_data.get("DEFAULT_TAB", "quick").lower()
-        tab_name = TAB_KEYS.get(tab_key, "Quick Build")
+        tab_key = self.config_data.get("DEFAULT_TAB", "yaml").lower()
+        tab_name = TAB_KEYS.get(tab_key, "YAML")
         if tab_name in TAB_KEYS.values():
             idx = list(TAB_KEYS.values()).index(tab_name)
             self.tab_control.select(idx)
+            
+    def _write_initial_config(self):
+        try:
+            with open(self.config_path, "w", encoding="utf-8") as f:
+                f.write(f'ADHOC_DIR = "{self.config_data["ADHOC_DIR"]}"\n')
+                f.write('DEFAULT_TAB = yaml\n')
+            print(f"[Init] Created new config: {self.config_path}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to write initial config:\n{e}")
+            self.destroy()
         
     def _first_time_setup(self):
         messagebox.showinfo("First-time Setup", "Adhoc Toolchain location not specified. Press OK to locate adhoc.exe on your system")
-    
+        initial_dir = os.path.dirname(os.path.abspath(__file__))
         exe_path = filedialog.askopenfilename(
-            title="Select adhoc.exe",
+            title="Locate Adhoc Toolchain execuatble",
             filetypes=[("Executable", "*.exe")],
+            initialdir=initial_dir
         )
     
         if not exe_path:
-            messagebox.showerror("Setup Incomplete", "adhoc.exe path was not selected. Exiting.")
+            messagebox.showerror("Setup Incomplete", "Adhoc Toolchain execuatble path was not selected. Exiting.")
             self.destroy()
             return
     
@@ -569,35 +904,123 @@ class CommandLineWrapperApp(tk.Tk):
         path_entry = ttk.Entry(path_row, textvariable=self.adhoc_path_var)
         path_entry.pack(side="left", fill="x", expand=True)
         ttk.Button(path_row, text="Browse", command=self._browse_adhoc_path).pack(side="left", padx=5)
+        
+        # INPUT_DIR
+        ttk.Label(frame, text="Set auto-jump to source projects on quick build configure:").grid(row=2, column=0, sticky="w")
+        self.input_dir_var = tk.StringVar(value=self.config_data.get("INPUT_DIR", ""))
+        ttk.Entry(frame, textvariable=self.input_dir_var, width=60).grid(row=3, column=0)
+        ttk.Button(frame, text="Browse", command=self._browse_input_dir).grid(row=3, column=2)
     
+        # OUTPUT_DIR
+        ttk.Label(frame, text="Set auto-jump to output projects on quick build configure:").grid(row=4, column=0, sticky="w")
+        self.output_dir_var = tk.StringVar(value=self.config_data.get("OUTPUT_DIR", ""))
+        ttk.Entry(frame, textvariable=self.output_dir_var, width=60).grid(row=5, column=0)
+        ttk.Button(frame, text="Browse", command=self._browse_output_dir).grid(row=5, column=2)
+        
         # 2. Default tab selection
-        ttk.Label(frame, text="Default Tab on Startup:").grid(row=2, column=0, sticky="w", pady=(10, 0))
+        ttk.Label(frame, text="Default Tab on Startup:").grid(row=6, column=0, sticky="w", pady=(10, 0))
         tab_names = list(TAB_KEYS.values())
         self.default_tab_var = tk.StringVar(value=TAB_KEYS.get(self.config_data.get("DEFAULT_TAB", "yaml"), "YAML"))
-        ttk.Combobox(frame, textvariable=self.default_tab_var, values=tab_names, state="readonly").grid(row=3, column=0, sticky="w")
+        ttk.Combobox(frame, textvariable=self.default_tab_var, values=tab_names, state="readonly").grid(row=7, column=0, sticky="w")
     
         # 3. Credits box
         credits_text = (
             "Adhoc Toolchain GUI Wrapper by Silentwarior112\n"
             "Built for modding workflows\n"
         )
-        ttk.Label(frame, text="Credits:").grid(row=4, column=0, sticky="w", pady=(20, 0))
-        credits_box = tk.Text(frame, height=5, width=60, wrap="word")
-        credits_box.grid(row=5, column=0, sticky="w")
+        ttk.Label(frame, text="Credits:").grid(row=8, column=0, sticky="w", pady=(20, 0))
+        credits_box = tk.Text(frame, height=5, width=50, wrap="word")
+        credits_box.grid(row=9, column=0, sticky="w")
         credits_box.insert("1.0", credits_text)
-        credits_box.configure(state="disabled")
+        credits_box.configure(state="disabled") 
     
         # Save settings button
-        ttk.Button(frame, text="Save Settings", command=self._save_settings).grid(row=6, column=0, pady=20, sticky="w")
+        ttk.Button(frame, text="Save Settings", command=self._save_settings).grid(row=10, column=0, pady=20, sticky="w")
+        
+        # Profile management buttons
+        ttk.Button(frame, text="Load Profile", command=self._load_profile_from_settings).grid(row=10, column=1, pady=20, sticky="w")
+        ttk.Button(frame, text="Create New Profile", command=self._create_new_profile_from_settings).grid(row=10, column=2, pady=20, sticky="w")
+        
+        # Add Adhoc Toolchain to environment variables
+        ttk.Label(frame, text="Add Adhoc Toolchain to environment variables").grid(row=15, column=0, sticky="w")
+        ttk.Button(frame, text="Add to PATH", command=lambda: add_adhoc_to_path(self.adhoc_path_var.get(), self)).grid(row=16, column=0, sticky="w", pady=(2, 10))
         
     def _browse_adhoc_path(self):
         path = filedialog.askopenfilename(title="Locate adhoc.exe", filetypes=[("Executable", "*.exe")])
         if path:
             self.adhoc_path_var.set(path)
+            
+    def _browse_input_dir(self):
+        folder = filedialog.askdirectory()
+        if folder:
+            self.input_dir_var.set(folder)
+    
+    def _browse_output_dir(self):
+        folder = filedialog.askdirectory()
+        if folder:
+            self.output_dir_var.set(folder)
+            
+            
+    def _create_new_profile_from_settings(self):
+        popup = tk.Toplevel(self)
+        popup.title("Create New Profile")
+        popup.geometry("400x160")  # Set desired size
+        center_window_top(popup, self)  # Center relative to settings window
+        popup.grab_set()
+    
+        tk.Label(popup, text="Enter new profile name:").pack(pady=(15, 5))
+        entry = ttk.Entry(popup, width=30)
+        entry.pack()
+    
+        def save():
+            name = entry.get().strip()
+            if name:
+                filename = f"adhocguiconfig_{name}.txt"
+                path = os.path.join(os.getcwd(), filename)
+                if not os.path.exists(path):
+                    with open(path, "w", encoding="utf-8") as f:
+                        f.write("")  # Create an empty profile file
+                    messagebox.showinfo("Profile Created", f"Profile '{name}' created. Select Load Profile to load the new profile.")
+                    popup.destroy()
+                else:
+                    messagebox.showwarning("Profile Exists", "Profile already exists.")
+    
+        ttk.Button(popup, text="Create", command=save).pack(pady=10)
+        
+    def _load_profile_from_settings(self):
+        all_files = [f for f in os.listdir() if f.startswith("adhocguiconfig_") and f.endswith(".txt")]
+        if not all_files:
+            messagebox.showinfo("No Profiles", "No profiles found to load.")
+            return
+    
+        profile_map = {f.replace("adhocguiconfig_", "").replace(".txt", ""): f for f in all_files}
+        display_names = list(profile_map.keys())
+    
+        popup = tk.Toplevel(self)
+        popup.title("Load Profile")
+        popup.resizable(False, False)
+        center_window_top(popup, self)
+    
+        ttk.Label(popup, text="Select a profile to load:").pack(pady=10)
+    
+        selected_name = tk.StringVar(value=display_names[0])
+        dropdown = ttk.Combobox(popup, textvariable=selected_name, values=display_names, state="readonly", width=50)
+        dropdown.pack(pady=5)
+    
+        def on_confirm():
+            popup.destroy()
+            self.destroy()
+            selected_file = profile_map[selected_name.get()]
+            launch_main_app(selected_file)
+    
+        ttk.Button(popup, text="Load", command=on_confirm).pack(pady=5)
     
     def _save_settings(self):
         # Update config data
         self.config_data["ADHOC_DIR"] = self.adhoc_path_var.get()
+        self.config_data["INPUT_DIR"] = self.input_dir_var.get()
+        self.config_data["OUTPUT_DIR"] = self.output_dir_var.get()
+    
         tab_key = [k for k, v in TAB_KEYS.items() if v == self.default_tab_var.get()]
         self.config_data["DEFAULT_TAB"] = tab_key[0] if tab_key else "yaml"
     
@@ -608,11 +1031,14 @@ class CommandLineWrapperApp(tk.Tk):
         except FileNotFoundError:
             lines = []
     
-        # Remove ADHOC_DIR and DEFAULT_TAB lines
-        lines = [line for line in lines if not line.strip().startswith("ADHOC_DIR") and not line.strip().startswith("DEFAULT_TAB")]
+        # Remove affected lines
+        lines = [line for line in lines if not line.strip().startswith(("ADHOC_DIR", "DEFAULT_TAB", "INPUT_DIR", "OUTPUT_DIR"))]
     
+        # Add updated lines
         lines.append(f'ADHOC_DIR = "{self.config_data["ADHOC_DIR"]}"\n')
         lines.append(f'DEFAULT_TAB = {self.config_data["DEFAULT_TAB"]}\n')
+        lines.append(f'INPUT_DIR = "{self.config_data["INPUT_DIR"]}"\n')
+        lines.append(f'OUTPUT_DIR = "{self.config_data["OUTPUT_DIR"]}"\n')
     
         try:
             with open(self.config_path, "w", encoding="utf-8") as f:
@@ -701,5 +1127,10 @@ class CommandLineWrapperApp(tk.Tk):
             messagebox.showerror("Disassembly Failed", f"Disassembly failed:\n{e}")
 
 if __name__ == "__main__":
+    selected_config_file = select_config_profile()
+    if selected_config_file is None:
+        exit()
+
+    CONFIG_FILE = selected_config_file
     app = CommandLineWrapperApp()
     app.mainloop()
