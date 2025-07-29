@@ -371,10 +371,10 @@ class QuickBuildTab(ttk.Frame):
             run_btn = ttk.Button(row, text="Build", width=16, command=lambda i=index: self._run_entry(i))
             run_btn.pack(side="left", padx=20)
             
-            openInput_btn = ttk.Button(row, text="Input Dir", command=lambda i=index: self._openInput(i))
+            openInput_btn = ttk.Button(row, text="Go to Source", command=lambda i=index: self._openInput(i))
             openInput_btn.pack(side="left", padx=2)
             
-            openOutput_btn = ttk.Button(row, text="Output Dir", command=lambda i=index: self._openOutput(i))
+            openOutput_btn = ttk.Button(row, text="Go to Output", command=lambda i=index: self._openOutput(i))
             openOutput_btn.pack(side="left", padx=2)
     
             config_btn = ttk.Button(row, text="Configure", command=lambda i=index: self._open_config(i))
