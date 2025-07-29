@@ -104,7 +104,7 @@ public class Program
                 string fileName = Path.GetFileNameWithoutExtension(file);
                 string dir = Path.GetDirectoryName(file);
 
-                gpb.Unpack(Path.GetFileNameWithoutExtension(file), null);
+                gpb.Unpack(Path.GetFileNameWithoutExtension(file), Path.Combine(dir, fileName), convertImages: true);
             }
         }
         catch (Exception e)
