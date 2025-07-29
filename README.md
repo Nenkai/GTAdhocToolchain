@@ -9,11 +9,18 @@ The toolchain contains the following:
 * **Adhoc Project Builder**
   * Compiles menu sources from a `.yaml` project file to `.adc`, `.mproject`, `.mpackage`
 * VS Code Extension
-* Menu Layout Reader/Serializer (`mproject/mwidget`)
+* Menu Layout Reader/Serializer (`.mproject/.mwidget`)
 * Script and Menu Layout Packager (GT6 `.mpackage`)
 * Asset Packager (`.gpb`)
 * Script Disassembler (`.adc` to assembly-like syntax)
 * Compare scripts for dissasembly matching
+
+## Python GUI Wrapper
+Inside the scripts folder, AdhocToolchainGUI.py provides a graphical interface for Adhoc Toolchain with the ability to compile and disassemble scripts. No .gpb, .mproject, or .mpackage implementation currently.
+The GUI script gives users the ability to automate the script compilation workflow easily by saving the user's configuration of input scripts and their output locations.
+<p align="center">
+ <img src="scripts/adhoctoolchaingui.png" width="1348" height="465">
+</p>
 
 ## Wiki
 Refer to the [Wiki](https://github.com/Nenkai/GTAdhocToolchain/wiki) for more information (compiler, language features, etc).
