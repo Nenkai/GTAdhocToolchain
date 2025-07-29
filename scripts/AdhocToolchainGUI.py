@@ -681,7 +681,8 @@ class QuickBuildTab(ttk.Frame):
 class CommandLineWrapperApp(tk.Tk):
     def __init__(self, config_path):
         super().__init__()
-        self.title("Adhoc Toolchain GUI Wrapper")
+        profile_name = config_path.replace("adhocguiconfig_", "").replace(".txt", "")
+        self.title(f"Adhoc Toolchain GUI Wrapper - {profile_name}")
         self.geometry("800x600")
         # Load config
         self.config_path = config_path
