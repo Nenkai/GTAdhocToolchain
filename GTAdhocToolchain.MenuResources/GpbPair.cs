@@ -4,11 +4,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace GTAdhocToolchain.Menu.Resources
+namespace GTAdhocToolchain.Menu.Resources;
+
+public class GpbPair
 {
-    public class GpbPair
-    {
-        public string FileName { get; set; }
-        public byte[] FileData { get; set; }
-    }
+    public string FileName { get; set; }
+    public byte[] FileData { get; set; }
 }
