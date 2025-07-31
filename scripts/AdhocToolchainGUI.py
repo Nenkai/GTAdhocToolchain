@@ -97,7 +97,7 @@ def remove_adhoc_from_path(path, parent_window):
                 messagebox.showerror("Error", f"Failed to remove from PATH:\n{e}")
                 return
 
-        else:  # Linux/macOS
+        else:  # Linux
             try:
                 bashrc_path = os.path.expanduser("~/.bashrc")
                 export_line = f'export PATH="{path_dir}:$PATH"'
@@ -415,7 +415,7 @@ def add_adhoc_to_path(path, parent_window):
                 messagebox.showerror("Error", f"Failed to add to PATH:\n{e}")
                 return
 
-        else:  # Linux/macOS
+        else:  # Linux
             try:
                 bashrc_path = os.path.expanduser("~/.bashrc")
                 export_line = f'export PATH="{path_dir}:$PATH"'
@@ -428,7 +428,7 @@ def add_adhoc_to_path(path, parent_window):
                     messagebox.showinfo("Already Exists", "The Adhoc Toolchain folder is already in PATH.")
                     return
                 with open(bashrc_path, "a") as f:
-                    f.write(f"\n# Added by Adhoc GUI\n{export_line}\n")
+                    f.write(f"\n{export_line}\n")
                 added = True
             except Exception as e:
                 progress.destroy()
@@ -860,9 +860,13 @@ class CommandLineWrapperApp(tk.Tk):
                 "First-Time Setup",
                 "This appears to be your first time using this profile.\nPlease locate the Adhoc Toolchain executable."
             )
+            if platform.system() == "Windows":
+                filetypes = [("Adhoc executable", "*.exe")]
+            else:
+                filetypes = [("Adhoc executable", "*")]  # Linux
             adhoc_path = filedialog.askopenfilename(
                 title="Select Adhoc Toolchain Executable",
-                filetypes=[("Executable", "*.exe")],
+                filetypes=filetypes,
                 initialdir=os.path.dirname(os.path.abspath(__file__)),
             )
     
