@@ -415,7 +415,7 @@ def add_adhoc_to_path(path, parent_window):
                 messagebox.showerror("Error", f"Failed to add to PATH:\n{e}")
                 return
 
-        else:  # Linux
+        else:  # Linux/macOS
             try:
                 bashrc_path = os.path.expanduser("~/.bashrc")
                 export_line = f'export PATH="{path_dir}:$PATH"'
@@ -849,7 +849,10 @@ class CommandLineWrapperApp(tk.Tk):
         super().__init__()
         profile_name = config_path.replace("adhocguiconfig_", "").replace(".txt", "")
         self.title(f"Adhoc Toolchain GUI Wrapper - {profile_name}")
-        self.geometry("800x600")
+        if platform.system() == "Windows":
+            self.geometry("800x600")
+        else:
+            self.geometry("880x600") # Linux needs a lil more width otherwise delete button gets cut off
         # Load config
         self.config_path = config_path
         self.config_data = parse_config(self.config_path)
