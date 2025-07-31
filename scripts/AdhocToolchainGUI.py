@@ -1,14 +1,161 @@
-import tkinter as tk
-from tkinter import ttk, filedialog, messagebox, simpledialog
-import os
-import ast
-import subprocess
-import shutil
-import platform
+try:
+    import tkinter as tk
+    from tkinter import ttk, filedialog, messagebox, simpledialog
+    import os
+    import subprocess
+    import shutil
+    import platform
+    from pathlib import Path
+    import threading
+    from threading import Thread
+except ImportError as e:
+    import sys
+    missing = str(e).split()[-1].strip("'")
+    tk.Tk().withdraw()  # Hide root window
+    messagebox.showerror(
+        "Missing Dependency",
+        f"The module '{missing}' is required but not installed.\n\n"
+        "Please install it and try again."
+    )
+    sys.exit(1)
 
 def launch_main_app(config_file):
     app = CommandLineWrapperApp(config_file)
     app.mainloop()
+    
+def is_path_in_env(path):
+    norm_path = os.path.normpath(path)
+
+    if platform.system() == "Windows":
+        try:
+            result = subprocess.run(
+                ["powershell", "-Command", "[Environment]::GetEnvironmentVariable('PATH', 'User')"],
+                capture_output=True, text=True, check=True
+            )
+            user_path = result.stdout.strip()
+            return norm_path in map(os.path.normpath, user_path.split(os.pathsep))
+        except subprocess.CalledProcessError:
+            return False
+    else:
+        home = Path.home()
+        shell = os.environ.get("SHELL", "")
+        rc_file = None
+
+        if "zsh" in shell:
+            rc_file = home / ".zshrc"
+        elif "bash" in shell:
+            rc_file = home / ".bashrc"
+        else:
+            rc_file = home / ".profile"
+
+        if rc_file.exists():
+            try:
+                with open(rc_file, "r", encoding="utf-8") as f:
+                    return norm_path in f.read()
+            except Exception:
+                return False
+        return False
+        
+        
+def remove_adhoc_from_path(path, parent_window):
+    def run():
+        # Ensure we're comparing just the directory
+        path_dir = os.path.dirname(path)
+
+        progress = tk.Toplevel(parent_window)
+        progress.title("Processing")
+        progress.transient(parent_window)
+        progress.grab_set()
+        tk.Label(progress, text="Removing from PATH, please wait...").pack(padx=20, pady=20)
+        center_window_top(progress, parent_window)
+        parent_window.update()
+
+        system = platform.system()
+        removed = False
+
+        if system == "Windows":
+            try:
+                current = subprocess.check_output(
+                    ["powershell", "-Command", "[Environment]::GetEnvironmentVariable('PATH', 'User')"],
+                    text=True
+                ).strip()
+                paths = current.split(";")
+                if path_dir not in paths:
+                    progress.destroy()
+                    messagebox.showinfo("Not Found", "The Adhoc Toolchain folder was not found in PATH.")
+                    return
+
+                new_paths = [p for p in paths if p.strip() != path_dir]
+                new_path_str = ";".join(new_paths)
+                subprocess.run(
+                    ["powershell", "-Command", f"[Environment]::SetEnvironmentVariable('PATH', '{new_path_str}', 'User')"],
+                    check=True
+                )
+                removed = True
+            except Exception as e:
+                progress.destroy()
+                messagebox.showerror("Error", f"Failed to remove from PATH:\n{e}")
+                return
+
+        else:  # Linux/macOS
+            try:
+                bashrc_path = os.path.expanduser("~/.bashrc")
+                export_line = f'export PATH="{path_dir}:$PATH"'
+                if not os.path.exists(bashrc_path):
+                    progress.destroy()
+                    messagebox.showinfo("Not Found", "The PATH entry was not found in .bashrc.")
+                    return
+                with open(bashrc_path, "r") as f:
+                    lines = f.readlines()
+                new_lines = [line for line in lines if export_line not in line]
+                with open(bashrc_path, "w") as f:
+                    f.writelines(new_lines)
+                removed = True
+            except Exception as e:
+                progress.destroy()
+                messagebox.showerror("Error", f"Failed to update .bashrc:\n{e}")
+                return
+
+        progress.destroy()
+        if removed:
+            messagebox.showinfo("Success", "Adhoc Toolchain folder removed from PATH successfully.")
+
+    Thread(target=run).start()
+    
+    
+def add_to_path_unix(path):
+    shell = os.environ.get("SHELL", "")
+    home = Path.home()
+    rc_file = None
+
+    if "zsh" in shell:
+        rc_file = home / ".zshrc"
+    elif "bash" in shell:
+        rc_file = home / ".bashrc"
+    else:
+        rc_file = home / ".profile"
+
+    export_line = f'\n# Added by Adhoc GUI\nexport PATH="$PATH:{path}"\n'
+
+    try:
+        with open(rc_file, "a") as f:
+            f.write(export_line)
+        return True
+    except Exception:
+        return False
+        
+    
+def add_to_path_windows(path):
+    cmd = [
+        "powershell",
+        "-Command",
+        f"[Environment]::SetEnvironmentVariable('PATH', [Environment]::GetEnvironmentVariable('PATH', 'User') + ';{path}', 'User')"
+    ]
+    try:
+        subprocess.run(cmd, check=True)
+        return True
+    except subprocess.CalledProcessError:
+        return False
 
 def select_config_profile():
     profile_window = tk.Tk()
@@ -230,60 +377,79 @@ def center_window_top(win, parent=None):
 
     win.geometry(f"+{x}+{y}")
     
-def add_adhoc_to_path(adhoc_exe_path, parent_frame):
-    adhoc_dir = os.path.dirname(adhoc_exe_path)
-    if not os.path.exists(adhoc_dir):
-        messagebox.showerror("Invalid Path", "Adhoc toolchain path is invalid.")
-        return
+def add_adhoc_to_path(path, parent_window):
+    def run():
+        # Ensure path is a folder, not the executable
+        path_dir = os.path.dirname(path)
 
-    confirm = messagebox.askokcancel(
-        "Add to PATH?",
-        "This will add the Adhoc toolchain directory to your user PATH environment variable.\n\n"
-        "Are you sure you want to continue?"
-    )
-    if not confirm:
-        return
+        progress = tk.Toplevel(parent_window)
+        progress.title("Processing")
+        progress.transient(parent_window)
+        progress.grab_set()
+        tk.Label(progress, text="Adding to PATH, please wait...").pack(padx=20, pady=20)
+        center_window_top(progress, parent_window)
+        parent_window.update()
 
-    current_path = os.environ.get("PATH", "")
-    path_parts = current_path.split(os.pathsep)
+        system = platform.system()
+        added = False
 
-    if adhoc_dir in path_parts:
-        proceed = messagebox.askokcancel(
-            "Already in PATH",
-            "Adhoc toolchain path is already in your PATH.\nDo you want to add it again anyway?"
-        )
-        if not proceed:
-            return
+        if system == "Windows":
+            try:
+                current = subprocess.check_output(
+                    ["powershell", "-Command", "[Environment]::GetEnvironmentVariable('PATH', 'User')"],
+                    text=True
+                ).strip()
+                if path_dir in current.split(";"):
+                    progress.destroy()
+                    messagebox.showinfo("Already Exists", "The Adhoc Toolchain folder is already in PATH.")
+                    return
 
-    # Create modal wait window
-    wait_win = tk.Toplevel(parent_frame)
-    wait_win.title("Please Wait")
-    wait_win.resizable(False, False)
-    wait_win.transient(parent_frame.winfo_toplevel())  # Set transient to root
-    wait_win.grab_set()
+                new_path = current + (";" if current else "") + path_dir
+                subprocess.run(
+                    ["powershell", "-Command", f"[Environment]::SetEnvironmentVariable('PATH', '{new_path}', 'User')"],
+                    check=True
+                )
+                added = True
+            except Exception as e:
+                progress.destroy()
+                messagebox.showerror("Error", f"Failed to add to PATH:\n{e}")
+                return
 
-    tk.Label(wait_win, text="Updating PATH, please wait...").pack(padx=20, pady=20)
+        else:  # Linux/macOS
+            try:
+                bashrc_path = os.path.expanduser("~/.bashrc")
+                export_line = f'export PATH="{path_dir}:$PATH"'
+                already_present = False
+                if os.path.exists(bashrc_path):
+                    with open(bashrc_path, "r") as f:
+                        already_present = any(export_line in line for line in f)
+                if already_present:
+                    progress.destroy()
+                    messagebox.showinfo("Already Exists", "The Adhoc Toolchain folder is already in PATH.")
+                    return
+                with open(bashrc_path, "a") as f:
+                    f.write(f"\n# Added by Adhoc GUI\n{export_line}\n")
+                added = True
+            except Exception as e:
+                progress.destroy()
+                messagebox.showerror("Error", f"Failed to update .bashrc:\n{e}")
+                return
 
-    # Center relative to the settings tab frame
-    center_window_top(wait_win, parent_frame)
+        progress.destroy()
+        if added:
+            messagebox.showinfo("Success", "Adhoc Toolchain folder added to PATH successfully.")
 
-    parent_frame.update()
-
-    try:
-        subprocess.run(
-            ["setx", "PATH", current_path + os.pathsep + adhoc_dir],
-            shell=True,
-            check=True
-        )
-        wait_win.destroy()
-        messagebox.showinfo(
-            "Success",
-            "Adhoc toolchain path was added to your PATH.\n"
-            "Restart your terminal or PC for changes to take effect."
-        )
-    except subprocess.CalledProcessError as e:
-        wait_win.destroy()
-        messagebox.showerror("Error", f"Failed to add to PATH:\n{e}")
+    Thread(target=run).start()
+    
+def show_progress(message, parent):
+    popup = Toplevel(parent)
+    popup.title("Please wait...")
+    popup.geometry("300x100")
+    popup.grab_set()
+    popup.transient(parent)
+    Label(popup, text=message).pack(expand=True)
+    popup.update()
+    return popup
     
 
 class QuickBuildTab(ttk.Frame):
@@ -945,6 +1111,7 @@ class CommandLineWrapperApp(tk.Tk):
         # Add Adhoc Toolchain to environment variables
         ttk.Label(frame, text="Add Adhoc Toolchain to environment variables").grid(row=15, column=0, sticky="w")
         ttk.Button(frame, text="Add to PATH", command=lambda: add_adhoc_to_path(self.adhoc_path_var.get(), self)).grid(row=16, column=0, sticky="w", pady=(2, 10))
+        ttk.Button(frame, text="Remove from PATH", command=lambda: remove_adhoc_from_path(self.adhoc_path_var.get(), self)).grid(row=16, column=1, sticky="w", pady=(2, 10))
         
     def _browse_adhoc_path(self):
         path = filedialog.askopenfilename(title="Locate adhoc.exe", filetypes=[("Executable", "*.exe")])
