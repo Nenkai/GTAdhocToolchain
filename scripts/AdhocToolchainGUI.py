@@ -415,7 +415,7 @@ def add_adhoc_to_path(path, parent_window):
                 messagebox.showerror("Error", f"Failed to add to PATH:\n{e}")
                 return
 
-        else:  # Linux/macOS
+        else:  # Linux
             try:
                 bashrc_path = os.path.expanduser("~/.bashrc")
                 export_line = f'export PATH="{path_dir}:$PATH"'
@@ -485,7 +485,7 @@ class QuickBuildTab(ttk.Frame):
         top_frame = ttk.Frame(self)
         top_frame.pack(fill="x", pady=5, padx=5)
 
-        auto_diss_check = ttk.Checkbutton(top_frame, text="Auto Disassemble on Build", variable=self.auto_diss_var)
+        auto_diss_check = ttk.Checkbutton(top_frame, text="Auto Disassemble on Build", variable=self.auto_diss_var, command=self.save_to_config)
         auto_diss_check.pack(side="left")
 
         add_button = ttk.Button(top_frame, text="Add Quick Build", command=self._add_dummy_entry)
@@ -805,8 +805,9 @@ class QuickBuildTab(ttk.Frame):
             lines.append(line)
     
         # Add/replace AUTO_DISS_ON_QUICKBUILD
+        self.config_data["AUTO_DISS_ON_QUICKBUILD"] = str(self.auto_diss_var.get()).lower()
         lines = [line for line in lines if not line.strip().startswith("AUTO_DISS_ON_QUICKBUILD")]
-        lines.append(f"AUTO_DISS_ON_QUICKBUILD = {'true' if self.auto_diss_var.get() else 'false'}\n")
+        lines.append(f"AUTO_DISS_ON_QUICKBUILD = {self.config_data['AUTO_DISS_ON_QUICKBUILD']}\n")
     
         try:
             with open(self.config_path, "w", encoding="utf-8") as f:
