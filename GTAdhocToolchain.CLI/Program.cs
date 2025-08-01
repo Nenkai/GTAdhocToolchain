@@ -218,56 +218,67 @@ public class Program
 
     public static void Unpack(UnpackVerbs unpackVerbs)
     {
-        if (!File.Exists(unpackVerbs.InputPath))
+        if (Directory.Exists(unpackVerbs.InputPath))
         {
-            Console.WriteLine("File does not exist.");
-            Environment.ExitCode = -1;
-            return;
-        }
-
-        if (unpackVerbs.InputPath.ToLower().EndsWith("gpb"))
-        {
-            Console.WriteLine("Assuming input is GPB");
-            
-            var gpb = GpbBase.ReadFile(unpackVerbs.InputPath);
-            if (gpb is null)
+            foreach (var file in Directory.GetFiles(unpackVerbs.InputPath, "*", SearchOption.TopDirectoryOnly))
             {
-                Console.WriteLine("Could not parse GPB Header.");
-                Environment.ExitCode = -1;
-                return;
-            }
-
-            if (string.IsNullOrEmpty(unpackVerbs.OutputPath))
-                unpackVerbs.OutputPath = Path.GetDirectoryName(unpackVerbs.InputPath);
-
-            try
-            {
-                gpb.Unpack(Path.GetFileNameWithoutExtension(unpackVerbs.InputPath), unpackVerbs.OutputPath, unpackVerbs.ConvertGPBFiles);
-                Environment.ExitCode = 0;
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine($"Failed to unpack gpb - {e.Message}.");
-                Environment.ExitCode = -1;
+                UnpackFile(file, unpackVerbs.OutputPath, unpackVerbs.ConvertGPBFiles);
             }
         }
-        else if (unpackVerbs.InputPath.EndsWith("mpackage"))
+        else if (File.Exists(unpackVerbs.InputPath))
         {
-            Console.WriteLine("Assuming input is MPackage");
-            try
-            {
-                AdhocPackage.ExtractPackage(unpackVerbs.InputPath);
-                Environment.ExitCode = 0;
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine($"Failed to unpack mpackage - {e.Message}.");
-                Environment.ExitCode = -1;
-            }
+            UnpackFile(unpackVerbs.InputPath, unpackVerbs.OutputPath, unpackVerbs.ConvertGPBFiles);
         }
         else
         {
             Console.WriteLine("Found nothing to unpack - ensure the provided input file has the proper file extension (gpb/mpackage)");
+            Environment.ExitCode = -1;
+        }
+    }
+
+    private static void UnpackFile(string inputFile, string outputPath, bool convertGpbFiles)
+    {
+        if (inputFile.ToLower().EndsWith("gpb"))
+        {
+            Console.WriteLine($"[:] {inputFile} - assuming input is GPB");
+            ExtractGpb(inputFile, outputPath, convertGpbFiles);
+        }
+        else if (inputFile.EndsWith("mpackage"))
+        {
+            Console.WriteLine($"[:] {inputFile} - assuming input is MPackage");
+            try
+            {
+                AdhocPackage.ExtractPackage(inputFile);
+                Environment.ExitCode = 0;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"ERROR: Failed to unpack mpackage - {e.Message}.");
+                Environment.ExitCode = -1;
+            }
+        }
+    }
+
+    private static void ExtractGpb(string inputFile, string outputPath, bool convertGpbFiles)
+    {
+        var gpb = GpbBase.ReadFile(inputFile);
+        if (gpb is null)
+        {
+            Console.WriteLine("Could not parse GPB Header.");
+            Environment.ExitCode = -1;
+        }
+
+        if (string.IsNullOrEmpty(outputPath))
+            outputPath = Path.GetDirectoryName(inputFile);
+
+        try
+        {
+            gpb.Unpack(Path.GetFileNameWithoutExtension(inputFile), outputPath, convertGpbFiles);
+            Environment.ExitCode = 0;
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine($"Failed to unpack gpb - {e.Message}.");
             Environment.ExitCode = -1;
         }
     }
