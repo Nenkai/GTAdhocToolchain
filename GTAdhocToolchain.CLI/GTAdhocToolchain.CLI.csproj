@@ -34,4 +34,9 @@
     <Folder Include="Properties\" />
   </ItemGroup>
 
+  <Target Name="CopyCustomContent" AfterTargets="AfterBuild">
+    <Copy SourceFiles="../scripts/GTAdhocCompare.py" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+	<Copy SourceFiles="../scripts/AdhocToolchainGUI.py" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+  </Target>
+
 </Project>
