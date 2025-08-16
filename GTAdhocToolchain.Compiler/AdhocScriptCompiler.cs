@@ -2137,7 +2137,7 @@ namespace GTAdhocToolchain.Compiler
                         if (popResult)
                             InsertAssignPop(frame);
                         else
-                            ; // throw new NotImplementedException("aa");
+                            InsertAssign(frame);
                     }
                 }
             }
@@ -3350,13 +3350,17 @@ namespace GTAdhocToolchain.Compiler
             }
             else
             {
-                if (frame.Version >= 10)
-                    frame.AddInstruction(InsAssign.Default, 0);
-                else // Assume under 10 that its the traditional assign + pop old
-                    frame.AddInstruction(InsAssignOld.Default, 0);
-
+                InsertAssign(frame);
                 InsertPop(frame);
             }
+        }
+
+        private static void InsertAssign(AdhocCodeFrame frame)
+        {
+            if (frame.Version >= 10)
+                frame.AddInstruction(InsAssign.Default, 0);
+            else // Assume under 10 that its the traditional assign + pop old
+                frame.AddInstruction(InsAssignOld.Default, 0);
         }
 
         /// <summary>
