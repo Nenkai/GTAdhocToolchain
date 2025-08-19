@@ -151,5 +151,28 @@ public class BuiltinMacros
             } \
         }
         """,
+
+        // PS2/GT4
+        $"DIALOG_OK {0}",
+        $"DIALOG_QUERY {1}",
+        $"DIALOG_ERROR {2}",
+        $"DIALOG_DEFAULT_NO {3}",
+        $"DIALOG_YESNO {4}",
+
+        // Screen resolutions (engine defaults for each platform)
+        $"PS3_SCREEN_W_F 1920.0",
+        $"PS3_SCREEN_W 1920",
+        $"PS3_SCREEN_H_F 1080.0",
+        $"PS3_SCREEN_H 1080",
+
+        $"PS2_SCREEN_W_F 640.0",
+        $"PS2_SCREEN_W 640",
+        $"PS2_SCREEN_H_F 480.0",
+        $"PS2_SCREEN_H 480",
+
+        $"PSP_SCREEN_W_F 480.0",
+        $"PSP_SCREEN_W 480",
+        $"PSP_SCREEN_H_F 272.0",
+        $"PSP_SCREEN_H 272",
     ];
 }
