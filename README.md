@@ -8,7 +8,7 @@ The toolchain contains the following:
   * Supports adhoc bytecode version 7 (GT4), 10 (GT4O/TT), 12 (GTPSP/GT5/GT6/GT Sport) with experimental support for Version 5 (GT4)
 * **Adhoc Project Builder**
   * Compiles menu sources from a `.yaml` project file to `.adc`, `.mproject`, `.mpackage`
-* VS Code Extension
+* VS Code Extension for syntax highlighting & many snippets (useful!)
 * Menu Layout Reader/Serializer (`.mproject/.mwidget`)
 * Script and Menu Layout Packager (GT6 `.mpackage`)
 * Asset Packager (`.gpb`)
