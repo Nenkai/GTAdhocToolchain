@@ -1,91 +1,107 @@
 {
+	"Assert": {
+		"prefix": "ASSERT",
+		"body": [
+			"ASSERT(${1:condition});",
+		],
+		"description": ">=PS3 Only - Assert condition"
+	},
 	"For Loop": {
-		"prefix": "for",
+		"prefix": ["for", "newfor"],
 		"body": [
 			"for (var ${1:i} = 0; ${1:i} < ${2:arr}.size; ${1:i}++)\n{",
-			"\tvar ${3:elem} = ${2:arr}[${1:i}];",
-			"\t$TM_SELECTED_TEXT$0",
+			"	var ${3:elem} = ${2:arr}[${1:i}];",
+			"	$TM_SELECTED_TEXT$0",
 			"}"
 		],
 		"description": "For Loop"
 	},
 	"For Iterator": {
-		"prefix": "foritor",
+		"prefix": ["foritor", "newforitor"],
 		"body": [
-			"for (var ${1:it} = ${1:it}.first; ${1:it} != nil; ${1:it} = ${1:it}.next)\n{",
-			"\t$TM_SELECTED_TEXT$0",
+			"for (var ${1:it} = ${1:it}.first; ${1:it} != nil; ${1:it} = ${1:it}.next)",
+			"{",
+			"	$TM_SELECTED_TEXT$0",
 			"}"
 		],
 		"description": "For Loop (iterator for widgets/other)"
 	},
 	"For-Each Loop": {
-		"prefix": "foreach",
+		"prefix": ["foreach", "newforeach"],
 		"body": [
-			"foreach (var ${1:elem} in ${2:array})\n{",
-			"\t$TM_SELECTED_TEXT$0",
+			"foreach (var ${1:elem} in ${2:array})",
+			"{",
+			"	$TM_SELECTED_TEXT$0",
 			"}"
 		],
 		"description": "For-Each Loop"
 	},
 	"Module Statement": {
-		"prefix": "module",
+		"prefix": ["module", "newmodule"],
 		"body": [
-			"module ${1:name}\n{",
-			"\t$TM_SELECTED_TEXT$0",
+			"module ${1:name}",
+			"{",
+			"	$TM_SELECTED_TEXT$0",
 			"}"
 		],
 		"description": "New Module Statement"
 	},
 	"Init Constructor": {
-		"prefix": ["init", "ctor"],
+		"prefix": ["init", "ctor", "newinit"],
 		"body": [
-			"method __init__(${1:params})\n{",
-			"\t$TM_SELECTED_TEXT$0",
+			"method __init__(${1:params})",
+			"{",
+			"	$TM_SELECTED_TEXT$0",
 			"}"
 		],
 		"description": "Module/Class Constructor"
 	},
 	"Function Statement": {
-		"prefix": "function",
+		"prefix": ["function", "newfunction"],
 		"body": [
-			"function ${1:name}(${2:params})\n{",
-			"\t$TM_SELECTED_TEXT$0",
+			"function ${1:name}(${2:params})",
+			"{",
+			"	$TM_SELECTED_TEXT$0",
 			"}"
 		],
 		"description": "Function Statement"
 	},
 	"Method Statement": {
-		"prefix": "method",
+		"prefix": ["method", "newmethod"],
 		"body": [
-			"method ${1:name}(${2:params})\n{",
-			"\t$TM_SELECTED_TEXT$0",
+			"method ${1:name}(${2:params})",
+			"{",
+			"	$TM_SELECTED_TEXT$0",
 			"}"
 		],
 		"description": "Function Statement"
 	},
 	"If Statement": {
-		"prefix": "if",
+		"prefix": ["if", "newif"],
 		"body": [
-			"if (${1:condition})\n{",
-			"\t$TM_SELECTED_TEXT$0",
+			"if (${1:condition})",
+			"{",
+			"	$TM_SELECTED_TEXT$0",
 			"}"
 		],
 		"description": "If Statement"
 	},
 	"If-Else Statement": {
-		"prefix": "ifelse",
+		"prefix": ["ifelse", "newifelse"],
 		"body": [
-			"if (${1:condition})\n{",
-			"\t$TM_SELECTED_TEXT$0",
-			"}\nelse\n{",
-			"\t",
+			"if (${1:condition})",
+			"{",
+			"	$TM_SELECTED_TEXT$0",
+			"}"
+			"else",
+			"{\n",
 			"}"
 		],
 		"description": "If-Else Statement"
 	},
 	"Attribute Expression": 
 	{
-		"prefix": "attr",
+		"prefix": ["attr", "newattr"],
 		"body": [
 			"attribute ${1:name};",
 		],
@@ -93,60 +109,66 @@
 	},
 	"Static Expression": 
 	{
-		"prefix": "static",
+		"prefix": ["static", "newstatic"],
 		"body": [
 			"static ${1:name};",
 		],
 		"description": "Static Definition"
 	},
 	"Switch Statement": {
-		"prefix": "switch",
+		"prefix": ["switch", "newswitch", "sw"],
 		"body": [
-			"switch (${1:key})\n{",
-			"\tcase ${2:value}:",
-			"\t\t$0",
-			"\t\tbreak;",
+			"switch (${1:key})",
+			"{"
+			"	case ${2:value}:",
+			"		$0",
+			"		break;",
 			"",
-			"\tdefault:",
-			"\t\tbreak;",
+			"	default:",
+			"		break;",
 			"}"
 		],
 		"description": "Switch Statement"
 	},
 	"While Statement": {
-		"prefix": "while",
+		"prefix": ["while", "newwhile"],
 		"body": [
-			"while (${1:condition})\n{",
-			"\t$TM_SELECTED_TEXT$0",
+			"while (${1:condition})",
+			"{",
+			"	$TM_SELECTED_TEXT$0",
 			"}"
 		],
 		"description": "While Statement"
 	},
 	"While True Statement": {
-		"prefix": "whiletrue",
+		"prefix": ["whiletrue", "newwhiletrue"],
 		"body": [
-			"while (true)\n{",
-			"\t$TM_SELECTED_TEXT$0",
+			"while (true)",
+			"{",
+			"	$TM_SELECTED_TEXT$0",
 			"}"
 		],
 		"description": "While True Statement"
 	},
 	"Do-While Statement": {
-		"prefix": "dowhile",
+		"prefix": ["dowhile", "newdowhile"],
 		"body": [
-			"do\n{",
-			"\t$TM_SELECTED_TEXT$0",
+			"do",
+			"{",
+			"	$TM_SELECTED_TEXT$0",
 			"} while (${1:condition});"
 		],
 		"description": "Do-While Statement"
 	},
 	"Try-Catch Statement": {
-		"prefix": "trycatch",
+		"prefix": ["trycatch", "newtrycatch"],
 		"body": [
-			"try\n{",
-			"\t$TM_SELECTED_TEXT$0",
-			"}\ncatch (${1:error})\n{",
-			"\t",
+			"try",
+			"{",
+			"	$TM_SELECTED_TEXT$0",
+			"}",
+			"catch (${1:error})"
+			"{\n",
 			"}"
 		],
 		"description": "Try-Catch Statement"
@@ -159,7 +181,7 @@
 		"description": "Import module."
 	},
 	"Map": {
-		"prefix": "mapvar",
+		"prefix": ["mapvar", "newmapvar"],
 		"body": [
 			"var ${1:name} = [\n\t${2:key} : ${3:value}\n];"
 		],
@@ -172,11 +194,102 @@
 		],
 		"description": "New symbol variable"
 	},
+	
+	"New Root": {
+		"prefix": ["newroot"],
+		"body": [
+			"module ROOT",
+			"{",
+			"	// Insert static variables or top level code to be executed on script file load here\n",
+			"	// Fired on root open/initialization.",
+			"	method open(context)",
+			"	{",
+			"		/* Initialize non-ui components here, start page directly or open ModalPage",
+			"		 * SequenceUtil::startPage(context, self);",
+			"		 *",
+			"		 * sPopup = SequenceUtil::startPage(context, self);",
+			"		 * sPopup.open();",
+			"		 * return result;",
+			"		*/\n",
+			"	}\n",
+			"	// Fired on root UI open/initialization.",
+			"	method onInitialize(context)",
+			"	{",
+			"		// Initialize UI here, set focus, cursor visibility state, etc.",
+			"		// Push script events if needed aswell.",
+			"		// context.pushEvent(main::menu::MScriptEvent(context, ROOT, \"functionName\"))\n";
+			"		// Do not open dialogs here!",
+			"	}\n",
+			"	// Fired on root close.",
+			"	method onFinalize(context)",
+			"	{",
+			"		// Finalize root & objects here",
+			"	}\n"
+			"	// Fired on key press.",
+			"	method onKeyPress(context)",
+			"	{",
+			"		switch (event.keysym)",
+			"		{",
+			"			// Handle specific key-presses here.\n",
+			"			default:",
+			"				return EVENTRESULT_CONTINUE;",
+			"		}",
+			"	}\n",
+			"	// Fired on cancel press.",
+			"	method onCancel(context, event, item)",
+			"	{",
+			"		// Handle cancel here\n",
+			"		return EVENTRESULT_FILTER;",
+			"	}",
+			"}"
+		],
+		"description": "PS2 Only - New Root"
+	},
+	
+	"New Root (PS2)": {
+		"prefix": ["newroot_ps2"],
+		"body": [
+			"module PROJECT::ROOT",
+			"{\n",
+			"	// Insert static variables or top level code to be executed on script file load here\n",
+			"	// Fired on root open/initialization.",
+			"	function onInitialize(context)",
+			"	{",
+			"		// Initialize UI here, set focus, cursor visibility state, etc.",
+			"		// Push script events if needed aswell.",
+			"		// context.pushEvent(main::menu::MScriptEvent(context, ROOT, "functionName"))\n";
+			"		// Do not open dialogs here!",
+			"	}\n",
+			"	// Fired on root close.",
+			"	function onFinalize(context)",
+			"	{",
+			"		// Finalize root & objects here",
+			"	}\n"
+			"	// Fired on key press.",
+			"	function onKeyPress(context)",
+			"	{",
+			"		switch (event.keysym)",
+			"		{",
+			"			// Handle specific key-presses here\n",
+			"			default:",
+			"				return EVENTRESULT_CONTINUE;",
+			"		}",
+			"	}\n",
+			"	// Fired on cancel press.",
+			"	function onCancel(context, event, item)",
+			"	{",
+			"		// Handle cancel here\n",
+			"		return EVENTRESULT_FILTER;",
+			"	}",
+			"}"
+		],
+		"description": "PS2 Only - New Root"
+	},
 
 	// Adhoc utils
 	"Play OK":
 	{
-		"prefix": "oksound",
+		"prefix": ["playok", "oksound"],
 		"body": [
 			"main::sound.play(\"ok\");"
 		],
@@ -184,7 +297,7 @@
 	},
 	"Play Cancel":
 	{
-		"prefix": "cancelsound",
+		"prefix": ["playcancel", "cancelsound"],
 		"body": [
 			"main::sound.play(\"cancel\");"
 		],
@@ -192,7 +305,7 @@
 	},
 	"Play Cursor":
 	{
-		"prefix": "cursorsound",
+		"prefix": ["playcursor", "cursorsound"],
 		"body": [
 			"main::sound.play(\"cursor\");"
 		],
@@ -200,7 +313,7 @@
 	},
 	"Play Disable":
 	{
-		"prefix": "disablesound",
+		"prefix": ["playdisable", "disablesound"],
 		"body": [
 			"main::sound.play(\"disable\");"
 		],
@@ -212,45 +325,89 @@
 		"body": [
 			"Thread::Sleep(${1:time})"
 		],
-		"description": "Sleep for X seconds"
+		"description": ">=PS3 Only - Sleep for X seconds"
 	},
-	"Translate":
+	"Context Sync":
+	{
+		"prefix": "sync",
+		"body": [
+			"context::sync(${1:time})"
+		],
+		"description": "Context sync"
+	},
+	"Translate (Manager)":
 	{
 		"prefix": "translate",
 		"body": [
 			"manager.translate(${1:page}, ${2:key})"
 		],
-		"description": "Localize String"
+		"description": ">=PS3 Only - Localize String"
+	},
+	"Translate (Context)":
+	{
+		"prefix": "translate_ctx",
+		"body": [
+			"context.translate(ROOT, ${1:page}, ${2:key})"
+		],
+		"description": "Context Localize String - page used is ROOT::{page}"
 	},
 	"Shows OK prompt": {
-		"prefix": "showok",
+		"prefix": ["dlgok", "showok"],
 		"body": [
 			"DialogUtil::openConfirmDialog(context, DialogUtil::OK, $1)"
 		],
-		"description": "Opens a 'OK' dialog"
+		"description": ">=PS3 Only - Opens a 'OK' dialog"
+	},
+	"Shows OK prompt (PS2)": {
+		"prefix": ["dlgok_ps2", "showok_ps2"],
+		"body": [
+			"openConfirmDialog(context, DIALOG_OK, $1)"
+		],
+		"description": "PS2 Only - Opens a 'OK' dialog"
 	},
 	"Shows YES/NO prompt": {
-		"prefix": "showyesno",
+		"prefix": ["dlgyesno", "showyesno"],
 		"body": [
 			"var res = DialogUtil::openConfirmDialog(context, DialogUtil::YESNO, $1)"
 		],
-		"description": "Opens a 'YES/NO' dialog"
+		"description": ">=PS3 Only - Opens a 'YES/NO' dialog"
+	},
+	"Shows YES/NO prompt (PS2)": {
+		"prefix": ["dlgyesno_ps2", "showyesno_ps2"],
+		"body": [
+			"var res = openConfirmDialog(context, DIALOG_YESNO, $1)"
+		],
+		"description": "PS2 Only - Opens a 'YES/NO' dialog"
+	},
+	"Shows Query prompt (PS2)": {
+		"prefix": ["dlgquery_ps2", "showquery_ps2"],
+		"body": [
+			"openConfirmDialog(context, DIALOG_QUERY, $1)"
+		],
+		"description": "PS2 Only - Opens a QUERY (OK/Cancel) dialog"
 	},
 	"Shows YES/NO prompt statement": {
-		"prefix": "showyesnocheck",
+		"prefix": ["dlgyesnocheck", "showyesnocheck"],
 		"body": [
 			"if (DialogUtil::openConfirmDialog(context, DialogUtil::YESNO, $1))\n{",
 			"\t$TM_SELECTED_TEXT$0",
 			"}",
 		],
-		"description": "Opens a 'YES/NO' dialog as a statement"
+		"description": ">=PS3 Only - Opens a 'YES/NO' dialog as a statement"
 	},
-	"Shows an error prompt": {
-		"prefix": "showerror",
+	"Shows error prompt": {
+		"prefix": ["dlgerr", "showerror"],
 		"body": [
 			"DialogUtil::openConfirmDialog(context, DialogUtil::ERROR, $1)"
 		],
-		"description": "Opens a 'ERROR' dialog"
+		"description": ">=PS3 Only - Opens a 'ERROR' dialog"
+	},
+	"Shows error prompt (PS2)": {
+		"prefix": ["dlgerr_ps2", "showerror_ps2"],
+		"body": [
+			"openConfirmDialog(context, DIALOG_ERROR, $1)"
+		],
+		"description": "PS2 Only - Opens a 'ERROR' dialog"
 	},
 	"Format": {
 		"prefix": "fmt",
@@ -266,126 +423,137 @@
 			"var buf = fst[\"buffer\"]",
 			"if (buf != nil)",
 			"{",
-			"\tvar xml = pdistd::MXml();",
-			"\txml.parse(buf);",
-			"\tvar dom = xml.result;",
-			"\tvar xml_nodes = dom[\"xml\"];",
-			"\t$TM_SELECTED_TEXT$0",
+			"	var xml = pdistd::MXml();",
+			"	xml.parse(buf);",
+			"	var dom = xml.result;",
+			"	var xml_nodes = dom[\"xml\"];",
+			"	$TM_SELECTED_TEXT$0",
 			"}"
-		]
+		],
+		"description": ">=PS3 Only - Open XML file sample",
 	},
 
 	// PDI Utils
 	"Read File (With Condition)": {
-		"prefix": "readfilesafe",
+		"prefix": ["filereadsafe", "readfilesafe"],
 		"body": [
 			"var fst = pdistd::ReadFile(${1:path});",
 			"var buf = fst[\"buffer\"];",
-			"if (buf)\n{",
-			"\t$TM_SELECTED_TEXT$0",
+			"if (buf)",
+			"{",
+			"	$TM_SELECTED_TEXT$0",
 			"}",
 		],
-		"description": "Reads a file with a checked statement"
+		"description": ">=PS3 Only - Reads a file with a checked statement"
 	},
 	"Make Directory For File": {
-		"prefix": "mkdir",
+		"prefix": ["dirmake", "mkdir"],
 		"body": [
 			"pdistd::MakeDirectoryForFile(${1:path});"
 		],
-		"description": "Creates a directory for a file path"
+		"description": ">=PS3 Only - Creates a directory for a file path"
 	},
 	"Copy File": {
-		"prefix": "copyfile",
+		"prefix": ["filecopy", "copyfile"],
 		"body": [
 			"var res = pdistd::CopyFile(${1:src}, ${2:dst});"
 		],
-		"description": "Copy a file from a path to another"
+		"description": ">=PS3 Only - Copy a file from a path to another"
 	},
 	"Rename File": {
-		"prefix": "renfile",
+		"prefix": ["fileren", "renfile"],
 		"body": [
 			"var res = pdistd::RenameFile(${1:src}, ${2:dst});"
 		],
-		"description": "Renames a file from a path to another"
+		"description": ">=PS3 Only - Renames a file from a path to another"
 	},
 	"Remove File": {
-		"prefix": ["delfile", "remfile"],
+		"prefix": ["filerem", "filedel", "delfile", "remfile"],
 		"body": [
 			"var res = pdistd::RemoveFile(${1:src});"
 		],
-		"description": "Removes/Deletes a file"
+		"description": ">=PS3 Only - Removes/Deletes a file"
 	},
 	"Append File": {
-		"prefix": "appendfile",
+		"prefix": ["fileappend", "appendfile"],
 		"body": [
 			"pdistd::AppendFile(${1:path}, ${2:data});"
 		],
-		"description": "Appends to a file"
+		"description": ">=PS3 Only - Appends to a file"
 	},
 	"Write File": {
-		"prefix": "writefile",
+		"prefix": ["filewrite", "writefile"],
 		"body": [
 			"pdistd::WriteFile(${1:path}, ${2:data});"
 		],
-		"description": "Writes a file (overwrites)"
+		"description": ">=PS3 Only - Writes a file (overwrites)"
 	},
 	"File Status": {
 		"prefix": ["fileinfo", "filestatus"],
 		"body": [
 			"var status = pdistd::GetFileStatus(${1:path});"
 		],
-		"description": "Writes a file (overwrites)"
+		"description": ">=PS3 Only - Writes a file (overwrites)"
 	},
 	"File Exists": {
 		"prefix": "fileexists",
 		"body": [
-			"if (pdistd::Exist(${1:path})\n{",
-			"\t$TM_SELECTED_TEXT$0",
+			"if (pdistd::Exist(${1:path})",
+			"{",
+			"	$TM_SELECTED_TEXT$0",
 			"}"
 		],
-		"description": "Checks if a file exist"
+		"description": ">=PS3 Only - Checks if a file exist"
 	},
 	"File Not Exists": {
 		"prefix": "filenotexists",
 		"body": [
-			"if (!pdistd::Exist(${1:path})\n{",
-			"\t$TM_SELECTED_TEXT$0",
+			"if (!pdistd::Exist(${1:path})",
+			"{",
+			"	$TM_SELECTED_TEXT$0",
 			"}"
 		],
-		"description": "Checks if a file exist"
+		"description": ">=PS3 Only - Checks if a file exist"
 	},
 	"File Entries": {
 		"prefix": ["direntries", "fileentries"],
 		"body": [
 			"var ${2:entries} = pdistd::GetFileEntries(${1:dir});"
 		],
-		"description": "Creates a directory for a file path"
+		"description": ">=PS3 Only - Creates a directory for a file path"
 	},
 	"Disk Free Size": {
 		"prefix": "freesize",
 		"body": [
 			"var ${2:free_size} = pdistd::GetDiskFreeSize(${1:dir});"
 		],
-		"description": "Gets free size for a certain dir"
+		"description": ">=PS3 Only - Gets free size for a certain dir"
 	},
 	"File Size": {
 		"prefix": "filesize",
 		"body": [
 			"var ${2:free_size} = IO::File::GetFileSize(${1:file});"
 		],
-		"description": "Gets the size of a certain file"
+		"description": ">=PS3 Only - Gets the size of a certain file"
 	},
 	"Language": {
 		"prefix": ["lang", "language"],
 		"body": [
 			"var ${1:lang} = pdistd::MLocale::getLanguage();",
 		],
-		"description": "Gets the current running language (US, JP, etc)"
+		"description": ">=PS3 Only - Gets the current running language (US, JP, etc)"
 	},
 	"Random": {
 		"prefix": ["rand", "random"],
 		"body": [
-			"var ${3:name} = pdistd::MRandom::getValue(${1:min}, ${2:max});",
+			"var ${3:value} = pdistd::MRandom::getValue(${1:min}, ${2:max});",
+		],
+		"description": ">=PS3 Only - Generates a value between two values (max exclusive)."
+	},
+	"Random (PS2)": {
+		"prefix": ["rand_ps2", "random_ps2"],
+		"body": [
+			"var ${3:value} = main::menu::MRandom::GetValue(${1:min}, ${2:max});",
 		],
 		"description": "Generates a value between two values (max exclusive)."
 	},
@@ -394,248 +562,290 @@
 		"body": [
 			"var ${1:time} = pdistd::GetSystemTimeMicroSecond();",
 		],
-		"description": "Gets current time as microseconds"
+		"description": ">=PS3 Only - Gets current time as microseconds"
 	},
 	"Time Milliseconds": {
 		"prefix": ["timemilli"],
 		"body": [
 			"var ${1:time} = pdistd::GetSystemTimeMilliSecond();",
 		],
-		"description": "Gets current time as milliseconds"
+		"description": ">=PS3 Only - Gets current time as milliseconds"
 	},
 	"Current Time": {
-		"prefix": ["current time"],
+		"prefix": ["timecurrent", "currenttime"],
 		"body": [
 			"var ${1:time} = pdistd::MTime::getCurrentTime();",
 		],
-		"description": "Gets current time object"
+		"description": ">=PS3 Only - Gets current time object"
 	},
 	"Time": {
 		"prefix": ["time"],
 		"body": [
 			"var ${1:time} = pdistd::MTime();",
 		],
-		"description": "Gets new time object"
+		"description": ">=PS3 Only - Gets new time object"
 	},
 	"TextConv": {
 		"prefix": ["textconv"],
 		"body": [
 			"var ${2:str} = pdistd::TextConv(${1:input});",
 		],
-		"description": "Converts text"
+		"description": ">=PS3 Only - Converts text"
 	},
 	"Mac Address": {
 		"prefix": ["macaddr"],
 		"body": [
 			"var mac = pdistd::MNetworkInterface::getMacAddress();",
 		],
-		"description": "Gets mac address as string"
+		"description": ">=PS3 Only - Gets mac address as string"
 	},
 	"Decompress/Inflate": {
 		"prefix": ["decompress", "inflate"],
 		"body": [
 			"var ${2:out} = pdistd::Inflate(${1:in});",
 		],
-		"description": "Decompress data"
+		"description": ">=PS3 Only - Decompress data"
 	},
 	"Compress/Deflate": {
 		"prefix": ["compress", "deflate"],
 		"body": [
 			"var ${2:out} = pdistd::Deflate(${1:in});",
 		],
-		"description": "Compresses data"
+		"description": ">=PS3 Only - Compresses data"
 	},
 	"Decode Base64 String": {
 		"prefix": ["b64decode"],
 		"body": [
 			"var ${2:out} = pdistd::DecodeBase64(${1:in});",
 		],
-		"description": "Decodes Base64 string"
+		"description": ">=PS3 Only - Decodes Base64 string"
 	},
 	"Encode Base64": {
 		"prefix": ["b64encode"],
 		"body": [
 			"var ${2:out} = pdistd::EncodeBase64(${1:in});",
 		],
-		"description": "Encodes Base64 data"
+		"description": ">=PS3 Only - Encodes Base64 data"
 	},
 
 	// UI Events
 	"On Activate": {
 		"prefix": "onactivate",
 		"body": [
-			"method onActivate(context)\n{",
-			"\t$TM_SELECTED_TEXT$0",
+			"method onActivate(context)",
+			"{",
+			"	$TM_SELECTED_TEXT$0\n",
+			"	return EVENTRESULT_FILTER;",
 			"}"
 		],
+		"description": "On UI element activation/press"
 	},
 	"On Initialize": {
 		"prefix": "oninitialize",
 		"body": [
-			"method onInitialize(context)\n{",
-			"\t$TM_SELECTED_TEXT$0",
+			"method onInitialize(context)",
+			"{",
+			"	$TM_SELECTED_TEXT$0",
 			"}"
 		],
+		"description": "On UI element initialization"
 	},
 	"On Finalize": {
 		"prefix": "onfinalize",
 		"body": [
-			"method onFinalize(context)\n{",
-			"\t$TM_SELECTED_TEXT$0",
+			"method onFinalize(context)",
+			"{",
+			"	$TM_SELECTED_TEXT$0",
 			"}"
 		],
+		"description": "On UI element finalize/deinitialization"
 	},
 	"On Realize": {
 		"prefix": "onrealize",
 		"body": [
-			"method onRealize(context)\n{",
-			"\t$TM_SELECTED_TEXT$0",
+			"method onRealize(context)",
+			"{",
+			"	$TM_SELECTED_TEXT$0",
 			"}"
 		],
 	},
 	"On Key Press": {
 		"prefix": "onkeypress",
 		"body": [
-			"method onKeyPress(context, event)\n{",
-			"\t$TM_SELECTED_TEXT$0",
+			"method onKeyPress(context, event)",
+			"{",
+			"	$TM_SELECTED_TEXT$0\n",
+			"	switch (event.keysym)",
+			"	{",
+			"		default:",
+						return EVENTRESULT_CONTINUE;",
+			"	}",
 			"}"
 		],
+		"description": "On UI element key press"
 	},
 	"On Cancel": {
 		"prefix": "oncancel",
 		"body": [
-			"method onCancel(context)\n{",
-			"\t$TM_SELECTED_TEXT$0",
+			"method onCancel(context)",
+			"{",
+			"	$TM_SELECTED_TEXT$0\n",
+			"	return EVENTRESULT_FILTER;",
 			"}"
 		],
+		"description": "On UI element cancel/circle button"
 	},
 	"On Load": {
 		"prefix": "onload",
 		"body": [
-			"method onLoad(${1:params})\n{",
-			"\t$TM_SELECTED_TEXT$0",
+			"method onLoad(${1:params})",
+			"{",
+			"	$TM_SELECTED_TEXT$0",
 			"}"
 		],
 	},
 	"On Focus Enter": {
 		"prefix": "onfocusenter",
 		"body": [
-			"method onFocusEnter(context, event)\n{",
-			"\t$TM_SELECTED_TEXT$0",
+			"method onFocusEnter(context, event)",
+			"{",
+			"	$TM_SELECTED_TEXT$0\n",
+			"	// Return event here"
 			"}"
 		],
+		"description": "On UI element cursor focus enter"
 	},
-	"On Focus Enter": {
+	"On Focus Leave": {
 		"prefix": "onfocusleave",
 		"body": [
-			"method onFocusLeave(context, event)\n{",
-			"\t$TM_SELECTED_TEXT$0",
+			"method onFocusLeave(context, event)",
+			"{",
+			"	$TM_SELECTED_TEXT$0\n",
+			"	// Return event here"
 			"}"
 		],
+		"description": "On UI element cursor focus leave"
 	},
 	"On Focus Notify": {
 		"prefix": "onfocusnotify",
 		"body": [
-			"method onFocusNotify(context, new_index, old_index)\n{",
-			"\t$TM_SELECTED_TEXT$0",
+			"method onFocusNotify(context, new_index, old_index)",
+			"{",
+			"	$TM_SELECTED_TEXT$0\n",
+			"	// Return event here"
 			"}"
 		],
 	},
 	"On Visible Notify": {
 		"prefix": "onvisiblenotify",
 		"body": [
-			"method onVisibleNotify(context, indexes)\n{",
-			"\t$TM_SELECTED_TEXT$0",
+			"method onVisibleNotify(context, indexes)",
+			"{",
+			"	$TM_SELECTED_TEXT$0",
 			"}"
 		],
 	},
 	"On Text Input": {
 		"prefix": "ontextinput",
 		"body": [
-			"method onTextInput(context, event)\n{",
-			"\t$TM_SELECTED_TEXT$0",
+			"method onTextInput(context, event)",
+			"{",
+			"	$TM_SELECTED_TEXT$0\n",
+			"	// Return event here"
 			"}"
 		],
+		"description": "On UI text input"
 	},
-	"Close Root": {
+	"Close Root (self)": {
 		"prefix": "closeroot",
 		"body": [
 			"self.close(context, $1);"
 		],
+		"description": ">=PS3 Only - Close current root",
 	},
-
 	"User Profile": {
 		"prefix": "userprofile",
 		"body": [
 			"GAME_STATUS.user_profile"
 		],
-
+		"description": "PS3 Only"
 	},
 	"User Garage": {
 		"prefix": "usergarage",
 		"body": [
 			"GAME_STATUS.user_profile.garage"
 		],
+		"description": "PS3 Only"
 	},
 	"User Context": {
 		"prefix": "usercontext",
 		"body": [
 			"GAME_STATUS.user_profile.context"
 		],
+		"description": "PS3 Only"
 	},
 	"User Option": {
 		"prefix": "useroption",
 		"body": [
 			"GAME_STATUS.user_profile.option"
 		],
+		"description": "PS3 Only"
 	},
 	"User Residence": {
 		"prefix": "userresidence",
 		"body": [
 			"GAME_STATUS.user_profile.residence"
 		],
+		"description": "PS3 Only"
 	},
 	"User Import Garage": {
 		"prefix": "userimportgarage",
 		"body": [
 			"GAME_STATUS.user_profile.import_garage"
 		],
+		"description": "PS3 Only"
 	},
 	"User Branch (runviewer only)": {
 		"prefix": "userbranch",
 		"body": [
 			"GAME_STATUS.user_profile.branch"
 		],
+		"description": "PS3 Only"
 	},
 	"User Record": {
 		"prefix": "userbranch",
 		"body": [
 			"GAME_STATUS.user_profile.record"
 		],
+		"description": "PS3 Only"
 	},
 	"User Event Record": {
 		"prefix": "usereventrecord",
 		"body": [
 			"GAME_STATUS.user_profile.record.event_record"
 		],
+		"description": "PS3 Only"
 	},
 	"User Suspender": {
 		"prefix": "usersuspender",
 		"body": [
 			"GAME_STATUS.user_profile.suspender"
 		],
+		"description": "PS3 Only"
 	},
 	"User Item": {
 		"prefix": "useritem",
 		"body": [
 			"GAME_STATUS.user_profile.item"
 		],
+		"description": "PS3 Only"
 	},
 	"User Game Flags": {
 		"prefix": "usergameflags",
 		"body": [
 			"GAME_STATUS.user_profile.game_flags"
 		],
+		"description": "PS3 Only"
 	},
 
 	"Get Riding Car": {
@@ -643,52 +853,60 @@
 		"body": [
 			"var cp = GAME_STATUS.user_profile.garage.getRidingCar();"
 		],
-		"description": "Gets the current user's car",
+		"description": "PS3 Only - Gets the current user's car",
 	},
 	"Get Cash": {
 		"prefix": ["cash", "credits"],
 		"body": [
 			"var credits = GAME_STATUS.user_profile.cash;"
 		],
-		"description": "Gets the current user's credits/cash",
+		"description": "PS3 Only - Gets the current user's credits/cash",
 	},
 	"Get Running Branch": {
 		"prefix": "branch",
 		"body": [
 			"GetVersionBranch()"
 		],
-		"description": "Gets the current running branch",
+		"description": "PS3 Only - Gets the current running branch",
+	},
+	"Get Running Branch (PS2)": {
+		"prefix": "branch",
+		"body": [
+			"main::menu::MSystem::GetVersionBranch()"
+		],
+		"description": "PS2 - Gets the current running branch",
 	},
 	"Is QA Build": {
 		"prefix": "isqa",
 		"body": [
 			"pdiext::isQABuild()"
 		],
-		"description": "Returns whether the game is running as a qa build",
+		"description": ">=PS3 Only - Returns whether the game is running as a qa build",
 	},
 	"Save Data Directory": {
 		"prefix": "savedatadir",
 		"body": [
 			"var dir = pdiext::MProductInformation::GetSaveDataDirectory();"
 		],
-		"description": "Gets the save data directory",
+		"description": ">=PS3 Only - Gets the save data directory",
 	},
 	"Has Command Line Argument": {
 		"prefix": "argdefined",
 		"body": [
 			"AppOpt.defined(\"${1:arg}\")"
 		],
-		"description": "Gets whether a command line argument is defined",
+		"description": ">=PS3 Only - Gets whether a command line argument is defined",
 	},
 	"Has Command Line Argument Statement": {
 		"prefix": "argdefinedstatement",
 		"body": [
-			"if (AppOpt.defined(\"${1:arg}\"))\n{",
-			"\tvar ${1:arg} = AppOpt[\"${1:arg}\"];",
-			"\t$TM_SELECTED_TEXT$0",
+			"if (AppOpt.defined(\"${1:arg}\"))",
+			"{",
+			"	var ${1:arg} = AppOpt[\"${1:arg}\"];",
+			"	$TM_SELECTED_TEXT$0",
 			"}"
 		],
-		"description": "Gets whether a command line argument is defined as a statement",
+		"description": ">=PS3 Only - Gets whether a command line argument is defined as a statement",
 	},
 
 	// SpecDB Stuff
@@ -697,144 +915,196 @@
 		"body": [
 			"var ${2:car_name} = gtengine::MSpecDB::getCarName(${1:car_code});"
 		],
-		"description": "Gets a car name from a car code",
+		"description": ">=PS3 Only - Gets a car name from a car code",
 	},
 	"Get Car Short Name": {
 		"prefix": "getcarshortname",
 		"body": [
 			"var ${2:car_name} = gtengine::MSpecDB::getCarShortName(${1:car_code});"
 		],
-		"description": "Gets a short car name from a car code",
+		"description": ">=PS3 Only - Gets a short car name from a car code",
 	},
 	"Get Car Country": {
 		"prefix": "getcarcountry",
 		"body": [
 			"var ${2:country} = gtengine::MSpecDB::getCarCountry(${1:car_label});"
 		],
-		"description": "Gets a car country from a car label (i.e US)",
+		"description": ">=PS3 Only - Gets a car country from a car label (i.e US)",
 	},
 	"Get Car Price": {
 		"prefix": "getcarprice",
 		"body": [
 			"var ${2:price} = gtengine::MSpecDB::getCarPrice(${1:car_label});"
 		],
-		"description": "Gets a car price from a car label",
+		"description": ">=PS3 Only - Gets a car price from a car label",
 	},
 	"Get Car Code": {
 		"prefix": "getcarcode",
 		"body": [
 			"var ${2:car_code} = gtengine::MSpecDB::getCarCode(${1:car_label});"
 		],
-		"description": "Gets a car code from a car label (i.e _787b_std)",
+		"description": ">=PS3 Only - Gets a car code from a car label (i.e _787b_std)",
 	},
 	"Get Car Label": {
 		"prefix": "getcarlabel",
 		"body": [
 			"var ${2:car_label} = gtengine::MSpecDB::getCarLabel(${1:car_code});"
 		],
-		"description": "Gets a car label from a car code",
+		"description": ">=PS3 Only - Gets a car label from a car code",
 	},
 	"Get Course Code": {
 		"prefix": "getcoursecode",
 		"body": [
 			"var ${2:crs_code} = gtengine::MSpecDB::getCourseCode(${1:crs_label});"
 		],
-		"description": "Gets a course code from a car label (i.e mini -> Autumn Ring Mini)",
+		"description": ">=PS3 Only - Gets a course code from a car label (i.e mini -> Autumn Ring Mini)",
 	},
 	"Get Course Label": {
 		"prefix": "getcourselabel",
 		"body": [
 			"var ${2:crs_label} = gtengine::MSpecDB::getCourseLabel(${1:crs_code});"
 		],
-		"description": "Gets a course label from a course code",
+		"description": ">=PS3 Only - Gets a course label from a course code",
 	},
 	"SpecDB No Code": {
 		"prefix": "nocodespecdb",
 		"body": [
 			"gtengine::MSpecDB::NO_CODE64"
 		],
-		"description": "Gets no code specdb",
+		"description": ">=PS3 Only - Gets no code specdb",
 	},
 
 	// Key codes
-	"CELL_PAD_CTRL_L3_LEFT (0xFF51)": { "prefix": "CELL_PAD_CTRL_L3_LEFT", "body": [ "CELL_PAD_CTRL_L3_LEFT" ], "description": "Left Stick LEFT"},
-	"CELL_PAD_CTRL_L3_UP (0xFF52)": { "prefix": "CELL_PAD_CTRL_L3_UP", "body": [ "CELL_PAD_CTRL_L3_UP" ], "description": "Left Stick UP"},
-	"CELL_PAD_CTRL_L3_RIGHT (0xFF53)": { "prefix": "CELL_PAD_CTRL_L3_RIGHT", "body": [ "CELL_PAD_CTRL_L3_RIGHT" ], "description": "Left Stick RIGHT"},
-	"CELL_PAD_CTRL_L3_DOWN (0xFF54)": { "prefix": "CELL_PAD_CTRL_L3_DOWN", "body": [ "CELL_PAD_CTRL_L3_DOWN" ], "description": "Left Stick DOWN"},
+	"CELL_PAD_CTRL_L3_LEFT (0xFF51)": { "prefix": "CELL_PAD_CTRL_L3_LEFT", "body": [ "CELL_PAD_CTRL_L3_LEFT" ], "description": "PS3 Left Stick LEFT"},
+	"CELL_PAD_CTRL_L3_UP (0xFF52)": { "prefix": "CELL_PAD_CTRL_L3_UP", "body": [ "CELL_PAD_CTRL_L3_UP" ], "description": "PS3 Left Stick UP"},
+	"CELL_PAD_CTRL_L3_RIGHT (0xFF53)": { "prefix": "CELL_PAD_CTRL_L3_RIGHT", "body": [ "CELL_PAD_CTRL_L3_RIGHT" ], "description": "PS3 Left Stick RIGHT"},
+	"CELL_PAD_CTRL_L3_DOWN (0xFF54)": { "prefix": "CELL_PAD_CTRL_L3_DOWN", "body": [ "CELL_PAD_CTRL_L3_DOWN" ], "description": "PS3 Left Stick DOWN"},
 	
-	"CELL_PAD_CTRL_R3_LEFT (0xFFB4)": { "prefix": "CELL_PAD_CTRL_R3_LEFT", "body": [ "CELL_PAD_CTRL_R3_LEFT" ], "description": "Right Stick LEFT"},
-	"CELL_PAD_CTRL_R3_UP (0xFFB8)": { "prefix": "CELL_PAD_CTRL_R3_UP", "body": [ "CELL_PAD_CTRL_R3_UP" ], "description": "Right Stick UP"},
-	"CELL_PAD_CTRL_R3_RIGHT (0xFF51)": { "prefix": "CELL_PAD_CTRL_R3_RIGHT", "body": [ "CELL_PAD_CTRL_R3_RIGHT" ], "description": "Right Stick RIGHT"},
-	"CELL_PAD_CTRL_R3_DOWN (0xFFB2)": { "prefix": "CELL_PAD_CTRL_R3_DOWN", "body": [ "CELL_PAD_CTRL_R3_DOWN" ], "description": "Right Stick DOWN"},
+	"CELL_PAD_CTRL_R3_LEFT (0xFFB4)": { "prefix": "CELL_PAD_CTRL_R3_LEFT", "body": [ "CELL_PAD_CTRL_R3_LEFT" ], "description": "PS3 Right Stick LEFT"},
+	"CELL_PAD_CTRL_R3_UP (0xFFB8)": { "prefix": "CELL_PAD_CTRL_R3_UP", "body": [ "CELL_PAD_CTRL_R3_UP" ], "description": "PS3 Right Stick UP"},
+	"CELL_PAD_CTRL_R3_RIGHT (0xFF51)": { "prefix": "CELL_PAD_CTRL_R3_RIGHT", "body": [ "CELL_PAD_CTRL_R3_RIGHT" ], "description": "PS3 Right Stick RIGHT"},
+	"CELL_PAD_CTRL_R3_DOWN (0xFFB2)": { "prefix": "CELL_PAD_CTRL_R3_DOWN", "body": [ "CELL_PAD_CTRL_R3_DOWN" ], "description": "PS3 Right Stick DOWN"},
 	
-	"CELL_PAD_CTRL_CROSS (0xFF0D)": { "prefix": "CELL_PAD_CTRL_CROSS", "body": [ "CELL_PAD_CTRL_CROSS" ], "description": "X Button"},
-	"CELL_PAD_CTRL_SQUARE (0xFFBF)": { "prefix": "CELL_PAD_CTRL_SQUARE", "body": [ "CELL_PAD_CTRL_SQUARE" ], "description": "□ Button"},
-	"CELL_PAD_CTRL_TRIANGLE (0xFFBE)": { "prefix": "CELL_PAD_CTRL_TRIANGLE", "body": [ "CELL_PAD_CTRL_TRIANGLE" ], "description": "△ Triangle Button"},
-	"CELL_PAD_CTRL_CIRCLE (0xFF1B)": { "prefix": "CELL_PAD_CTRL_CIRCLE", "body": [ "CELL_PAD_CTRL_CIRCLE" ], "description": "O Button"},
+	"CELL_PAD_CTRL_CROSS (0xFF0D)": { "prefix": "CELL_PAD_CTRL_CROSS", "body": [ "CELL_PAD_CTRL_CROSS" ], "description": "PS3 X Button"},
+	"CELL_PAD_CTRL_SQUARE (0xFFBF)": { "prefix": "CELL_PAD_CTRL_SQUARE", "body": [ "CELL_PAD_CTRL_SQUARE" ], "description": "PS3 □ Button"},
+	"CELL_PAD_CTRL_TRIANGLE (0xFFBE)": { "prefix": "CELL_PAD_CTRL_TRIANGLE", "body": [ "CELL_PAD_CTRL_TRIANGLE" ], "description": "PS3 △ Triangle Button"},
+	"CELL_PAD_CTRL_CIRCLE (0xFF1B)": { "prefix": "CELL_PAD_CTRL_CIRCLE", "body": [ "CELL_PAD_CTRL_CIRCLE" ], "description": "PS3 O Button"},
 	
-	"CELL_PAD_CTRL_SELECT (0xFF63)": { "prefix": "CELL_PAD_CTRL_SELECT", "body": [ "CELL_PAD_CTRL_SELECT" ], "description": "Select Button"},
-	"CELL_PAD_CTRL_START (0xFF8D)": { "prefix": "CELL_PAD_CTRL_START", "body": [ "CELL_PAD_CTRL_START" ], "description": "Start Buton"},
+	"CELL_PAD_CTRL_SELECT (0xFF63)": { "prefix": "CELL_PAD_CTRL_SELECT", "body": [ "CELL_PAD_CTRL_SELECT" ], "description": "PS3 Select Button"},
+	"CELL_PAD_CTRL_START (0xFF8D)": { "prefix": "CELL_PAD_CTRL_START", "body": [ "CELL_PAD_CTRL_START" ], "description": "PS3 Start Buton"},
 	
-	"CELL_PAD_CTRL_L1 (0xFFD7)": { "prefix": "CELL_PAD_CTRL_L1", "body": [ "CELL_PAD_CTRL_L1" ], "description": "L1 Button"},
-	"CELL_PAD_CTRL_L2 (0xFFD8)": { "prefix": "CELL_PAD_CTRL_L2", "body": [ "CELL_PAD_CTRL_L2" ], "description": "L2 Button"},
-	"CELL_PAD_CTRL_L3 (0xFFD9)": { "prefix": "CELL_PAD_CTRL_L3", "body": [ "CELL_PAD_CTRL_L3" ], "description": "L3 Button"},
-	"CELL_PAD_CTRL_R1 (0xFFDC)": { "prefix": "CELL_PAD_CTRL_R1", "body": [ "CELL_PAD_CTRL_R1" ], "description": "R1 Button"},
-	"CELL_PAD_CTRL_R2 (0xFFDD)": { "prefix": "CELL_PAD_CTRL_R2", "body": [ "CELL_PAD_CTRL_R2" ], "description": "R2 Button"},
-	"CELL_PAD_CTRL_R3 (0xFFDE)": { "prefix": "CELL_PAD_CTRL_R3", "body": [ "CELL_PAD_CTRL_R3" ], "description": "R3 Button"},
+	"CELL_PAD_CTRL_L1 (0xFFD7)": { "prefix": "CELL_PAD_CTRL_L1", "body": [ "CELL_PAD_CTRL_L1" ], "description": "PS3 L1 Button"},
+	"CELL_PAD_CTRL_L2 (0xFFD8)": { "prefix": "CELL_PAD_CTRL_L2", "body": [ "CELL_PAD_CTRL_L2" ], "description": "PS3 L2 Button"},
+	"CELL_PAD_CTRL_L3 (0xFFD9)": { "prefix": "CELL_PAD_CTRL_L3", "body": [ "CELL_PAD_CTRL_L3" ], "description": "PS3 L3 Button"},
+	"CELL_PAD_CTRL_R1 (0xFFDC)": { "prefix": "CELL_PAD_CTRL_R1", "body": [ "CELL_PAD_CTRL_R1" ], "description": "PS3 R1 Button"},
+	"CELL_PAD_CTRL_R2 (0xFFDD)": { "prefix": "CELL_PAD_CTRL_R2", "body": [ "CELL_PAD_CTRL_R2" ], "description": "PS3 R2 Button"},
+	"CELL_PAD_CTRL_R3 (0xFFDE)": { "prefix": "CELL_PAD_CTRL_R3", "body": [ "CELL_PAD_CTRL_R3" ], "description": "PS3 R3 Button"},
 
 	// PS2 key codes
-	"PS2_PAD_CTRL_L3_LEFT (0xFF51)": { "prefix": "PS2_PAD_CTRL_L3_LEFT", "body": [ "PS2_PAD_CTRL_L3_LEFT" ], "description": "Left Stick LEFT"},
-	"PS2_PAD_CTRL_L3_UP (0xFF52)": { "prefix": "PS2_PAD_CTRL_L3_UP", "body": [ "PS2_PAD_CTRL_L3_UP" ], "description": "Left Stick UP"},
-	"PS2_PAD_CTRL_L3_RIGHT (0xFF53)": { "prefix": "PS2_PAD_CTRL_L3_RIGHT", "body": [ "PS2_PAD_CTRL_L3_RIGHT" ], "description": "Left Stick RIGHT"},
-	"PS2_PAD_CTRL_L3_DOWN (0xFF54)": { "prefix": "PS2_PAD_CTRL_L3_DOWN", "body": [ "PS2_PAD_CTRL_L3_DOWN" ], "description": "Left Stick DOWN"},
+	"PS2_PAD_CTRL_L3_LEFT (0xFF51)": { "prefix": "PS2_PAD_CTRL_L3_LEFT", "body": [ "PS2_PAD_CTRL_L3_LEFT" ], "description": "PS2 Left Stick LEFT"},
+	"PS2_PAD_CTRL_L3_UP (0xFF52)": { "prefix": "PS2_PAD_CTRL_L3_UP", "body": [ "PS2_PAD_CTRL_L3_UP" ], "description": "PS2 Left Stick UP"},
+	"PS2_PAD_CTRL_L3_RIGHT (0xFF53)": { "prefix": "PS2_PAD_CTRL_L3_RIGHT", "body": [ "PS2_PAD_CTRL_L3_RIGHT" ], "description": "PS2 Left Stick RIGHT"},
+	"PS2_PAD_CTRL_L3_DOWN (0xFF54)": { "prefix": "PS2_PAD_CTRL_L3_DOWN", "body": [ "PS2_PAD_CTRL_L3_DOWN" ], "description": "PS2 Left Stick DOWN"},
 	
-	"PS2_PAD_CTRL_R3_LEFT (0xFFB4)": { "prefix": "PS2_PAD_CTRL_R3_LEFT", "body": [ "PS2_PAD_CTRL_R3_LEFT" ], "description": "Right Stick LEFT"},
-	"PS2_PAD_CTRL_R3_UP (0xFFB8)": { "prefix": "PS2_PAD_CTRL_R3_UP", "body": [ "PS2_PAD_CTRL_R3_UP" ], "description": "Right Stick UP"},
-	"PS2_PAD_CTRL_R3_RIGHT (0xFF51)": { "prefix": "PS2_PAD_CTRL_R3_RIGHT", "body": [ "PS2_PAD_CTRL_R3_RIGHT" ], "description": "Right Stick RIGHT"},
-	"PS2_PAD_CTRL_R3_DOWN (0xFFB2)": { "prefix": "PS2_PAD_CTRL_R3_DOWN", "body": [ "PS2_PAD_CTRL_R3_DOWN" ], "description": "Right Stick DOWN"},
+	"PS2_PAD_CTRL_R3_LEFT (0xFFB4)": { "prefix": "PS2_PAD_CTRL_R3_LEFT", "body": [ "PS2_PAD_CTRL_R3_LEFT" ], "description": "PS2 Right Stick LEFT"},
+	"PS2_PAD_CTRL_R3_UP (0xFFB8)": { "prefix": "PS2_PAD_CTRL_R3_UP", "body": [ "PS2_PAD_CTRL_R3_UP" ], "description": "PS2 Right Stick UP"},
+	"PS2_PAD_CTRL_R3_RIGHT (0xFF51)": { "prefix": "PS2_PAD_CTRL_R3_RIGHT", "body": [ "PS2_PAD_CTRL_R3_RIGHT" ], "description": "PS2 Right Stick RIGHT"},
+	"PS2_PAD_CTRL_R3_DOWN (0xFFB2)": { "prefix": "PS2_PAD_CTRL_R3_DOWN", "body": [ "PS2_PAD_CTRL_R3_DOWN" ], "description": "PS2 Right Stick DOWN"},
 	
-	"PS2_PAD_CTRL_CROSS (0xFF0D)": { "prefix": "PS2_PAD_CTRL_CROSS", "body": [ "PS2_PAD_CTRL_CROSS" ], "description": "X Button"},
-	"PS2_PAD_CTRL_SQUARE (0xFFBF)": { "prefix": "PS2_PAD_CTRL_SQUARE", "body": [ "PS2_PAD_CTRL_SQUARE" ], "description": "□ Button"},
-	"PS2_PAD_CTRL_TRIANGLE (0xFFBE)": { "prefix": "PS2_PAD_CTRL_TRIANGLE", "body": [ "PS2_PAD_CTRL_TRIANGLE" ], "description": "△ Triangle Button"},
-	"PS2_PAD_CTRL_CIRCLE (0xFF1B)": { "prefix": "PS2_PAD_CTRL_CIRCLE", "body": [ "PS2_PAD_CTRL_CIRCLE" ], "description": "O Button"},
+	"PS2_PAD_CTRL_CROSS (0xFF0D)": { "prefix": "PS2_PAD_CTRL_CROSS", "body": [ "PS2_PAD_CTRL_CROSS" ], "description": "PS2X Button"},
+	"PS2_PAD_CTRL_SQUARE (0xFFBF)": { "prefix": "PS2_PAD_CTRL_SQUARE", "body": [ "PS2_PAD_CTRL_SQUARE" ], "description": "PS2 □ Button"},
+	"PS2_PAD_CTRL_TRIANGLE (0xFFBE)": { "prefix": "PS2_PAD_CTRL_TRIANGLE", "body": [ "PS2_PAD_CTRL_TRIANGLE" ], "description": "PS2 △ Triangle Button"},
+	"PS2_PAD_CTRL_CIRCLE (0xFF1B)": { "prefix": "PS2_PAD_CTRL_CIRCLE", "body": [ "PS2_PAD_CTRL_CIRCLE" ], "description": "PS2 O Button"},
 	
-	"PS2_PAD_CTRL_SELECT (0xFF63)": { "prefix": "PS2_PAD_CTRL_SELECT", "body": [ "PS2_PAD_CTRL_SELECT" ], "description": "Select Button"},
-	"PS2_PAD_CTRL_START (0xFF8D)": { "prefix": "PS2_PAD_CTRL_START", "body": [ "PS2_PAD_CTRL_START" ], "description": "Start Buton"},
+	"PS2_PAD_CTRL_SELECT (0xFF63)": { "prefix": "PS2_PAD_CTRL_SELECT", "body": [ "PS2_PAD_CTRL_SELECT" ], "description": "PS2 Select Button"},
+	"PS2_PAD_CTRL_START (0xFF8D)": { "prefix": "PS2_PAD_CTRL_START", "body": [ "PS2_PAD_CTRL_START" ], "description": "PS2 Start Buton"},
 	
-	"PS2_PAD_CTRL_L1 (0xFFC8)": { "prefix": "PS2_PAD_CTRL_L1", "body": [ "PS2_PAD_CTRL_L1" ], "description": "L1 Button"},
-	"PS2_PAD_CTRL_L2 (0xFFC9)": { "prefix": "PS2_PAD_CTRL_L2", "body": [ "PS2_PAD_CTRL_L2" ], "description": "L2 Button"},
-	"PS2_PAD_CTRL_R1 (0xFFD2)": { "prefix": "PS2_PAD_CTRL_R1", "body": [ "PS2_PAD_CTRL_R1" ], "description": "R1 Button"},
-	"PS2_PAD_CTRL_R2 (0xFFD3)": { "prefix": "PS2_PAD_CTRL_R2", "body": [ "PS2_PAD_CTRL_R2" ], "description": "R2 Button"},
+	"PS2_PAD_CTRL_L1 (0xFFC8)": { "prefix": "PS2_PAD_CTRL_L1", "body": [ "PS2_PAD_CTRL_L1" ], "description": "PS2 L1 Button"},
+	"PS2_PAD_CTRL_L2 (0xFFC9)": { "prefix": "PS2_PAD_CTRL_L2", "body": [ "PS2_PAD_CTRL_L2" ], "description": "PS2 L2 Button"},
+	"PS2_PAD_CTRL_R1 (0xFFD2)": { "prefix": "PS2_PAD_CTRL_R1", "body": [ "PS2_PAD_CTRL_R1" ], "description": "PS2 R1 Button"},
+	"PS2_PAD_CTRL_R2 (0xFFD3)": { "prefix": "PS2_PAD_CTRL_R2", "body": [ "PS2_PAD_CTRL_R2" ], "description": "PS2 R2 Button"},
 	
 	// Text colors
-	"COLOR_DEFAULT (0x10)": { "prefix": "TEXT_COLOR_DEFAULT", "body": [ "COLOR_DEFAULT" ], "description": "Reverts to normal color"},
-	"COLOR_WHITE (0x11)": { "prefix": "TEXT_COLOR_WHITE", "body": [ "COLOR_WHITE" ], "description": "Sets next text to white"},
-	"COLOR_RED (0x12)": { "prefix": "TEXT_COLOR_RED", "body": [ "COLOR_RED" ], "description": "Sets next text to red"},
-	"COLOR_GREEN (0x13)": { "prefix": "TEXT_COLOR_GREEN", "body": [ "COLOR_GREEN" ], "description": "Sets next text to green"},
-	"COLOR_BLUE (0x14)": { "prefix": "TEXT_COLOR_BLUE", "body": [ "COLOR_BLUE" ], "description": "Sets next text to blue"},
-	"COLOR_YELLOW (0x15)": { "prefix": "TEXT_COLOR_YELLOW", "body": [ "COLOR_YELLOW" ], "description": "Sets next text to yellow"},
-	"COLOR_CYAN (0x16)": { "prefix": "TEXT_COLOR_CYAN", "body": [ "COLOR_CYAN" ], "description": "Sets next text to cyan"},
-	"COLOR_BLACK (0x17)": { "prefix": "TEXT_COLOR_BLACK", "body": [ "COLOR_BLACK" ], "description": "Sets next text to black"},
+	"COLOR_DEFAULT (0x10)": { "prefix": "TEXT_COLOR_DEFAULT", "body": [ "COLOR_DEFAULT" ], "description": "UI - Reverts to normal color"},
+	"COLOR_WHITE (0x11)": { "prefix": "TEXT_COLOR_WHITE", "body": [ "COLOR_WHITE" ], "description": "UI - Sets next text to white"},
+	"COLOR_RED (0x12)": { "prefix": "TEXT_COLOR_RED", "body": [ "COLOR_RED" ], "description": "UI - Sets next text to red"},
+	"COLOR_GREEN (0x13)": { "prefix": "TEXT_COLOR_GREEN", "body": [ "COLOR_GREEN" ], "description": "UI - Sets next text to green"},
+	"COLOR_BLUE (0x14)": { "prefix": "TEXT_COLOR_BLUE", "body": [ "COLOR_BLUE" ], "description": "UI - Sets next text to blue"},
+	"COLOR_YELLOW (0x15)": { "prefix": "TEXT_COLOR_YELLOW", "body": [ "COLOR_YELLOW" ], "description": "UI - Sets next text to yellow"},
+	"COLOR_CYAN (0x16)": { "prefix": "TEXT_COLOR_CYAN", "body": [ "COLOR_CYAN" ], "description": "UI - Sets next text to cyan"},
+	"COLOR_BLACK (0x17)": { "prefix": "TEXT_COLOR_BLACK", "body": [ "COLOR_BLACK" ], "description": "UI - Sets next text to black"},
 
 	"SCROLL_MODE_FOLLOW_FOCUS (0)": { "prefix": "SCROLL_MODE_FOLLOW_FOCUS", "body": [ "SCROLL_MODE_FOLLOW_FOCUS" ], "description": "Scroll Mode - Follow Focus"},
 	"SCROLL_MODE_FLOATING (1)": { "prefix": "SCROLL_MODE_FLOATING", "body": [ "SCROLL_MODE_FLOATING" ], "description": "Scroll Mode - Floating"},
 	"SCROLL_MODE_MANUAL (2)": { "prefix": "SCROLL_MODE_MANUAL", "body": [ "SCROLL_MODE_MANUAL" ], "description": "Scroll Mode - Manual"},
 	"SCROLL_MODE_FOLLOW_MODE (3)": { "prefix": "SCROLL_MODE_FOLLOW_MODE", "body": [ "SCROLL_MODE_FOLLOW_MODE" ], "description": "Scroll Mode - Follow Mode"},
 	
-	// Thread States
-	"STATE_EXIT (0)": { "prefix": "THREAD_STATE_EXIT", "body": [ "STATE_EXIT" ], "description": "State Exit"},
-	"STATE_RETURN (1)": { "prefix": "THREAD_STATE_RETURN", "body": [ "STATE_RETURN" ], "description": "State Return"},
-	"STATE_YIELD (2)": { "prefix": "THREAD_STATE_YIELD", "body": [ "STATE_YIELD" ], "description": "State Yield"},
-	"STATE_EXCEPTION (3)": { "prefix": "THREAD_STATE_EXCEPTION", "body": [ "STATE_EXCEPTION" ], "description": "State Exception"},
-	"STATE_CALL (4)": { "prefix": "THREAD_STATE_CALL", "body": [ "STATE_CALL" ], "description": "State Call"},
-	"STATE_RUN (5)": { "prefix": "THREAD_STATE_RUN", "body": [ "STATE_RUN" ], "description": "State Run"},
+	// Event States
+	"EVENTRESULT_CONTINUE (0)": { "prefix": "EVENTRESULT_CONTINUE", "body": [ "EVENTRESULT_CONTINUE" ], "description": "Continue processing/passing any other events including this one"},
+	"EVENTRESULT_STOP (1)": { "prefix": "EVENTRESULT_STOP", "body": [ "EVENTRESULT_STOP" ], "description": "Stop processing any other events"},
+	"EVENTRESULT_FILTER (2)": { "prefix": "EVENTRESULT_FILTER", "body": [ "EVENTRESULT_FILTER" ], "description": "Pass any other events to other event handlers except this one"},
 
+	// SQLite
+	"SQLITE_OK (0)": { "prefix": "SQLITE_OK", "body": [ "SQLITE_OK" ], "description": "Successful result"},
+	"SQLITE_ERROR (1)": { "prefix": "SQLITE_ERROR", "body": [ "SQLITE_ERROR" ], "description": "Generic error"},
+	"SQLITE_INTERNAL (2)": { "prefix": "SQLITE_INTERNAL", "body": [ "SQLITE_INTERNAL" ], "description": "Internal logic error in SQLite"},
+	"SQLITE_PERM (3)": { "prefix": "SQLITE_PERM", "body": [ "SQLITE_PERM" ], "description": "Access permission denied"},
+	"SQLITE_ABORT (4)": { "prefix": "SQLITE_ABORT", "body": [ "SQLITE_ABORT" ], "description": "Callback routine requested an abort"},
+	"SQLITE_BUSY (5)": { "prefix": "SQLITE_BUSY", "body": [ "SQLITE_BUSY" ], "description": "The database file is locked"},
+	"SQLITE_LOCKED (6)": { "prefix": "SQLITE_LOCKED", "body": [ "SQLITE_LOCKED" ], "description": "A table in the database is locked"},
+	"SQLITE_NOMEM (7)": { "prefix": "SQLITE_NOMEM", "body": [ "SQLITE_NOMEM" ], "description": "A malloc() faile"},
+	"SQLITE_READONLY (8)": { "prefix": "SQLITE_READONLY", "body": [ "SQLITE_READONLY" ], "description": "Attempt to write a readonly database"},
+	"SQLITE_INTERRUPT (9)": { "prefix": "SQLITE_INTERRUPT", "body": [ "SQLITE_INTERRUPT" ], "description": "Operation terminated by sqlite3_interrupt()"},
+	"SQLITE_IOERR (10)": { "prefix": "SQLITE_IOERR", "body": [ "SQLITE_IOERR" ], "description": "Some kind of disk I/O error occurred"},
+	"SQLITE_CORRUPT (11)": { "prefix": "SQLITE_CORRUPT", "body": [ "SQLITE_CORRUPT" ], "description": "The database disk image is malformed"},
+	"SQLITE_NOTFOUND (12)": { "prefix": "SQLITE_NOTFOUND", "body": [ "SQLITE_NOTFOUND" ], "description": "Unknown opcode in sqlite3_file_control()"},
+	"SQLITE_FULL (13)": { "prefix": "SQLITE_FULL", "body": [ "SQLITE_FULL" ], "description": "Insertion failed because database is full"},
+	"SQLITE_CANTOPEN (14)": { "prefix": "SQLITE_CANTOPEN", "body": [ "SQLITE_CANTOPEN" ], "description": "Unable to open the database file"},
+	"SQLITE_PROTOCOL (15)": { "prefix": "SQLITE_PROTOCOL", "body": [ "SQLITE_PROTOCOL" ], "description": "Database lock protocol error"},
+	"SQLITE_EMPTY (16)": { "prefix": "SQLITE_EMPTY", "body": [ "SQLITE_EMPTY" ], "description": "Internal use only"},
+	"SQLITE_SCHEMA (17)": { "prefix": "SQLITE_SCHEMA", "body": [ "SQLITE_SCHEMA" ], "description": "The database schema changed"},
+	"SQLITE_TOOBIG (18)": { "prefix": "SQLITE_TOOBIG", "body": [ "SQLITE_TOOBIG" ], "description": "String or BLOB exceeds size limit"},
+	"SQLITE_CONSTRAINT (19)": { "prefix": "SQLITE_CONSTRAINT", "body": [ "SQLITE_CONSTRAINT" ], "description": "Abort due to constraint violation"},
+	"SQLITE_MISMATCH (20)": { "prefix": "SQLITE_MISMATCH", "body": [ "SQLITE_MISMATCH" ], "description": "Data type mismatch"},
+	"SQLITE_MISUSE (21)": { "prefix": "SQLITE_MISUSE", "body": [ "SQLITE_MISUSE" ], "description": "Library used incorrectly"},
+	"SQLITE_NOLFS (22)": { "prefix": "SQLITE_NOLFS", "body": [ "SQLITE_NOLFS" ], "description": "Uses OS features not supported on host"},
+	"SQLITE_AUTH (23)": { "prefix": "SQLITE_AUTH", "body": [ "SQLITE_AUTH" ], "description": "Authorization denied"},
+	"SQLITE_FORMAT (24)": { "prefix": "SQLITE_FORMAT", "body": [ "SQLITE_FORMAT" ], "description": "Not used"},
+	"SQLITE_RANGE (25)": { "prefix": "SQLITE_RANGE", "body": [ "SQLITE_RANGE" ], "description": "2nd parameter to sqlite3_bind out of range"},
+	"SQLITE_NOTADB (26)": { "prefix": "SQLITE_NOTADB", "body": [ "SQLITE_NOTADB" ], "description": "File opened that is not a database file"},
+	"SQLITE_NOTICE (27)": { "prefix": "SQLITE_NOTICE", "body": [ "SQLITE_NOTICE" ], "description": "Notifications from sqlite3_log()"},
+	"SQLITE_WARNING (28)": { "prefix": "SQLITE_WARNING", "body": [ "SQLITE_WARNING" ], "description": "Warnings from sqlite3_log()"},
+	"SQLITE_ROW (100)": { "prefix": "SQLITE_ROW", "body": [ "SQLITE_ROW" ], "description": "sqlite3_step() has another row ready"},
+	"SQLITE_DONE (101)": { "prefix": "SQLITE_DONE", "body": [ "SQLITE_DONE" ], "description": "sqlite3_step() has finished executing"},
+
+	"ROOT": { "prefix": "ROOT", "body": [ "ROOT" ], "description": "Current root (for projects)"},
+	"PROJECT": { "prefix": "PROJECT", "body": [ "PROJECT" ], "description": "Current project (for projects)"},
+	"IMPL": { "prefix": "IMPL", "body": [ "IMPL" ], "description": "Current root implementation (GTSport, for projects)"},
 	"LINE": { "prefix": "LINE", "body": [ "__LINE__" ], "description": "Current Script Line"},
 	"FILE": { "prefix": "FILE", "body": [ "__FILE__" ], "description": "Current Script Path"},
 	"DATE": { "prefix": "FILE", "body": [ "__DATE__" ], "description": "Returns compilation date i.e 'Jun 15 2009'"},
 	"TIME": { "prefix": "TIME", "body": [ "__TIME__" ], "description": "Returns compilation time i.e '13:45:30'"},
 	"COUNTER": { "prefix": "COUNTER", "body": [ "__COUNTER__" ], "description": "Returns global counter"},
 	"TIMESTAMP": { "prefix": "TIMESTAMP", "body": [ "__TIMESTAMP__" ], "description": "Returns script last write timestamp i.e 'Jun 15 2009 13:45:30 2009'"},
+
+	"DIALOG_OK (0)": { "prefix": "DIALOG_OK", "body": [ "DIALOG_OK" ], "description": "Dialog with OK button"},
+	"DIALOG_QUERY (1)": { "prefix": "DIALOG_QUERY", "body": [ "DIALOG_QUERY" ], "description": "Dialog with OK/Cancel prompt"},
+	"DIALOG_ERROR (2)": { "prefix": "DIALOG_ERROR", "body": [ "DIALOG_ERROR" ], "description": "Dialog with error"},
+	"DIALOG_DEFAULT_NO (3)": { "prefix": "DIALOG_DEFAULT_NO", "body": [ "DIALOG_DEFAULT_NO" ], "description": "Dialog with yes/no prompt, defaults to no"},
+	"DIALOG_YESNO (4)": { "prefix": "DIALOG_YESNO", "body": [ "DIALOG_YESNO" ], "description": "Dialog with yes/no prompt"},
+
+	"PS3_SCREEN_W_F": { "prefix": "PS2_SCREEN_W_F", "body": [ "PS2_SCREEN_W_F" ], "description": "PS3 Screen Width (float, default 1920.0)"},
+	"PS3_SCREEN_W": { "prefix": "PS2_SCREEN_W", "body": [ "PS2_SCREEN_W" ], "description": "PS3 Screen Width (int, default 1920)"},
+	"PS3_SCREEN_H_F": { "prefix": "PS2_SCREEN_H_F", "body": [ "PS2_SCREEN_H_F" ], "description": "PS3 Screen Height (float, default 1080.0)"},
+	"PS3_SCREEN_H": { "prefix": "PS2_SCREEN_H", "body": [ "PS2_SCREEN_H" ], "description": "PS3 Screen Height (int, default 1080)"},
+	"PS2_SCREEN_W_F": { "prefix": "PS2_SCREEN_W_F", "body": [ "PS2_SCREEN_W_F" ], "description": "PS2 Screen Width (float, default 640.0)"},
+	"PS2_SCREEN_W": { "prefix": "PS2_SCREEN_W", "body": [ "PS2_SCREEN_W" ], "description": "PS2 Screen Width (int, default 640)"},
+	"PS2_SCREEN_H_F": { "prefix": "PS2_SCREEN_H_F", "body": [ "PS2_SCREEN_H_F" ], "description": "PS2 Screen Height (float, default 480.0)"},
+	"PS2_SCREEN_H": { "prefix": "PS2_SCREEN_H", "body": [ "PS2_SCREEN_H" ], "description": "PS2 Screen Height (int, default 480)"},
+	"PSP_SCREEN_W_F": { "prefix": "PSP_SCREEN_W_F", "body": [ "PSP_SCREEN_W_F" ], "description": "PSP Screen Width (float, default 480.0)"},
+	"PSP_SCREEN_W": { "prefix": "PSP_SCREEN_W", "body": [ "PSP_SCREEN_W" ], "description": "PSP Screen Width (int, default 480)"},
+	"PSP_SCREEN_H_F": { "prefix": "PSP_SCREEN_H_F", "body": [ "PSP_SCREEN_H_F" ], "description": "PSP Screen Height (float, default 272.0)"},
+	"PSP_SCREEN_H": { "prefix": "PSP_SCREEN_H", "body": [ "PSP_SCREEN_H" ], "description": "PSP Screen Height (int, default 272)"},
 
 
 	// Numeric limits
