@@ -188,7 +188,7 @@ namespace GTAdhocToolchain.Core
                 case AdhocInstructionType.ASSIGN:
                 case AdhocInstructionType.JUMP_IF_FALSE:
                 case AdhocInstructionType.JUMP_IF_TRUE:
-                case AdhocInstructionType.JUMP_IF_NOT_NIL:
+                case AdhocInstructionType.JUMP_IF_NIL:
                 case AdhocInstructionType.REQUIRE:
                 case AdhocInstructionType.ARRAY_PUSH:
                 case AdhocInstructionType.MODULE_CONSTRUCTOR:
@@ -634,7 +634,7 @@ namespace GTAdhocToolchain.Core
                     }
                 }
 
-                uint unkVarHeapIndex = stream.ReadUInt32();
+                uint unkVarStackIndex = stream.ReadUInt32();
             }
 
             if (Version <= 10)

@@ -6,6 +6,8 @@ using GTAdhocToolchain.Core;
 using GTAdhocToolchain.Core.Instructions;
 using GTAdhocToolchain.Core.Variables;
 
+using System.Diagnostics;
+
 namespace GTAdhocToolchain.Compiler
 {
     /// <summary>
@@ -199,6 +201,9 @@ namespace GTAdhocToolchain.Compiler
                     break;
                 case Nodes.DoWhileStatement:
                     CompileDoWhile(frame, node as DoWhileStatement);
+                    break;
+                case Nodes.ListAssignmentStatement:
+                    CompileListAssignmentStatement(frame, node as ListAssignementStatement);
                     break;
                 case Nodes.VariableDeclaration:
                     CompileVariableDeclaration(frame, node as VariableDeclaration);
@@ -875,10 +880,19 @@ namespace GTAdhocToolchain.Compiler
             InsertVariableEvalFromSymbol(frame, itorIdentifier);
             frame.AddInstruction(new InsEval(), 0);
 
-            if (foreachStatement.Left is not VariableDeclaration)
-                ThrowCompilationError(foreachStatement, CompilationMessages.Error_ForeachDeclarationNotVariable);
-
-            CompileVariableDeclaration(frame, foreachStatement.Left as VariableDeclaration, pushWhenNoInit: true); // We're unboxing, gotta push anyway
+            if (foreachStatement.Left.Type == Nodes.VariableDeclaration)
+            {
+                CompileVariableDeclaration(frame, foreachStatement.Left as VariableDeclaration, pushWhenNoInit: true); // We're unboxing, gotta push anyway
+            }
+            else if (foreachStatement.Left.Type == Nodes.ListAssignmentExpression)
+            {
+                ListAssignementExpression list = foreachStatement.Left as ListAssignementExpression;
+                CompileListAsssignmentExpression(frame, list);
+            }
+            else
+            {
+                ThrowCompilationError(foreachStatement, CompilationMessages.Error_ForeachDeclarationNotVariableOrList);
+            }
 
             // Compile body.
             CompileStatementWithScope(frame, foreachStatement.Body);
@@ -1084,6 +1098,31 @@ namespace GTAdhocToolchain.Compiler
                     frame.AddInstruction(new InsNilConst(), paramIdent.Location.Start.Line);
                 }
             }
+            else if (param.Type == Nodes.ListAssignmentExpression)
+            {
+                // Adhoc allows deconstructing an array directly into variables into a function. i.e:
+                /* function sum({a, b})
+                 * {
+                 *    return a + b;
+                 * }
+                 * sum([1, 2]);
+                 */
+                var listExpr = param as ListAssignementExpression;
+
+                // This isn't ever used by any of the scripts. What the compiler does is generate a temporary 'arg#{number}' variable in the
+                // subroutine body itself.
+
+                string tempArgName = $"arg#{SymbolMap.TempVariableCounter++}";
+                AdhocSymbol paramSymb = SymbolMap.RegisterSymbol(tempArgName);
+                subroutine.CodeFrame.AddScopeVariable(paramSymb, isAssignment: true, isLocalDeclaration: true);
+
+                // We create a new list with identifiers remapped as variable declarations.
+                // Any other expression type is not supported, so this doubles as an argument verifier.
+                var listClone = CreateAndVerifyListAssignmentForFunctionParameter(listExpr); 
+
+                ListAssignementStatement assignmentExpr = new ListAssignementStatement(listClone, new Identifier(tempArgName));
+                CompileListAssignmentStatement(subroutine.CodeFrame, assignmentExpr);
+            }
             else
             {
                 if (frame.Version < 7)
@@ -1140,6 +1179,34 @@ namespace GTAdhocToolchain.Compiler
         }
 
         /// <summary>
+        /// Creates a list assignment expression for subroutine argument declaration.
+        /// </summary>
+        /// <param name="list"></param>
+        /// <returns></returns>
+        private ListAssignementExpression CreateAndVerifyListAssignmentForFunctionParameter(ListAssignementExpression list)
+        {
+            List<Node> nodes = [];
+            foreach (Node elem in list.Elements)
+            {
+                if (elem.Type == Nodes.Identifier)
+                {
+                    nodes.Add(new VariableDeclarator(elem as Identifier, init: null));
+                }
+                else if (elem.Type == Nodes.ListAssignmentExpression)
+                {
+                    ListAssignementExpression nestedList = CreateAndVerifyListAssignmentForFunctionParameter(elem as ListAssignementExpression);
+                    nodes.Add(nestedList);
+                }
+                else
+                {
+                    ThrowCompilationError(elem, CompilationMessages.Error_InvalidListAssignmentArgumentInSubroutine);
+                }
+            }
+
+            return new ListAssignementExpression(NodeList.Create(nodes), list.HasRestElement);
+        }
+
+        /// <summary>
         /// Compiles: 'return <expression>;' .
         /// </summary>
         /// <param name="frame"></param>
@@ -1173,7 +1240,7 @@ namespace GTAdhocToolchain.Compiler
         }
 
         /// <summary>
-        /// Compiles "var a = 0, [b = 1] ...;"
+        /// Compiles "var a = 0, ...;"
         /// </summary>
         /// <param name="frame"></param>
         /// <param name="varDeclaration"></param>
@@ -1233,10 +1300,6 @@ namespace GTAdhocToolchain.Compiler
                             frame.AddScopeVariable(varSymb, isAssignment: true, isLocalDeclaration: true);
                         }
                     }
-                    else if (id is ArrayPattern arrayPattern) // var [hello, world] = helloworld; - deconstruct array
-                    {
-                        CompileArrayPatternPush(frame, arrayPattern, isDeclaration: true);
-                    }
                     else
                     {
                         ThrowCompilationError(varDeclaration, "Variable declaration for id is not an identifier.");
@@ -1260,10 +1323,6 @@ namespace GTAdhocToolchain.Compiler
                             AdhocSymbol varSymb = SymbolMap.RegisterSymbol(idIdentifier.Name);
                             frame.AddScopeVariable(varSymb, isAssignment: true, isLocalDeclaration: true);
                         }
-                    }
-                    else if (id is ArrayPattern arrayPattern) // var [hello, world] = helloworld; - deconstruct array
-                    {
-                        CompileArrayPatternPush(frame, arrayPattern, isDeclaration: true);
                     }
                     else
                     {
@@ -1289,52 +1348,105 @@ namespace GTAdhocToolchain.Compiler
                             CompileExpression(frame, initValue);
                         }
 
-                        // Perform assignment
-                        if (id is ArrayPattern arrayPattern)
-                        {
-                            InsListAssignOld listAssign = new InsListAssignOld(arrayPattern.Elements.Count);
-                            frame.AddInstruction(listAssign, arrayPattern.Location.Start.Line);
-                            InsertPop(frame);
-                        }
-                        else
-                        {
-                            InsertAssignPop(frame);
-                        }
+                        
+                        InsertAssignPop(frame);
                     }
                 }
                 
             }
         }
 
-        private void CompileArrayPatternPush(AdhocCodeFrame frame, ArrayPattern arrayPattern, bool isDeclaration = false)
+        /// <summary>
+        /// Compiles trivial "|a, b, c.d, e::f| = g" statement
+        /// </summary>
+        /// <param name="frame"></param>
+        /// <param name="listAssignment"></param>
+        /// <param name="pushWhenNoInit"></param>
+        public void CompileListAssignmentStatement(AdhocCodeFrame frame, ListAssignementStatement listAssignment)
         {
-            if (arrayPattern.Elements.Count == 0)
-                ThrowCompilationError(arrayPattern, CompilationMessages.Error_ArrayPatternNoElements);
+            if (frame.Version >= 11) // Must be before in late versions
+                CompileExpression(frame, listAssignment.Right);
 
-            foreach (Expression exp in arrayPattern.Elements)
+            var before = frame.Version < 11 ? listAssignment.Right : null;
+            CompileListAsssignmentExpression(frame, listAssignment.Left, init: before);
+        }
+
+        /// <summary>
+        /// Compiles trivial "|a, b, c.d, e::f| = g" statement with specified init, mainly due to foreach having a different init
+        /// </summary>
+        /// <param name="frame"></param>
+        /// <param name="list"></param>
+        /// <param name="init"></param>
+        private void CompileListAsssignmentExpression(AdhocCodeFrame frame, ListAssignementExpression list, Expression? init = null, bool popResult = true)
+        {
+            if (list.HasRestElement && frame.Version < 12)
+                ThrowCompilationError(list, CompilationMessages.Error_ListAssignementRestElementUnsupported);
+
+            Dictionary<ListAssignementExpression, AdhocSymbol> nestedLists = [];
+            foreach (var elem in list.Elements)
             {
-                if (exp.Type == Nodes.Identifier)
+                if (elem.Type == Nodes.Identifier)
                 {
-                    Identifier arrElemIdentifier = exp as Identifier;
-                    InsertVariablePush(frame, arrElemIdentifier, isDeclaration);
+                    Identifier variableIdentifier = elem as Identifier;
+                    InsertVariablePush(frame, variableIdentifier, isVariableDeclaration: false);
                 }
-                else if (exp is AttributeMemberExpression)
+                else if (elem.Type == Nodes.VariableDeclarator)
                 {
-                    CompileAttributeMemberAssignmentPush(frame, exp as AttributeMemberExpression);
+                    VariableDeclarator variableDeclarator = elem as VariableDeclarator;
+                    Identifier variableIdentifier = variableDeclarator.Id as Identifier;
+                    InsertVariablePush(frame, variableIdentifier, isVariableDeclaration: true);
+                }
+                else if (elem is AttributeMemberExpression)
+                {
+                    CompileAttributeMemberAssignmentPush(frame, elem as AttributeMemberExpression);
+                }
+                else if (elem is StaticMemberExpression)
+                {
+                    CompileStaticMemberExpressionPush(frame, elem as StaticMemberExpression);
+                }
+                else if (elem is ListAssignementExpression nestedList)
+                {
+                    string tmpTaskVariable = $"tmp#{SymbolMap.TempVariableCounter++}";
+                    AdhocSymbol tempVariable = InsertVariablePush(frame, new Identifier(tmpTaskVariable), true);
+
+                    // Keep track of these
+                    nestedLists.Add(nestedList, tempVariable);
                 }
                 else
-                    ThrowCompilationError(exp, "Expected array pattern element to be an identifier or attribute member expression.");
+                    ThrowCompilationError(elem, "Expected list assignment element to be an identifier, variable declaration, attribute path, static path, or nested list assignment.");
             }
 
-            if (frame.Version >= 11)
+            // FIXME: Logic can probably be improved
+            if (frame.Version < 11 && init is not null)
             {
-                InsListAssign listAssign = new InsListAssign(arrayPattern.Elements.Count);
-                frame.AddInstruction(listAssign, arrayPattern.Location.Start.Line);
-                InsertPop(frame);
+                if (init.Type == Nodes.AssignmentExpression)
+                {
+                    InsertListAssign(frame, list.Elements.Count, list.HasRestElement, list.Location.Start.Line);
+                    CompileExpression(frame, init);
+                }
+                else
+                {
+                    CompileExpression(frame, init);
+                    InsertListAssign(frame, list.Elements.Count, list.HasRestElement, list.Location.Start.Line);
+                }
             }
             else
             {
-                return; // Needs to be after the value evaluation
+                InsertListAssign(frame, list.Elements.Count, list.HasRestElement, list.Location.Start.Line);
+            }
+
+            if (popResult)
+                InsertPop(frame);
+
+            foreach (KeyValuePair<ListAssignementExpression, AdhocSymbol> nestedListAndTmpVarPair in nestedLists)
+            {
+                ListAssignementExpression nestedList = nestedListAndTmpVarPair.Key;
+                AdhocSymbol tempListVariable = nestedListAndTmpVarPair.Value;
+
+                if (frame.Version >= 11)
+                    InsertVariableEvalFromSymbol(frame, tempListVariable);
+
+                CompileListAsssignmentExpression(frame, nestedList, new Identifier(tempListVariable.Name), popResult: true); // In a nested list, we are not reusing the result. pop it.
             }
         }
 
@@ -2068,28 +2180,36 @@ namespace GTAdhocToolchain.Compiler
                         CompileExpression(frame, assignExpression.Right);
                     }
 
-                    CompileVariableAssignment(frame, assignExpression.Left, popResult);
+                    // |a, b| = |c, d| = ...?
+                    if (assignExpression.Left.Type == Nodes.ListAssignmentExpression)
+                    {
+                        CompileListAsssignmentExpression(frame, assignExpression.Left as ListAssignementExpression, popResult: false);
+                    }
+                    else
+                    {
+                        CompileVariableAssignment(frame, assignExpression.Left, popResult);
+                    }
                 }
                 else // Target first in old versions
                 {
                     // Regular update of left-hand side
                     // Left-hand side needs to be pushed first
-
-                    // Assigning to a reference variable (*var = 1)
-                    if (IsUnaryIndirection(assignExpression.Left))
+                    if (IsUnaryIndirection(assignExpression.Left)) // Assigning to a reference variable (*var = 1)
                     {
                         // Trivially compile left reference
                         CompileUnaryExpression(frame, assignExpression.Left as UnaryExpression);
+                    }
+                    else if (assignExpression.Left.Type == Nodes.ListAssignmentExpression) // |a, b| = |c, d| = e;
+                    {
+                        var listAssignExpr = assignExpression.Left as ListAssignementExpression;
+                        CompileListAsssignmentExpression(frame, listAssignExpr, null, popResult: false);
+                        return; // No actual assignment, covered by list assign.
                     }
                     else
                     {
                         if (assignExpression.Left.Type == Nodes.Identifier)
                         {
                             InsertVariablePush(frame, assignExpression.Left as Identifier, isVariableDeclaration: false);
-                        }
-                        else if (assignExpression.Left.Type == Nodes.ArrayPattern)
-                        {
-                            CompileArrayPatternPush(frame, assignExpression.Left as ArrayPattern, isDeclaration: false);
                         }
                         else if (assignExpression.Left is AttributeMemberExpression attr)
                         {
@@ -2122,23 +2242,10 @@ namespace GTAdhocToolchain.Compiler
                         CompileExpression(frame, assignExpression.Right);
                     }
 
-                    if (assignExpression.Left.Type == Nodes.ArrayPattern)
-                    {
-                        // Finish array pattern assignment by adding LIST_ASSIGN_OLD
-                        ArrayPattern arrayPattern = assignExpression.Left as ArrayPattern;
-                        InsListAssignOld listAssign = new InsListAssignOld(arrayPattern.Elements.Count);
-                        frame.AddInstruction(listAssign, arrayPattern.Location.Start.Line);
-
-                        if (popResult)
-                            InsertPop(frame);
-                    }
+                    if (popResult)
+                        InsertAssignPop(frame);
                     else
-                    {
-                        if (popResult)
-                            InsertAssignPop(frame);
-                        else
-                            InsertAssign(frame);
-                    }
+                        InsertAssign(frame);
                 }
             }
             else if (IsAdhocAssignWithOperandOperator(assignExpression.Operator)) // += -= /= etc..
@@ -2225,11 +2332,6 @@ namespace GTAdhocToolchain.Compiler
                 else
                     ThrowCompilationError(expression, $"Unimplemented member expression assignment type: '{expression.Type}'");
 
-            }
-            else if (expression.Type == Nodes.ArrayPattern) // var [hi, hello] = args
-            {
-                CompileArrayPatternPush(frame, expression as ArrayPattern, isDeclaration: false);
-                return; // No need for assign pop
             }
             else if (expression is UnaryExpression unaryExp && unaryExp.Operator == UnaryOperator.Indirection) // (*/&)hello = world
             {
@@ -2646,7 +2748,7 @@ namespace GTAdhocToolchain.Compiler
                     if (frame.Version < 13)
                         AddPostCompilationWarning(CompilationMessages.Warning_UsingOptional_Code);
 
-                    var jumpIfNotNil = new InsJumpIfNotNil();
+                    var jumpIfNotNil = new InsJumpIfNil();
                     frame.AddInstruction(jumpIfNotNil, binExp.Location.Start.Line);
                     CompileExpression(frame, binExp.Right);
                     jumpIfNotNil.InstructionIndex = frame.GetLastInstructionIndex();
@@ -2777,7 +2879,7 @@ namespace GTAdhocToolchain.Compiler
                     UnaryOperator.Increment when preIncrement => AdhocConstants.UNARY_OPERATOR_PRE_INCREMENT,
                     UnaryOperator.Decrement when !preIncrement => AdhocConstants.UNARY_OPERATOR_POST_DECREMENT,
                     UnaryOperator.Decrement when preIncrement => AdhocConstants.UNARY_OPERATOR_PRE_DECREMENT,
-                    _ => throw new NotImplementedException("TODO"),
+                    _ => throw new UnreachableException("Invalid unary operator"),
                 };
 
                 bool opToSymbol = frame.Version >= 12;
@@ -3361,6 +3463,18 @@ namespace GTAdhocToolchain.Compiler
                 frame.AddInstruction(InsAssign.Default, 0);
             else // Assume under 10 that its the traditional assign + pop old
                 frame.AddInstruction(InsAssignOld.Default, 0);
+        }
+
+        /// <summary>
+        /// Inserts a version-aware list_assign
+        /// </summary>
+        /// <param name="frame"></param>
+        private void InsertListAssign(AdhocCodeFrame frame, int numElements, bool restElement, int lineNumber)
+        {
+            if (frame.Version >= 11)
+                frame.AddInstruction(new InsListAssign() { VariableCount = numElements, }, lineNumber);
+            else
+                frame.AddInstruction(new InsListAssignOld() { VariableCount = numElements }, lineNumber);
         }
 
         /// <summary>
