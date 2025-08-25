@@ -2509,6 +2509,7 @@ namespace GTAdhocToolchain.Compiler
             CompileExpression(frame, objSelectExpr.Object);
             CompileExpression(frame, objSelectExpr.Property);
             frame.AddInstruction(InsObjectSelector.Default, 0);
+            frame.AddInstruction(new InsEval(), 0);
         }
 
         /// <summary>
