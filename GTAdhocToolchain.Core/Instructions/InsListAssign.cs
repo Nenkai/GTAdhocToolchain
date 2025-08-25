@@ -17,7 +17,7 @@ namespace GTAdhocToolchain.Core.Instructions
 
         public int VariableCount { get; set; }
 
-        public bool Unk { get; set; }
+        public bool HasRestElement { get; set; }
 
         public InsListAssign(int varCount)
         {
@@ -33,14 +33,14 @@ namespace GTAdhocToolchain.Core.Instructions
         {
             stream.WriteInt32(VariableCount);
             if (stream.Version > 11)
-                stream.WriteBoolean(Unk);
+                stream.WriteBoolean(HasRestElement);
         }
 
         public override void Deserialize(AdhocStream stream)
         {
             VariableCount = stream.ReadInt32();
             if (stream.Version > 11)
-                Unk = stream.ReadBoolean();
+                HasRestElement = stream.ReadBoolean();
         }
 
         public override string ToString()
@@ -49,6 +49,6 @@ namespace GTAdhocToolchain.Core.Instructions
         }
 
         public override string Disassemble(bool asCompareMode = false)
-           => $"{InstructionType}: ElemCount={VariableCount}, UnkBool={Unk}";
+           => $"{InstructionType}: ElemCount={VariableCount}, HasRestElement={HasRestElement}";
     }
 }

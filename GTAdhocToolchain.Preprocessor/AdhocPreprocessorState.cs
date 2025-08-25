@@ -18,7 +18,7 @@ public class AdhocPreprocessorUnit
     public string CurrentIncludePath;
     public Scanner TokenScanner;
     public Token Lookahead;
-    public DateTime FileTimeStamp;
+    public DateTime FileTimeStamp = DateTime.Now;
     public bool Writing = true;
 
     public AdhocPreprocessorUnit()
