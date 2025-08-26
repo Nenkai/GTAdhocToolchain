@@ -62,6 +62,9 @@ namespace GTAdhocToolchain.Compiler
         public const string Error_OptionalMemberUnsupported = "Optional '?.' is only available starting from Adhoc version 12, starting GT Sport.";
         public const string Error_NullCoalescingUnsupported = "Nullish coalescing (??) is only available from Adhoc version 12, starting GT Sport";
 
+        public const string Error_NumberConstructorMissingArgument = "Number constructor missing numeric literal argument.";
+        public const string Error_NumberConstructorArgumentNotNumericLiteral = "Number constructor argument is not a numeric literal.";
+
         public const string Error_VaCall_MissingFunctionTarget = "Missing FunctionObject target and argument array in variadic function call";
         public const string Error_VaCall_MissingArguments = "Missing argument array in variadic function call";
 
@@ -69,5 +72,15 @@ namespace GTAdhocToolchain.Compiler
 
         public const string Error_DefaultParameterValuesUnsupported = "Default parameter values are only supported in Adhoc version 7 and above.";
         public const string Error_DefaultAttributeValuesUnsupported = "Default attribute values are only available in Adhoc version 7 and above.";
+
+        public const string Error_V12UIntLiteralUnsupported = "Unsigned int literals are only available in Adhoc version 12 and above.";
+        public const string Error_V12ULongLiteralUnsupported = "Unsigned long literals are only available in Adhoc version 12 and above.";
+        public const string Error_V12DoubleLiteralUnsupported = "Double literals are only available in Adhoc version 12 and above.";
+
+        public const string Error_V13ByteLiteralsUnsupported = "Byte literals are only available in Adhoc Version 13 and above (GT7).";
+        public const string Error_V13UByteLiteralsUnsupported = "UByte literals is only available in Adhoc Version 13 and above (GT7).";
+        public const string Error_V13ShortLiteralsUnsupported = "Short literals is only available in Adhoc Version 13 and above (GT7).";
+        public const string Error_V13UShortLiteralsUnsupported = "UShort literals is only available in Adhoc Version 13 and above (GT7).";
+
     }
 }

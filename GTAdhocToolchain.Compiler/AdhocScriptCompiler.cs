@@ -2434,7 +2434,7 @@ namespace GTAdhocToolchain.Compiler
                 if (frame.Version < 13)
                     AddPostCompilationWarning(CompilationMessages.Warning_UsingOptional_Code);
 
-                frame.AddInstruction(new InsOptional(), computedMember.Location.Start.Line);
+                frame.AddInstruction(new InsLogicalOptional(), computedMember.Location.Start.Line);
             }
 
             CompileExpression(frame, computedMember.Property);
@@ -2495,7 +2495,7 @@ namespace GTAdhocToolchain.Compiler
                 if (frame.Version < 13)
                     AddPostCompilationWarning(CompilationMessages.Warning_UsingOptional_Code);
 
-                frame.AddInstruction(new InsOptional(), attrExp.Location.Start.Line);
+                frame.AddInstruction(new InsLogicalOptional(), attrExp.Location.Start.Line);
             }
 
             if (attrExp.Property.Type == Nodes.Identifier)
@@ -2626,8 +2626,8 @@ namespace GTAdhocToolchain.Compiler
         /// <param name="call"></param>
         private void CompileCall(AdhocCodeFrame frame, CallExpression call, bool popReturnValue = false)
         {
-            bool isVariadicCall = false;
-            if (call.Callee is Identifier ident && ident.Name == "call")
+            // Handle special types first
+            if (call.Callee is Identifier ident && ident.Name == "call") // VA_CALL
             {
                 if (call.Arguments.Count < 1)
                     ThrowCompilationError(call, CompilationMessages.Error_VaCall_MissingFunctionTarget);
@@ -2638,10 +2638,20 @@ namespace GTAdhocToolchain.Compiler
                 foreach (var arg in call.Arguments)
                     CompileExpression(frame, arg);
 
-                isVariadicCall = true;
+                var vaCallIns = new InsVaCall() { PopObjectCount = (uint)call.Arguments.Count };
+                frame.AddInstruction(vaCallIns, call.Location.Start.Line);
+                AddPostCompilationWarning(CompilationMessages.Warning_UsingVaCall_Code);
+
+                if (frame.Version < 11)
+                    frame.AddInstruction(new InsEval(), call.Location.Start.Line);
+            }
+            else if (IsNumberTypeIdentifier(call.Callee)) // UInt(1) => U_INT_CONST
+            {
+                CompileNumberConstructor(frame, call);
             }
             else
             {
+                // Regular calls
                 if (call.Callee is Identifier awaitTaskIdentifier && awaitTaskIdentifier.Name == "AwaitTask")
                 {
                     if (call.Arguments.Count != 1)
@@ -2666,26 +2676,101 @@ namespace GTAdhocToolchain.Compiler
                     else
                         CompileExpression(frame, call.Arguments[i]);
                 }
-            }
 
-            if (isVariadicCall)
-            {
-                var vaCallIns = new InsVaCall() { PopObjectCount = (uint)call.Arguments.Count };
-                frame.AddInstruction(vaCallIns, call.Location.Start.Line);
-                AddPostCompilationWarning(CompilationMessages.Warning_UsingVaCall_Code);
-            }
-            else
-            {
                 var callIns = new InsCall(call.Arguments.Count);
                 frame.AddInstruction(callIns, call.Location.Start.Line);
-            }
 
-            if (frame.Version < 11)
-                frame.AddInstruction(new InsEval(), call.Location.Start.Line);
+                if (frame.Version < 11)
+                    frame.AddInstruction(new InsEval(), call.Location.Start.Line);
+            }
 
             // When calling and not caring about returns
             if (popReturnValue)
                 InsertPop(frame);
+        }
+
+        /// <summary>
+        /// Compiles 'UInt(1), Float(5)' etc.
+        /// </summary>
+        /// <param name="frame"></param>
+        /// <param name="call"></param>
+        private void CompileNumberConstructor(AdhocCodeFrame frame, CallExpression call)
+        {
+            Identifier calleeIdentifier = call.Callee as Identifier;
+            if (call.Arguments.Count < 1)
+                ThrowCompilationError(call, CompilationMessages.Error_NumberConstructorMissingArgument);
+
+            if (call.Arguments[0].Type != Nodes.Literal)
+                ThrowCompilationError(call, CompilationMessages.Error_NumberConstructorArgumentNotNumericLiteral);
+
+            var literal = (Literal)call.Arguments[0];
+            if (literal.TokenType != TokenType.NumericLiteral)
+                ThrowCompilationError(call, CompilationMessages.Error_NumberConstructorArgumentNotNumericLiteral);
+
+            switch (calleeIdentifier.Name)
+            {
+                case "Byte":
+                    if (frame.Version < 13)
+                        ThrowCompilationError(calleeIdentifier, CompilationMessages.Error_V13ByteLiteralsUnsupported);
+
+                    var byteConst = new InsByteConst(Convert.ToSByte(literal.NumericValue));
+                    frame.AddInstruction(byteConst, literal.Location.Start.Line);
+                    break;
+                case "UByte":
+                    if (frame.Version < 13)
+                        ThrowCompilationError(calleeIdentifier, CompilationMessages.Error_V13UByteLiteralsUnsupported);
+
+                    var ubyteConst = new InsUByteConst(Convert.ToByte(literal.NumericValue));
+                    frame.AddInstruction(ubyteConst, literal.Location.Start.Line);
+                    break;
+                case "Short":
+                    if (frame.Version < 13)
+                        ThrowCompilationError(calleeIdentifier, CompilationMessages.Error_V13ShortLiteralsUnsupported);
+
+                    var shortConst = new InsShortConst(Convert.ToInt16(literal.NumericValue));
+                    frame.AddInstruction(shortConst, literal.Location.Start.Line);
+                    break;
+                case "UShort":
+                    if (frame.Version < 13)
+                        ThrowCompilationError(calleeIdentifier, CompilationMessages.Error_V13UShortLiteralsUnsupported);
+
+                    var ushortConst = new InsUShortConst(Convert.ToUInt16(literal.NumericValue));
+                    frame.AddInstruction(ushortConst, literal.Location.Start.Line);
+                    break;
+                case "Int":
+                    var intConst = new InsIntConst(Convert.ToInt32(literal.NumericValue));
+                    frame.AddInstruction(intConst, literal.Location.Start.Line);
+                    break;
+                case "UInt":
+                    if (frame.Version < 12)
+                        ThrowCompilationError(literal, CompilationMessages.Error_V12UIntLiteralUnsupported);
+
+                    var uintConst = new InsUIntConst(Convert.ToUInt32(literal.NumericValue));
+                    frame.AddInstruction(uintConst, literal.Location.Start.Line);
+                    break;
+                case "Long":
+                    var longConst = new InsLongConst(Convert.ToInt64(literal.NumericValue));
+                    frame.AddInstruction(longConst, literal.Location.Start.Line);
+                    break;
+                case "ULong":
+                    if (frame.Version < 12)
+                        ThrowCompilationError(literal, CompilationMessages.Error_V12ULongLiteralUnsupported);
+
+                    var ulongConst = new InsULongConst(Convert.ToUInt64(literal.NumericValue));
+                    frame.AddInstruction(ulongConst, literal.Location.Start.Line);
+                    break;
+                case "Float":
+                    var singleConst = new InsFloatConst(Convert.ToSingle(literal.NumericValue));
+                    frame.AddInstruction(singleConst, literal.Location.Start.Line);
+                    break;
+                case "Double":
+                    if (frame.Version < 12)
+                        ThrowCompilationError(literal, CompilationMessages.Error_V12DoubleLiteralUnsupported);
+
+                    var doubleConst = new InsDoubleConst(Convert.ToDouble(literal.NumericValue));
+                    frame.AddInstruction(doubleConst, literal.Location.Start.Line);
+                    break;
+            }
         }
 
         /// <summary>
@@ -3040,7 +3125,7 @@ namespace GTAdhocToolchain.Compiler
 
                         case NumericTokenType.UnsignedInteger:
                             if (frame.Version < 12)
-                                ThrowCompilationError(literal, "Unsigned integer literals are only available in Adhoc version 12 and above.");
+                                ThrowCompilationError(literal, CompilationMessages.Error_V12UIntLiteralUnsupported);
                             ins = new InsUIntConst((uint)literal.NumericValue);
                             break;
 
@@ -3050,13 +3135,13 @@ namespace GTAdhocToolchain.Compiler
 
                         case NumericTokenType.UnsignedLong:
                             if (frame.Version < 12)
-                                ThrowCompilationError(literal, "Unsigned long literals are only available in Adhoc version 12 and above.");
+                                ThrowCompilationError(literal, CompilationMessages.Error_V12ULongLiteralUnsupported);
                             ins = new InsULongConst((ulong)literal.NumericValue);
                             break;
 
                         case NumericTokenType.Double:
                             if (frame.Version < 12)
-                                ThrowCompilationError(literal, "Double literals are only available in Adhoc version 12 and above.");
+                                ThrowCompilationError(literal, CompilationMessages.Error_V12DoubleLiteralUnsupported);
                             ins = new InsDoubleConst((double)literal.NumericValue);
                             break;
 
@@ -3623,6 +3708,34 @@ namespace GTAdhocToolchain.Compiler
                 case AssignmentOperator.RightShiftAssign:
                 case AssignmentOperator.LeftShiftAssign:
                     return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Returns whether an expression is an identifier mapping to base numeric types.
+        /// </summary>
+        /// <param name="expression"></param>
+        /// <returns></returns>
+        private static bool IsNumberTypeIdentifier(Expression expression)
+        {
+            if (expression is Identifier identifier)
+            {
+                switch (identifier.Name)
+                {
+                    case "Byte":
+                    case "UByte":
+                    case "Short":
+                    case "UShort":
+                    case "Int":
+                    case "UInt":
+                    case "Long":
+                    case "ULong":
+                    case "Float":
+                    case "Double":
+                        return true;
+                }
             }
 
             return false;

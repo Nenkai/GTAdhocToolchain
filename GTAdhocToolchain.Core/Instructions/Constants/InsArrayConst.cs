@@ -4,8 +4,6 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-using GTAdhocToolchain.Core;
-
 using Syroot.BinaryData;
 
 namespace GTAdhocToolchain.Core.Instructions

@@ -146,7 +146,12 @@ namespace GTAdhocToolchain.Core
                 case AdhocInstructionType.VARIABLE_EVAL:
                 case AdhocInstructionType.SYMBOL_CONST:
                 case AdhocInstructionType.VOID_CONST:
-                    Stack.IncrementStackCounter(); break;
+                case AdhocInstructionType.BYTE_CONST:
+                case AdhocInstructionType.U_BYTE_CONST:
+                case AdhocInstructionType.SHORT_CONST:
+                case AdhocInstructionType.U_SHORT_CONST:
+                    Stack.IncrementStackCounter(); 
+                    break;
                 case AdhocInstructionType.FUNCTION_DEFINE:
                     InsFunctionDefine func = ins as InsFunctionDefine;
                     if (Version >= 8)

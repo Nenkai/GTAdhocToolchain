@@ -7,34 +7,34 @@ using System.Threading.Tasks;
 namespace GTAdhocToolchain.Core.Instructions
 {
     /// <summary>
-    /// Sets the current frame's state.
+    /// Pushes an array const into the variable storage.
     /// </summary>
-    public class InsSetStateOld : InstructionBase
+    public class InsArrayConstOld : InstructionBase
     {
-        public override AdhocInstructionType InstructionType => AdhocInstructionType.SET_STATE_OLD;
+        public override AdhocInstructionType InstructionType => AdhocInstructionType.ARRAY_CONST_OLD;
 
-        public override string InstructionName => "SET_STATE_OLD";
+        public override string InstructionName => "ARRAY_CONST_OLD";
 
-        public AdhocRunState State { get; set; }
+        public uint ArraySize { get; set; }
 
-        public InsSetStateOld(AdhocRunState state)
+        public InsArrayConstOld(uint size)
         {
-            State = state;
+            ArraySize = size;
         }
 
-        public InsSetStateOld()
+        public InsArrayConstOld()
         {
 
         }
 
         public override void Serialize(AdhocStream stream)
         {
-            stream.WriteByte((byte)State);
+            stream.WriteUInt32(ArraySize);
         }
 
         public override void Deserialize(AdhocStream stream)
         {
-            State = (AdhocRunState)stream.ReadByte();
+            ArraySize = stream.ReadUInt32();
         }
 
         public override string ToString()
@@ -43,6 +43,6 @@ namespace GTAdhocToolchain.Core.Instructions
         }
 
         public override string Disassemble(bool asCompareMode = false)
-            => $"{InstructionType}: State={State} ({(byte)State})";
+            => $"{InstructionType}: [{ArraySize}]";
     }
 }

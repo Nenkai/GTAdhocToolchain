@@ -4,6 +4,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
+using GTAdhocToolchain.Core.Instructions;
+
 namespace GTAdhocToolchain.Core.Instructions
 {
     public abstract class InstructionBase
@@ -98,7 +100,11 @@ namespace GTAdhocToolchain.Core.Instructions
                 AdhocInstructionType.DOUBLE_CONST => new InsDoubleConst(),
                 AdhocInstructionType.DELEGATE_DEFINE => new InsDelegateDefine(),
                 AdhocInstructionType.JUMP_IF_NIL => new InsJumpIfNil(),
-                AdhocInstructionType.LOGICAL_OPTIONAL => new InsOptional(),
+                AdhocInstructionType.LOGICAL_OPTIONAL => new InsLogicalOptional(),
+                AdhocInstructionType.BYTE_CONST => new InsByteConst(),
+                AdhocInstructionType.U_BYTE_CONST => new InsUByteConst(),
+                AdhocInstructionType.SHORT_CONST => new InsShortConst(),
+                AdhocInstructionType.U_SHORT_CONST => new InsUShortConst(),
                 _ => throw new Exception($"Encountered unimplemented {type} instruction."),
             };
         }
@@ -174,7 +180,7 @@ namespace GTAdhocToolchain.Core.Instructions
         VOID_CONST = 56,
         ASSIGN_POP = 57,
 
-        // GT5 Spec 3 (V12)
+        // GT5P Spec 3 (V12)
         U_INT_CONST = 58,
         U_LONG_CONST = 59,
         DOUBLE_CONST = 60,
@@ -195,6 +201,12 @@ namespace GTAdhocToolchain.Core.Instructions
         DELEGATE_DEFINE = 69,
         JUMP_IF_NIL = 70,
         LOGICAL_OPTIONAL = 71,
+
+        // GT7 (V13)
+        BYTE_CONST = 72,
+        U_BYTE_CONST = 73,
+        SHORT_CONST = 74,
+        U_SHORT_CONST = 75,
     }
 
     enum AdhocVersion
