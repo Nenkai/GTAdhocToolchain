@@ -2707,69 +2707,80 @@ namespace GTAdhocToolchain.Compiler
             if (literal.TokenType != TokenType.NumericLiteral)
                 ThrowCompilationError(call, CompilationMessages.Error_NumberConstructorArgumentNotNumericLiteral);
 
-            switch (calleeIdentifier.Name)
+            try
             {
-                case "Byte":
-                    if (frame.Version < 13)
-                        ThrowCompilationError(calleeIdentifier, CompilationMessages.Error_V13ByteLiteralsUnsupported);
+                switch (calleeIdentifier.Name)
+                {
+                    case "Byte":
+                        if (frame.Version < 13)
+                            ThrowCompilationError(calleeIdentifier, CompilationMessages.Error_V13ByteLiteralsUnsupported);
 
-                    var byteConst = new InsByteConst(Convert.ToSByte(literal.NumericValue));
-                    frame.AddInstruction(byteConst, literal.Location.Start.Line);
-                    break;
-                case "UByte":
-                    if (frame.Version < 13)
-                        ThrowCompilationError(calleeIdentifier, CompilationMessages.Error_V13UByteLiteralsUnsupported);
+                        var byteConst = new InsByteConst(Convert.ToSByte(literal.NumericValue));
+                        frame.AddInstruction(byteConst, literal.Location.Start.Line);
+                        break;
+                    case "UByte":
+                        if (frame.Version < 13)
+                            ThrowCompilationError(calleeIdentifier, CompilationMessages.Error_V13UByteLiteralsUnsupported);
 
-                    var ubyteConst = new InsUByteConst(Convert.ToByte(literal.NumericValue));
-                    frame.AddInstruction(ubyteConst, literal.Location.Start.Line);
-                    break;
-                case "Short":
-                    if (frame.Version < 13)
-                        ThrowCompilationError(calleeIdentifier, CompilationMessages.Error_V13ShortLiteralsUnsupported);
+                        var ubyteConst = new InsUByteConst(Convert.ToByte(literal.NumericValue));
+                        frame.AddInstruction(ubyteConst, literal.Location.Start.Line);
+                        break;
+                    case "Short":
+                        if (frame.Version < 13)
+                            ThrowCompilationError(calleeIdentifier, CompilationMessages.Error_V13ShortLiteralsUnsupported);
 
-                    var shortConst = new InsShortConst(Convert.ToInt16(literal.NumericValue));
-                    frame.AddInstruction(shortConst, literal.Location.Start.Line);
-                    break;
-                case "UShort":
-                    if (frame.Version < 13)
-                        ThrowCompilationError(calleeIdentifier, CompilationMessages.Error_V13UShortLiteralsUnsupported);
+                        var shortConst = new InsShortConst(Convert.ToInt16(literal.NumericValue));
+                        frame.AddInstruction(shortConst, literal.Location.Start.Line);
+                        break;
+                    case "UShort":
+                        if (frame.Version < 13)
+                            ThrowCompilationError(calleeIdentifier, CompilationMessages.Error_V13UShortLiteralsUnsupported);
 
-                    var ushortConst = new InsUShortConst(Convert.ToUInt16(literal.NumericValue));
-                    frame.AddInstruction(ushortConst, literal.Location.Start.Line);
-                    break;
-                case "Int":
-                    var intConst = new InsIntConst(Convert.ToInt32(literal.NumericValue));
-                    frame.AddInstruction(intConst, literal.Location.Start.Line);
-                    break;
-                case "UInt":
-                    if (frame.Version < 12)
-                        ThrowCompilationError(literal, CompilationMessages.Error_V12UIntLiteralUnsupported);
+                        var ushortConst = new InsUShortConst(Convert.ToUInt16(literal.NumericValue));
+                        frame.AddInstruction(ushortConst, literal.Location.Start.Line);
+                        break;
+                    case "Int":
+                        var intConst = new InsIntConst(Convert.ToInt32(literal.NumericValue));
+                        frame.AddInstruction(intConst, literal.Location.Start.Line);
+                        break;
+                    case "UInt":
+                        if (frame.Version < 12)
+                            ThrowCompilationError(literal, CompilationMessages.Error_V12UIntLiteralUnsupported);
 
-                    var uintConst = new InsUIntConst(Convert.ToUInt32(literal.NumericValue));
-                    frame.AddInstruction(uintConst, literal.Location.Start.Line);
-                    break;
-                case "Long":
-                    var longConst = new InsLongConst(Convert.ToInt64(literal.NumericValue));
-                    frame.AddInstruction(longConst, literal.Location.Start.Line);
-                    break;
-                case "ULong":
-                    if (frame.Version < 12)
-                        ThrowCompilationError(literal, CompilationMessages.Error_V12ULongLiteralUnsupported);
+                        var uintConst = new InsUIntConst(Convert.ToUInt32(literal.NumericValue));
+                        frame.AddInstruction(uintConst, literal.Location.Start.Line);
+                        break;
+                    case "Long":
+                        var longConst = new InsLongConst(Convert.ToInt64(literal.NumericValue));
+                        frame.AddInstruction(longConst, literal.Location.Start.Line);
+                        break;
+                    case "ULong":
+                        if (frame.Version < 12)
+                            ThrowCompilationError(literal, CompilationMessages.Error_V12ULongLiteralUnsupported);
 
-                    var ulongConst = new InsULongConst(Convert.ToUInt64(literal.NumericValue));
-                    frame.AddInstruction(ulongConst, literal.Location.Start.Line);
-                    break;
-                case "Float":
-                    var singleConst = new InsFloatConst(Convert.ToSingle(literal.NumericValue));
-                    frame.AddInstruction(singleConst, literal.Location.Start.Line);
-                    break;
-                case "Double":
-                    if (frame.Version < 12)
-                        ThrowCompilationError(literal, CompilationMessages.Error_V12DoubleLiteralUnsupported);
+                        var ulongConst = new InsULongConst(Convert.ToUInt64(literal.NumericValue));
+                        frame.AddInstruction(ulongConst, literal.Location.Start.Line);
+                        break;
+                    case "Float":
+                        var singleConst = new InsFloatConst(Convert.ToSingle(literal.NumericValue));
+                        frame.AddInstruction(singleConst, literal.Location.Start.Line);
+                        break;
+                    case "Double":
+                        if (frame.Version < 12)
+                            ThrowCompilationError(literal, CompilationMessages.Error_V12DoubleLiteralUnsupported);
 
-                    var doubleConst = new InsDoubleConst(Convert.ToDouble(literal.NumericValue));
-                    frame.AddInstruction(doubleConst, literal.Location.Start.Line);
-                    break;
+                        var doubleConst = new InsDoubleConst(Convert.ToDouble(literal.NumericValue));
+                        frame.AddInstruction(doubleConst, literal.Location.Start.Line);
+                        break;
+                }
+            }
+            catch (OverflowException overflowEx)
+            {
+                ThrowCompilationError(literal, overflowEx.Message);
+            }
+            catch
+            {
+                throw;
             }
         }
 
