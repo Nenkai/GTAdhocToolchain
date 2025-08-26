@@ -104,7 +104,7 @@ namespace GTAdhocToolchain.Compiler
 
             EnterScope(MainFrame, script);
             CompileScriptBody(MainFrame, script);
-            LeaveScope(MainFrame);
+            LeaveScope(MainFrame, insertLeaveInstruction: MainFrame.CurrentScope.LocalScopeVariables.Count > 0);
 
             // Script done.
             InsertSetState(MainFrame, AdhocRunState.EXIT);
@@ -726,7 +726,6 @@ namespace GTAdhocToolchain.Compiler
             foreach (var breakJmp in loopCtx.BreakJumps)
                 breakJmp.JumpInstructionIndex = loopExitInsIndex;
 
-            // Insert final leave
             LeaveLoop(frame);
         }
 
@@ -792,8 +791,9 @@ namespace GTAdhocToolchain.Compiler
                 frame.AddInstruction(jumpIfFalse, 0);
             }
 
-
             CompileStatementWithScope(frame, whileStatement.Body);
+
+            int jmpIndex = frame.GetLastInstructionIndex();
 
             // Insert jump to go back to the beginning of the loop
             InsJump startJump = new InsJump();
@@ -803,7 +803,12 @@ namespace GTAdhocToolchain.Compiler
             // Reached bottom, proceed to do update
             // But first, process continue if any
             foreach (var continueJmp in loopCtx.ContinueJumps)
-                continueJmp.JumpInstructionIndex = loopStartInsIndex;
+            {
+                // Ideally this should jump to the start of the loop.
+                // Theirs jump to the bottom jumper though, which is redundant since it will then jump back to the start.
+                // For accuracy, we do the same.
+                continueJmp.JumpInstructionIndex = jmpIndex; 
+            }
 
             // Update jump that exits the loop
             int loopExitInsIndex = frame.GetLastInstructionIndex();
@@ -823,7 +828,7 @@ namespace GTAdhocToolchain.Compiler
             int loopStartInsIndex = frame.GetLastInstructionIndex();
 
             CompileStatementWithScope(frame, doWhileStatement.Body);
-
+            
             int testInsIndex = frame.GetLastInstructionIndex();
             CompileTestStatement(frame, doWhileStatement.Test);
 
@@ -1480,7 +1485,7 @@ namespace GTAdhocToolchain.Compiler
             importIns.ModuleValue = targetSymbol;
             importIns.ImportAs = aliasSymbol;
 
-            if (importIns.ImportAs is not null) // Alias is defined as a static
+            if (import.Alias is not null) // Alias is defined as a static
             {
                 if (import.Target.Name == AdhocConstants.OPERATOR_IMPORT_ALL) // Should be caught by parser, but worth having anyway
                     ThrowCompilationError(import, CompilationMessages.Error_ImportWildcardWithAlias);
@@ -1575,9 +1580,6 @@ namespace GTAdhocToolchain.Compiler
                 case Nodes.ClassExpression:
                     CompileClassExpression(frame, exp as ClassExpression);
                     break;
-                case Nodes.ArrowFunctionExpression:
-                    CompileArrowFunctionExpression(frame, exp as ArrowFunctionExpression);
-                    break;
                 case Nodes.ImportDeclaration:
                     CompileImport(frame, (exp as ImportExpression).Declaration);
                     break;
@@ -1663,11 +1665,6 @@ namespace GTAdhocToolchain.Compiler
         private void CompileSpreadElement(AdhocCodeFrame frame, SpreadElement spreadElement)
         {
             CompileExpression(frame, spreadElement.Argument);
-        }
-
-        private void CompileArrowFunctionExpression(AdhocCodeFrame frame, ArrowFunctionExpression arrowFuncExpr)
-        {
-            CompileAnonymousSubroutine(frame, arrowFuncExpr, arrowFuncExpr.Body, arrowFuncExpr.Params);
         }
 
         private void CompileYield(AdhocCodeFrame frame, YieldExpression yield)
@@ -1781,7 +1778,7 @@ namespace GTAdhocToolchain.Compiler
              * Example:
              *    var arr = [0, 1, 2];
              *    var map = Map();               
-             *    arr.each(e => {
+             *    arr.each(function(e) {
              *        map[e.toString()] = e * 100; -> Inserts a new key/value pair into map, which is from the parent frame
              *    });
              */
@@ -1793,7 +1790,7 @@ namespace GTAdhocToolchain.Compiler
 
             if (body.Type == Nodes.BlockStatement)
             {
-                CompileStatement(subroutine.CodeFrame, body as BlockStatement);
+                CompileBlockStatement(subroutine.CodeFrame, body as BlockStatement, insertLeaveInstruction: false);
                 InsertFrameExitIfNeeded(subroutine.CodeFrame, body);
             }
             else
@@ -3336,7 +3333,7 @@ namespace GTAdhocToolchain.Compiler
 
         private void LeaveModuleOrClass(AdhocCodeFrame frame, bool fromSubroutine = false)
         {
-            LeaveScope(frame, isModuleLeave: true, isModuleExitFromSubroutine: fromSubroutine);
+            LeaveScope(frame, insertLeaveInstruction: false, isModuleLeave: true, isModuleExitFromSubroutine: fromSubroutine);
 
             ModuleOrClassScopes.Pop();
             Modules.Pop();
@@ -3351,18 +3348,19 @@ namespace GTAdhocToolchain.Compiler
         /// <param name="statement"></param>
         private void CompileStatementWithScope(AdhocCodeFrame frame, Statement statement)
         {
-            if (statement is BlockStatement)
+            if (statement is BlockStatement blockStatement)
             {
                 InsertNopAtScopeChangeIfNeeded(frame, statement.Location.Start.Line);
 
-                CompileStatements(frame, statement);
+                CompileBlockStatement(frame, blockStatement);
 
                 InsertNopAtScopeChangeIfNeeded(frame, statement.Location.End.Line);
             }
             else if (statement is ContinueStatement
-                || statement is BreakStatement)
+                || statement is BreakStatement
+                || statement is EmptyStatement)
             {
-                // continues are not a scope
+                // continues/breaks are not a scope, neither are empty statements
                 CompileStatement(frame, statement);
             }
             else
