@@ -1,3 +1,13 @@
+GT7 Compiler input tests & reverse engineering notes.
+
+Used a shadPS4 fork to hook the game. https://github.com/Nenkai/shadPS4/tree/eboot-hooks-nenkai
+Requires a code.ad with source inside in the directory of the executable.
+CUSA24767 1.00.
+
+config.toml:
+logFilter = "*:Critical Core.Hooking:Info"
+logType = "sync"
+
 ////////////////////////////////////////////////////////////////////////
 // OBJECT_SELECTOR
 ////////////////////////////////////////////////////////////////////////
