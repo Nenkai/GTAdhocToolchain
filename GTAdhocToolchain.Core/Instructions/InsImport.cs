@@ -15,7 +15,7 @@ namespace GTAdhocToolchain.Core.Instructions
 
         public override string InstructionName => "IMPORT";
 
-        public List<AdhocSymbol> ImportNamespaceParts { get; set; } = new();
+        public List<AdhocSymbol> ModulePath { get; set; } = new();
         public AdhocSymbol ModuleValue { get; set; }
         public AdhocSymbol ImportAs { get; set; }
 
@@ -26,7 +26,7 @@ namespace GTAdhocToolchain.Core.Instructions
 
         public override void Serialize(AdhocStream stream)
         {
-            stream.WriteSymbols(ImportNamespaceParts);
+            stream.WriteSymbols(ModulePath);
             stream.WriteSymbol(ModuleValue);
 
             if (stream.Version > 9)
@@ -35,7 +35,7 @@ namespace GTAdhocToolchain.Core.Instructions
 
         public override void Deserialize(AdhocStream stream)
         {
-            ImportNamespaceParts = stream.ReadSymbols();
+            ModulePath = stream.ReadSymbols();
             ModuleValue = stream.ReadSymbol();
 
             if (stream.Version > 9)
@@ -49,7 +49,7 @@ namespace GTAdhocToolchain.Core.Instructions
 
         public override string Disassemble(bool asCompareMode = false)
         {
-            string str = $"{InstructionType}: Path:{ImportNamespaceParts[^1].Name}, Property:{ModuleValue.Name}";
+            string str = $"{InstructionType}: Path:{ModulePath[^1].Name}, Property:{ModuleValue.Name}";
             if (ImportAs is not null)
                 str += $", ImportAs:{ImportAs.Name}";
             return str;

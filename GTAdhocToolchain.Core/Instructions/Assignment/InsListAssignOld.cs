@@ -7,34 +7,34 @@ using System.Threading.Tasks;
 namespace GTAdhocToolchain.Core.Instructions
 {
     /// <summary>
-    /// Sets the current frame's state.
+    /// Deconstructs an array into elements.
     /// </summary>
-    public class InsSetStateOld : InstructionBase
+    public class InsListAssignOld : InstructionBase
     {
-        public override AdhocInstructionType InstructionType => AdhocInstructionType.SET_STATE_OLD;
+        public override AdhocInstructionType InstructionType => AdhocInstructionType.LIST_ASSIGN_OLD;
 
-        public override string InstructionName => "SET_STATE_OLD";
+        public override string InstructionName => "LIST_ASSIGN_OLD";
 
-        public AdhocRunState State { get; set; }
+        public int VariableCount { get; set; }
 
-        public InsSetStateOld(AdhocRunState state)
+        public InsListAssignOld(int varCount)
         {
-            State = state;
+            VariableCount = varCount;
         }
 
-        public InsSetStateOld()
+        public InsListAssignOld()
         {
 
         }
 
         public override void Serialize(AdhocStream stream)
         {
-            stream.WriteByte((byte)State);
+            stream.WriteInt32(VariableCount);
         }
 
         public override void Deserialize(AdhocStream stream)
         {
-            State = (AdhocRunState)stream.ReadByte();
+            VariableCount = stream.ReadInt32();
         }
 
         public override string ToString()
@@ -43,6 +43,6 @@ namespace GTAdhocToolchain.Core.Instructions
         }
 
         public override string Disassemble(bool asCompareMode = false)
-            => $"{InstructionType}: State={State} ({(byte)State})";
+           => $"{InstructionType}: ElemCount={VariableCount}";
     }
 }

@@ -4,39 +4,37 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-using GTAdhocToolchain.Core;
-
 namespace GTAdhocToolchain.Core.Instructions
 {
     /// <summary>
-    /// Pushes an array const into the variable storage.
+    /// Pushes a signed short onto the stack.
     /// </summary>
-    public class InsArrayConstOld : InstructionBase
+    public class InsUShortConst : InstructionBase
     {
-        public override AdhocInstructionType InstructionType => AdhocInstructionType.ARRAY_CONST_OLD;
+        public override AdhocInstructionType InstructionType => AdhocInstructionType.U_SHORT_CONST;
 
-        public override string InstructionName => "ARRAY_CONST_OLD";
+        public override string InstructionName => "U_SHORT_CONST";
 
-        public uint ArraySize { get; set; }
+        public ushort Value { get; set; }
 
-        public InsArrayConstOld(uint size)
+        public InsUShortConst(ushort value)
         {
-            ArraySize = size;
+            Value = value;
         }
 
-        public InsArrayConstOld()
+        public InsUShortConst()
         {
 
         }
 
         public override void Serialize(AdhocStream stream)
         {
-            stream.WriteUInt32(ArraySize);
+            stream.WriteUInt16(Value);
         }
 
         public override void Deserialize(AdhocStream stream)
         {
-            ArraySize = stream.ReadUInt32();
+            Value = stream.ReadUInt16();
         }
 
         public override string ToString()
@@ -45,6 +43,6 @@ namespace GTAdhocToolchain.Core.Instructions
         }
 
         public override string Disassemble(bool asCompareMode = false)
-            => $"{InstructionType}: [{ArraySize}]";
+            => $"{InstructionType}: {Value} (0x{Value:X4})";
     }
 }

@@ -6,6 +6,8 @@ using GTAdhocToolchain.Core;
 using GTAdhocToolchain.Core.Instructions;
 using GTAdhocToolchain.Core.Variables;
 
+using System.Diagnostics;
+
 namespace GTAdhocToolchain.Compiler
 {
     /// <summary>
@@ -102,7 +104,7 @@ namespace GTAdhocToolchain.Compiler
 
             EnterScope(MainFrame, script);
             CompileScriptBody(MainFrame, script);
-            LeaveScope(MainFrame);
+            LeaveScope(MainFrame, insertLeaveInstruction: MainFrame.CurrentScope.LocalScopeVariables.Count > 0);
 
             // Script done.
             InsertSetState(MainFrame, AdhocRunState.EXIT);
@@ -199,6 +201,9 @@ namespace GTAdhocToolchain.Compiler
                     break;
                 case Nodes.DoWhileStatement:
                     CompileDoWhile(frame, node as DoWhileStatement);
+                    break;
+                case Nodes.ListAssignmentStatement:
+                    CompileListAssignmentStatement(frame, node as ListAssignementStatement);
                     break;
                 case Nodes.VariableDeclaration:
                     CompileVariableDeclaration(frame, node as VariableDeclaration);
@@ -721,7 +726,6 @@ namespace GTAdhocToolchain.Compiler
             foreach (var breakJmp in loopCtx.BreakJumps)
                 breakJmp.JumpInstructionIndex = loopExitInsIndex;
 
-            // Insert final leave
             LeaveLoop(frame);
         }
 
@@ -787,8 +791,9 @@ namespace GTAdhocToolchain.Compiler
                 frame.AddInstruction(jumpIfFalse, 0);
             }
 
-
             CompileStatementWithScope(frame, whileStatement.Body);
+
+            int jmpIndex = frame.GetLastInstructionIndex();
 
             // Insert jump to go back to the beginning of the loop
             InsJump startJump = new InsJump();
@@ -798,7 +803,12 @@ namespace GTAdhocToolchain.Compiler
             // Reached bottom, proceed to do update
             // But first, process continue if any
             foreach (var continueJmp in loopCtx.ContinueJumps)
-                continueJmp.JumpInstructionIndex = loopStartInsIndex;
+            {
+                // Ideally this should jump to the start of the loop.
+                // Theirs jump to the bottom jumper though, which is redundant since it will then jump back to the start.
+                // For accuracy, we do the same.
+                continueJmp.JumpInstructionIndex = jmpIndex; 
+            }
 
             // Update jump that exits the loop
             int loopExitInsIndex = frame.GetLastInstructionIndex();
@@ -818,7 +828,7 @@ namespace GTAdhocToolchain.Compiler
             int loopStartInsIndex = frame.GetLastInstructionIndex();
 
             CompileStatementWithScope(frame, doWhileStatement.Body);
-
+            
             int testInsIndex = frame.GetLastInstructionIndex();
             CompileTestStatement(frame, doWhileStatement.Test);
 
@@ -875,10 +885,19 @@ namespace GTAdhocToolchain.Compiler
             InsertVariableEvalFromSymbol(frame, itorIdentifier);
             frame.AddInstruction(new InsEval(), 0);
 
-            if (foreachStatement.Left is not VariableDeclaration)
-                ThrowCompilationError(foreachStatement, CompilationMessages.Error_ForeachDeclarationNotVariable);
-
-            CompileVariableDeclaration(frame, foreachStatement.Left as VariableDeclaration, pushWhenNoInit: true); // We're unboxing, gotta push anyway
+            if (foreachStatement.Left.Type == Nodes.VariableDeclaration)
+            {
+                CompileVariableDeclaration(frame, foreachStatement.Left as VariableDeclaration, pushWhenNoInit: true); // We're unboxing, gotta push anyway
+            }
+            else if (foreachStatement.Left.Type == Nodes.ListAssignmentExpression)
+            {
+                ListAssignementExpression list = foreachStatement.Left as ListAssignementExpression;
+                CompileListAsssignmentExpression(frame, list);
+            }
+            else
+            {
+                ThrowCompilationError(foreachStatement, CompilationMessages.Error_ForeachDeclarationNotVariableOrList);
+            }
 
             // Compile body.
             CompileStatementWithScope(frame, foreachStatement.Body);
@@ -927,7 +946,7 @@ namespace GTAdhocToolchain.Compiler
                     CompileExpression(frame, swCase.Test);
 
                     // Equal check
-                    InsBinaryOperator eqOp = new InsBinaryOperator(SymbolMap.RegisterSymbol("==", convertToOperand: frame.Version > 10));
+                    InsBinaryOperator eqOp = new InsBinaryOperator(SymbolMap.RegisterSymbol(AdhocConstants.OPERATOR_EQUAL, convertToOperand: frame.Version >= 11));
                     frame.AddInstruction(eqOp, swCase.Location.Start.Line);
 
                     // Write the jump
@@ -1084,6 +1103,31 @@ namespace GTAdhocToolchain.Compiler
                     frame.AddInstruction(new InsNilConst(), paramIdent.Location.Start.Line);
                 }
             }
+            else if (param.Type == Nodes.ListAssignmentExpression)
+            {
+                // Adhoc allows deconstructing an array directly into variables into a function. i.e:
+                /* function sum({a, b})
+                 * {
+                 *    return a + b;
+                 * }
+                 * sum([1, 2]);
+                 */
+                var listExpr = param as ListAssignementExpression;
+
+                // This isn't ever used by any of the scripts. What the compiler does is generate a temporary 'arg#{number}' variable in the
+                // subroutine body itself.
+
+                string tempArgName = $"arg#{SymbolMap.TempVariableCounter++}";
+                AdhocSymbol paramSymb = SymbolMap.RegisterSymbol(tempArgName);
+                subroutine.CodeFrame.AddScopeVariable(paramSymb, isAssignment: true, isLocalDeclaration: true);
+
+                // We create a new list with identifiers remapped as variable declarations.
+                // Any other expression type is not supported, so this doubles as an argument verifier.
+                var listClone = CreateAndVerifyListAssignmentForFunctionParameter(listExpr); 
+
+                ListAssignementStatement assignmentExpr = new ListAssignementStatement(listClone, new Identifier(tempArgName));
+                CompileListAssignmentStatement(subroutine.CodeFrame, assignmentExpr);
+            }
             else
             {
                 if (frame.Version < 7)
@@ -1140,6 +1184,34 @@ namespace GTAdhocToolchain.Compiler
         }
 
         /// <summary>
+        /// Creates a list assignment expression for subroutine argument declaration.
+        /// </summary>
+        /// <param name="list"></param>
+        /// <returns></returns>
+        private ListAssignementExpression CreateAndVerifyListAssignmentForFunctionParameter(ListAssignementExpression list)
+        {
+            List<Node> nodes = [];
+            foreach (Node elem in list.Elements)
+            {
+                if (elem.Type == Nodes.Identifier)
+                {
+                    nodes.Add(new VariableDeclarator(elem as Identifier, init: null));
+                }
+                else if (elem.Type == Nodes.ListAssignmentExpression)
+                {
+                    ListAssignementExpression nestedList = CreateAndVerifyListAssignmentForFunctionParameter(elem as ListAssignementExpression);
+                    nodes.Add(nestedList);
+                }
+                else
+                {
+                    ThrowCompilationError(elem, CompilationMessages.Error_InvalidListAssignmentArgumentInSubroutine);
+                }
+            }
+
+            return new ListAssignementExpression(NodeList.Create(nodes), list.HasRestElement);
+        }
+
+        /// <summary>
         /// Compiles: 'return <expression>;' .
         /// </summary>
         /// <param name="frame"></param>
@@ -1173,7 +1245,7 @@ namespace GTAdhocToolchain.Compiler
         }
 
         /// <summary>
-        /// Compiles "var a = 0, [b = 1] ...;"
+        /// Compiles "var a = 0, ...;"
         /// </summary>
         /// <param name="frame"></param>
         /// <param name="varDeclaration"></param>
@@ -1186,7 +1258,7 @@ namespace GTAdhocToolchain.Compiler
                 Expression? id = declarator.Id;
 
                 // In later versions, we first compile the call
-                if (frame.Version > 10)
+                if (frame.Version >= 11)
                 {
                     if (initValue is not null)
                     {
@@ -1233,10 +1305,6 @@ namespace GTAdhocToolchain.Compiler
                             frame.AddScopeVariable(varSymb, isAssignment: true, isLocalDeclaration: true);
                         }
                     }
-                    else if (id is ArrayPattern arrayPattern) // var [hello, world] = helloworld; - deconstruct array
-                    {
-                        CompileArrayPatternPush(frame, arrayPattern, isDeclaration: true);
-                    }
                     else
                     {
                         ThrowCompilationError(varDeclaration, "Variable declaration for id is not an identifier.");
@@ -1260,10 +1328,6 @@ namespace GTAdhocToolchain.Compiler
                             AdhocSymbol varSymb = SymbolMap.RegisterSymbol(idIdentifier.Name);
                             frame.AddScopeVariable(varSymb, isAssignment: true, isLocalDeclaration: true);
                         }
-                    }
-                    else if (id is ArrayPattern arrayPattern) // var [hello, world] = helloworld; - deconstruct array
-                    {
-                        CompileArrayPatternPush(frame, arrayPattern, isDeclaration: true);
                     }
                     else
                     {
@@ -1289,52 +1353,105 @@ namespace GTAdhocToolchain.Compiler
                             CompileExpression(frame, initValue);
                         }
 
-                        // Perform assignment
-                        if (id is ArrayPattern arrayPattern)
-                        {
-                            InsListAssignOld listAssign = new InsListAssignOld(arrayPattern.Elements.Count);
-                            frame.AddInstruction(listAssign, arrayPattern.Location.Start.Line);
-                            InsertPop(frame);
-                        }
-                        else
-                        {
-                            InsertAssignPop(frame);
-                        }
+                        
+                        InsertAssignPop(frame);
                     }
                 }
                 
             }
         }
 
-        private void CompileArrayPatternPush(AdhocCodeFrame frame, ArrayPattern arrayPattern, bool isDeclaration = false)
+        /// <summary>
+        /// Compiles trivial "|a, b, c.d, e::f| = g" statement
+        /// </summary>
+        /// <param name="frame"></param>
+        /// <param name="listAssignment"></param>
+        /// <param name="pushWhenNoInit"></param>
+        public void CompileListAssignmentStatement(AdhocCodeFrame frame, ListAssignementStatement listAssignment)
         {
-            if (arrayPattern.Elements.Count == 0)
-                ThrowCompilationError(arrayPattern, CompilationMessages.Error_ArrayPatternNoElements);
+            if (frame.Version >= 11) // Must be before in late versions
+                CompileExpression(frame, listAssignment.Right);
 
-            foreach (Expression exp in arrayPattern.Elements)
+            var before = frame.Version < 11 ? listAssignment.Right : null;
+            CompileListAsssignmentExpression(frame, listAssignment.Left, init: before);
+        }
+
+        /// <summary>
+        /// Compiles trivial "|a, b, c.d, e::f| = g" statement with specified init, mainly due to foreach having a different init
+        /// </summary>
+        /// <param name="frame"></param>
+        /// <param name="list"></param>
+        /// <param name="init"></param>
+        private void CompileListAsssignmentExpression(AdhocCodeFrame frame, ListAssignementExpression list, Expression? init = null, bool popResult = true)
+        {
+            if (list.HasRestElement && frame.Version < 12)
+                ThrowCompilationError(list, CompilationMessages.Error_ListAssignementRestElementUnsupported);
+
+            Dictionary<ListAssignementExpression, AdhocSymbol> nestedLists = [];
+            foreach (var elem in list.Elements)
             {
-                if (exp.Type == Nodes.Identifier)
+                if (elem.Type == Nodes.Identifier)
                 {
-                    Identifier arrElemIdentifier = exp as Identifier;
-                    InsertVariablePush(frame, arrElemIdentifier, isDeclaration);
+                    Identifier variableIdentifier = elem as Identifier;
+                    InsertVariablePush(frame, variableIdentifier, isVariableDeclaration: false);
                 }
-                else if (exp is AttributeMemberExpression)
+                else if (elem.Type == Nodes.VariableDeclarator)
                 {
-                    CompileAttributeMemberAssignmentPush(frame, exp as AttributeMemberExpression);
+                    VariableDeclarator variableDeclarator = elem as VariableDeclarator;
+                    Identifier variableIdentifier = variableDeclarator.Id as Identifier;
+                    InsertVariablePush(frame, variableIdentifier, isVariableDeclaration: true);
+                }
+                else if (elem is AttributeMemberExpression)
+                {
+                    CompileAttributeMemberAssignmentPush(frame, elem as AttributeMemberExpression);
+                }
+                else if (elem is StaticMemberExpression)
+                {
+                    CompileStaticMemberExpressionPush(frame, elem as StaticMemberExpression);
+                }
+                else if (elem is ListAssignementExpression nestedList)
+                {
+                    string tmpTaskVariable = $"tmp#{SymbolMap.TempVariableCounter++}";
+                    AdhocSymbol tempVariable = InsertVariablePush(frame, new Identifier(tmpTaskVariable), true);
+
+                    // Keep track of these
+                    nestedLists.Add(nestedList, tempVariable);
                 }
                 else
-                    ThrowCompilationError(exp, "Expected array pattern element to be an identifier or attribute member expression.");
+                    ThrowCompilationError(elem, "Expected list assignment element to be an identifier, variable declaration, attribute path, static path, or nested list assignment.");
             }
 
-            if (frame.Version >= 11)
+            // FIXME: Logic can probably be improved
+            if (frame.Version < 11 && init is not null)
             {
-                InsListAssign listAssign = new InsListAssign(arrayPattern.Elements.Count);
-                frame.AddInstruction(listAssign, arrayPattern.Location.Start.Line);
-                InsertPop(frame);
+                if (init.Type == Nodes.AssignmentExpression)
+                {
+                    InsertListAssign(frame, list.Elements.Count, list.HasRestElement, list.Location.Start.Line);
+                    CompileExpression(frame, init);
+                }
+                else
+                {
+                    CompileExpression(frame, init);
+                    InsertListAssign(frame, list.Elements.Count, list.HasRestElement, list.Location.Start.Line);
+                }
             }
             else
             {
-                return; // Needs to be after the value evaluation
+                InsertListAssign(frame, list.Elements.Count, list.HasRestElement, list.Location.Start.Line);
+            }
+
+            if (popResult)
+                InsertPop(frame);
+
+            foreach (KeyValuePair<ListAssignementExpression, AdhocSymbol> nestedListAndTmpVarPair in nestedLists)
+            {
+                ListAssignementExpression nestedList = nestedListAndTmpVarPair.Key;
+                AdhocSymbol tempListVariable = nestedListAndTmpVarPair.Value;
+
+                if (frame.Version >= 11)
+                    InsertVariableEvalFromSymbol(frame, tempListVariable);
+
+                CompileListAsssignmentExpression(frame, nestedList, new Identifier(tempListVariable.Name), popResult: true); // In a nested list, we are not reusing the result. pop it.
             }
         }
 
@@ -1345,10 +1462,7 @@ namespace GTAdhocToolchain.Compiler
         /// <param name="import"></param>
         public void CompileImport(AdhocCodeFrame frame, ImportDeclaration import)
         {
-            if (import.Specifiers.Count == 0)
-                ThrowCompilationError(import, CompilationMessages.Error_ImportDeclarationEmpty);
-
-            string fullImportNamespace = "";
+            string modulePath = "";
 
             InsImport importIns = new InsImport();
 
@@ -1356,38 +1470,47 @@ namespace GTAdhocToolchain.Compiler
             {
                 ImportDeclarationSpecifier specifier = import.Specifiers[i];
                 AdhocSymbol part = SymbolMap.RegisterSymbol(specifier.Local.Name);
-                importIns.ImportNamespaceParts.Add(part);
-                fullImportNamespace += specifier.Local.Name;
+                importIns.ModulePath.Add(part);
+                modulePath += specifier.Local.Name;
 
                 if (i < import.Specifiers.Count - 1)
-                    fullImportNamespace += AdhocConstants.OPERATOR_STATIC;
+                    modulePath += AdhocConstants.OPERATOR_STATIC;
             }
 
-            AdhocSymbol namespaceSymbol = SymbolMap.RegisterSymbol(fullImportNamespace);
-            AdhocSymbol value = SymbolMap.RegisterSymbol(import.Target.Name);
-            AdhocSymbol nilSymbol = SymbolMap.RegisterSymbol(AdhocConstants.NIL);
+            AdhocSymbol fullModulePathSymbol = SymbolMap.RegisterSymbol(!string.IsNullOrEmpty(modulePath) ? modulePath : AdhocConstants.NIL);
+            AdhocSymbol targetSymbol = SymbolMap.RegisterSymbol(import.Target.Name);
+            AdhocSymbol aliasSymbol = SymbolMap.RegisterSymbol(import.Alias is not null ? import.Alias.Name : AdhocConstants.NIL);
 
-            importIns.ImportNamespaceParts.Add(namespaceSymbol);
-            importIns.ModuleValue = value;
-            importIns.ImportAs = nilSymbol;
+            importIns.ModulePath.Add(fullModulePathSymbol);
+            importIns.ModuleValue = targetSymbol;
+            importIns.ImportAs = aliasSymbol;
 
-            /* Imports actually copies the static members from the target */
-            if (import.Target.Name == AdhocConstants.OPERATOR_IMPORT_ALL)
+            if (import.Alias is not null) // Alias is defined as a static
             {
-                if (TopLevelModules.TryGetValue(fullImportNamespace, out AdhocModule mod))
+                if (import.Target.Name == AdhocConstants.OPERATOR_IMPORT_ALL) // Should be caught by parser, but worth having anyway
+                    ThrowCompilationError(import, CompilationMessages.Error_ImportWildcardWithAlias);
+
+                frame.Stack.AddStaticVariable(new StaticVariable() { Symbol = aliasSymbol });
+            }
+            else if (import.Target.Name == AdhocConstants.OPERATOR_IMPORT_ALL) // Imports actually copies the static members from the target
+            {
+                if (import.Target.Name == AdhocConstants.OPERATOR_IMPORT_ALL)
                 {
-                    foreach (var memberSymbol in mod.GetAllMembers())
-                        frame.Stack.AddStaticVariable(new StaticVariable() { Symbol = memberSymbol });
-                }
-                else
-                {
-                    // TODO
-                    frame.Stack.AddStaticVariable(null);
+                    if (TopLevelModules.TryGetValue(modulePath, out AdhocModule mod))
+                    {
+                        foreach (var memberSymbol in mod.GetAllMembers())
+                            frame.Stack.AddStaticVariable(new StaticVariable() { Symbol = memberSymbol });
+                    }
+                    else
+                    {
+                        // TODO
+                        frame.Stack.AddStaticVariable(null);
+                    }
                 }
             }
             else
             {
-                frame.Stack.AddStaticVariable(new StaticVariable() { Symbol = value });
+                frame.Stack.AddStaticVariable(new StaticVariable() { Symbol = targetSymbol });
             }
 
             frame.AddInstruction(importIns, import.Location.Start.Line);
@@ -1456,9 +1579,6 @@ namespace GTAdhocToolchain.Compiler
                     break;
                 case Nodes.ClassExpression:
                     CompileClassExpression(frame, exp as ClassExpression);
-                    break;
-                case Nodes.ArrowFunctionExpression:
-                    CompileArrowFunctionExpression(frame, exp as ArrowFunctionExpression);
                     break;
                 case Nodes.ImportDeclaration:
                     CompileImport(frame, (exp as ImportExpression).Declaration);
@@ -1545,11 +1665,6 @@ namespace GTAdhocToolchain.Compiler
         private void CompileSpreadElement(AdhocCodeFrame frame, SpreadElement spreadElement)
         {
             CompileExpression(frame, spreadElement.Argument);
-        }
-
-        private void CompileArrowFunctionExpression(AdhocCodeFrame frame, ArrowFunctionExpression arrowFuncExpr)
-        {
-            CompileAnonymousSubroutine(frame, arrowFuncExpr, arrowFuncExpr.Body, arrowFuncExpr.Params);
         }
 
         private void CompileYield(AdhocCodeFrame frame, YieldExpression yield)
@@ -1663,7 +1778,7 @@ namespace GTAdhocToolchain.Compiler
              * Example:
              *    var arr = [0, 1, 2];
              *    var map = Map();               
-             *    arr.each(e => {
+             *    arr.each(function(e) {
              *        map[e.toString()] = e * 100; -> Inserts a new key/value pair into map, which is from the parent frame
              *    });
              */
@@ -1675,7 +1790,7 @@ namespace GTAdhocToolchain.Compiler
 
             if (body.Type == Nodes.BlockStatement)
             {
-                CompileStatement(subroutine.CodeFrame, body as BlockStatement);
+                CompileBlockStatement(subroutine.CodeFrame, body as BlockStatement, insertLeaveInstruction: false);
                 InsertFrameExitIfNeeded(subroutine.CodeFrame, body);
             }
             else
@@ -1745,7 +1860,7 @@ namespace GTAdhocToolchain.Compiler
                 frame.AddAttributeOrStaticMemberVariable(idSymb);
 
                 // Assigning to something new
-                if (frame.Version > 10)
+                if (frame.Version >= 11)
                 {
                     CompileExpression(frame, declValue);
                     CompileVariableAssignment(frame, staticDeclaration.Declaration.Id);
@@ -1987,7 +2102,7 @@ namespace GTAdhocToolchain.Compiler
 
                 // On later versions, empty strings are always a string push with 0 args, which is a short hand for a static empty string
                 // It also works on earlier versions, but that's just how they compiled it
-                if (string.IsNullOrEmpty(strElement.Value.Cooked) && frame.Version > 10)
+                if (string.IsNullOrEmpty(strElement.Value.Cooked) && frame.Version >= 11)
                 {
                     InsStringPush strPush = new InsStringPush(0);
                     frame.AddInstruction(strPush, strElement.Location.Start.Line);
@@ -2033,7 +2148,7 @@ namespace GTAdhocToolchain.Compiler
                 }
                 else
                 {
-                    if (frame.Version > 10)
+                    if (frame.Version >= 11)
                     {
                         InsStringPush strPush = new InsStringPush(0);
                         frame.AddInstruction(strPush, templateLiteral.Location.Start.Line);
@@ -2068,28 +2183,36 @@ namespace GTAdhocToolchain.Compiler
                         CompileExpression(frame, assignExpression.Right);
                     }
 
-                    CompileVariableAssignment(frame, assignExpression.Left, popResult);
+                    // |a, b| = |c, d| = ...?
+                    if (assignExpression.Left.Type == Nodes.ListAssignmentExpression)
+                    {
+                        CompileListAsssignmentExpression(frame, assignExpression.Left as ListAssignementExpression, popResult: false);
+                    }
+                    else
+                    {
+                        CompileVariableAssignment(frame, assignExpression.Left, popResult);
+                    }
                 }
                 else // Target first in old versions
                 {
                     // Regular update of left-hand side
                     // Left-hand side needs to be pushed first
-
-                    // Assigning to a reference variable (*var = 1)
-                    if (IsUnaryIndirection(assignExpression.Left))
+                    if (IsUnaryIndirection(assignExpression.Left)) // Assigning to a reference variable (*var = 1)
                     {
                         // Trivially compile left reference
                         CompileUnaryExpression(frame, assignExpression.Left as UnaryExpression);
+                    }
+                    else if (assignExpression.Left.Type == Nodes.ListAssignmentExpression) // |a, b| = |c, d| = e;
+                    {
+                        var listAssignExpr = assignExpression.Left as ListAssignementExpression;
+                        CompileListAsssignmentExpression(frame, listAssignExpr, null, popResult: false);
+                        return; // No actual assignment, covered by list assign.
                     }
                     else
                     {
                         if (assignExpression.Left.Type == Nodes.Identifier)
                         {
                             InsertVariablePush(frame, assignExpression.Left as Identifier, isVariableDeclaration: false);
-                        }
-                        else if (assignExpression.Left.Type == Nodes.ArrayPattern)
-                        {
-                            CompileArrayPatternPush(frame, assignExpression.Left as ArrayPattern, isDeclaration: false);
                         }
                         else if (assignExpression.Left is AttributeMemberExpression attr)
                         {
@@ -2122,23 +2245,10 @@ namespace GTAdhocToolchain.Compiler
                         CompileExpression(frame, assignExpression.Right);
                     }
 
-                    if (assignExpression.Left.Type == Nodes.ArrayPattern)
-                    {
-                        // Finish array pattern assignment by adding LIST_ASSIGN_OLD
-                        ArrayPattern arrayPattern = assignExpression.Left as ArrayPattern;
-                        InsListAssignOld listAssign = new InsListAssignOld(arrayPattern.Elements.Count);
-                        frame.AddInstruction(listAssign, arrayPattern.Location.Start.Line);
-
-                        if (popResult)
-                            InsertPop(frame);
-                    }
+                    if (popResult)
+                        InsertAssignPop(frame);
                     else
-                    {
-                        if (popResult)
-                            InsertAssignPop(frame);
-                        else
-                            InsertAssign(frame);
-                    }
+                        InsertAssign(frame);
                 }
             }
             else if (IsAdhocAssignWithOperandOperator(assignExpression.Operator)) // += -= /= etc..
@@ -2225,11 +2335,6 @@ namespace GTAdhocToolchain.Compiler
                 else
                     ThrowCompilationError(expression, $"Unimplemented member expression assignment type: '{expression.Type}'");
 
-            }
-            else if (expression.Type == Nodes.ArrayPattern) // var [hi, hello] = args
-            {
-                CompileArrayPatternPush(frame, expression as ArrayPattern, isDeclaration: false);
-                return; // No need for assign pop
             }
             else if (expression is UnaryExpression unaryExp && unaryExp.Operator == UnaryOperator.Indirection) // (*/&)hello = world
             {
@@ -2326,7 +2431,7 @@ namespace GTAdhocToolchain.Compiler
                 if (frame.Version < 13)
                     AddPostCompilationWarning(CompilationMessages.Warning_UsingOptional_Code);
 
-                frame.AddInstruction(new InsOptional(), computedMember.Location.Start.Line);
+                frame.AddInstruction(new InsLogicalOptional(), computedMember.Location.Start.Line);
             }
 
             CompileExpression(frame, computedMember.Property);
@@ -2336,7 +2441,7 @@ namespace GTAdhocToolchain.Compiler
             else
             {
                 // Below, including 11 uses direct symbols
-                var indexerIns = new InsBinaryOperator(SymbolMap.RegisterSymbol(AdhocConstants.OPERATOR_SUBSCRIPT, convertToOperand: frame.Version > 10));
+                var indexerIns = new InsBinaryOperator(SymbolMap.RegisterSymbol(AdhocConstants.OPERATOR_SUBSCRIPT, convertToOperand: frame.Version >= 11));
 
                 frame.AddInstruction(indexerIns, computedMember.Location.Start.Line);
                 frame.AddInstruction(new InsEval(), 0);
@@ -2356,7 +2461,7 @@ namespace GTAdhocToolchain.Compiler
             else
             {
                 // Below, including 11 uses direct symbols
-                var indexerIns = new InsBinaryOperator(SymbolMap.RegisterSymbol(AdhocConstants.OPERATOR_SUBSCRIPT, convertToOperand: frame.Version > 10));
+                var indexerIns = new InsBinaryOperator(SymbolMap.RegisterSymbol(AdhocConstants.OPERATOR_SUBSCRIPT, convertToOperand: frame.Version >= 11));
 
                 frame.AddInstruction(indexerIns, computedMember.Location.Start.Line);
             }
@@ -2387,7 +2492,7 @@ namespace GTAdhocToolchain.Compiler
                 if (frame.Version < 13)
                     AddPostCompilationWarning(CompilationMessages.Warning_UsingOptional_Code);
 
-                frame.AddInstruction(new InsOptional(), attrExp.Location.Start.Line);
+                frame.AddInstruction(new InsLogicalOptional(), attrExp.Location.Start.Line);
             }
 
             if (attrExp.Property.Type == Nodes.Identifier)
@@ -2407,6 +2512,7 @@ namespace GTAdhocToolchain.Compiler
             CompileExpression(frame, objSelectExpr.Object);
             CompileExpression(frame, objSelectExpr.Property);
             frame.AddInstruction(InsObjectSelector.Default, 0);
+            frame.AddInstruction(new InsEval(), 0);
         }
 
         /// <summary>
@@ -2517,8 +2623,8 @@ namespace GTAdhocToolchain.Compiler
         /// <param name="call"></param>
         private void CompileCall(AdhocCodeFrame frame, CallExpression call, bool popReturnValue = false)
         {
-            bool isVariadicCall = false;
-            if (call.Callee is Identifier ident && ident.Name == "call")
+            // Handle special types first
+            if (call.Callee is Identifier ident && ident.Name == "call") // VA_CALL
             {
                 if (call.Arguments.Count < 1)
                     ThrowCompilationError(call, CompilationMessages.Error_VaCall_MissingFunctionTarget);
@@ -2529,10 +2635,20 @@ namespace GTAdhocToolchain.Compiler
                 foreach (var arg in call.Arguments)
                     CompileExpression(frame, arg);
 
-                isVariadicCall = true;
+                var vaCallIns = new InsVaCall() { PopObjectCount = (uint)call.Arguments.Count };
+                frame.AddInstruction(vaCallIns, call.Location.Start.Line);
+                AddPostCompilationWarning(CompilationMessages.Warning_UsingVaCall_Code);
+
+                if (frame.Version < 11)
+                    frame.AddInstruction(new InsEval(), call.Location.Start.Line);
+            }
+            else if (IsNumberTypeIdentifier(call.Callee)) // UInt(1) => U_INT_CONST
+            {
+                CompileNumberConstructor(frame, call);
             }
             else
             {
+                // Regular calls
                 if (call.Callee is Identifier awaitTaskIdentifier && awaitTaskIdentifier.Name == "AwaitTask")
                 {
                     if (call.Arguments.Count != 1)
@@ -2557,26 +2673,112 @@ namespace GTAdhocToolchain.Compiler
                     else
                         CompileExpression(frame, call.Arguments[i]);
                 }
-            }
 
-            if (isVariadicCall)
-            {
-                var vaCallIns = new InsVaCall() { PopObjectCount = (uint)call.Arguments.Count };
-                frame.AddInstruction(vaCallIns, call.Location.Start.Line);
-                AddPostCompilationWarning(CompilationMessages.Warning_UsingVaCall_Code);
-            }
-            else
-            {
                 var callIns = new InsCall(call.Arguments.Count);
                 frame.AddInstruction(callIns, call.Location.Start.Line);
-            }
 
-            if (frame.Version < 11)
-                frame.AddInstruction(new InsEval(), call.Location.Start.Line);
+                if (frame.Version < 11)
+                    frame.AddInstruction(new InsEval(), call.Location.Start.Line);
+            }
 
             // When calling and not caring about returns
             if (popReturnValue)
                 InsertPop(frame);
+        }
+
+        /// <summary>
+        /// Compiles 'UInt(1), Float(5)' etc.
+        /// </summary>
+        /// <param name="frame"></param>
+        /// <param name="call"></param>
+        private void CompileNumberConstructor(AdhocCodeFrame frame, CallExpression call)
+        {
+            Identifier calleeIdentifier = call.Callee as Identifier;
+            if (call.Arguments.Count < 1)
+                ThrowCompilationError(call, CompilationMessages.Error_NumberConstructorMissingArgument);
+
+            if (call.Arguments[0].Type != Nodes.Literal)
+                ThrowCompilationError(call, CompilationMessages.Error_NumberConstructorArgumentNotNumericLiteral);
+
+            var literal = (Literal)call.Arguments[0];
+            if (literal.TokenType != TokenType.NumericLiteral)
+                ThrowCompilationError(call, CompilationMessages.Error_NumberConstructorArgumentNotNumericLiteral);
+
+            try
+            {
+                switch (calleeIdentifier.Name)
+                {
+                    case "Byte":
+                        if (frame.Version < 13)
+                            ThrowCompilationError(calleeIdentifier, CompilationMessages.Error_V13ByteLiteralsUnsupported);
+
+                        var byteConst = new InsByteConst(Convert.ToSByte(literal.NumericValue));
+                        frame.AddInstruction(byteConst, literal.Location.Start.Line);
+                        break;
+                    case "UByte":
+                        if (frame.Version < 13)
+                            ThrowCompilationError(calleeIdentifier, CompilationMessages.Error_V13UByteLiteralsUnsupported);
+
+                        var ubyteConst = new InsUByteConst(Convert.ToByte(literal.NumericValue));
+                        frame.AddInstruction(ubyteConst, literal.Location.Start.Line);
+                        break;
+                    case "Short":
+                        if (frame.Version < 13)
+                            ThrowCompilationError(calleeIdentifier, CompilationMessages.Error_V13ShortLiteralsUnsupported);
+
+                        var shortConst = new InsShortConst(Convert.ToInt16(literal.NumericValue));
+                        frame.AddInstruction(shortConst, literal.Location.Start.Line);
+                        break;
+                    case "UShort":
+                        if (frame.Version < 13)
+                            ThrowCompilationError(calleeIdentifier, CompilationMessages.Error_V13UShortLiteralsUnsupported);
+
+                        var ushortConst = new InsUShortConst(Convert.ToUInt16(literal.NumericValue));
+                        frame.AddInstruction(ushortConst, literal.Location.Start.Line);
+                        break;
+                    case "Int":
+                        var intConst = new InsIntConst(Convert.ToInt32(literal.NumericValue));
+                        frame.AddInstruction(intConst, literal.Location.Start.Line);
+                        break;
+                    case "UInt":
+                        if (frame.Version < 12)
+                            ThrowCompilationError(literal, CompilationMessages.Error_V12UIntLiteralUnsupported);
+
+                        var uintConst = new InsUIntConst(Convert.ToUInt32(literal.NumericValue));
+                        frame.AddInstruction(uintConst, literal.Location.Start.Line);
+                        break;
+                    case "Long":
+                        var longConst = new InsLongConst(Convert.ToInt64(literal.NumericValue));
+                        frame.AddInstruction(longConst, literal.Location.Start.Line);
+                        break;
+                    case "ULong":
+                        if (frame.Version < 12)
+                            ThrowCompilationError(literal, CompilationMessages.Error_V12ULongLiteralUnsupported);
+
+                        var ulongConst = new InsULongConst(Convert.ToUInt64(literal.NumericValue));
+                        frame.AddInstruction(ulongConst, literal.Location.Start.Line);
+                        break;
+                    case "Float":
+                        var singleConst = new InsFloatConst(Convert.ToSingle(literal.NumericValue));
+                        frame.AddInstruction(singleConst, literal.Location.Start.Line);
+                        break;
+                    case "Double":
+                        if (frame.Version < 12)
+                            ThrowCompilationError(literal, CompilationMessages.Error_V12DoubleLiteralUnsupported);
+
+                        var doubleConst = new InsDoubleConst(Convert.ToDouble(literal.NumericValue));
+                        frame.AddInstruction(doubleConst, literal.Location.Start.Line);
+                        break;
+                }
+            }
+            catch (OverflowException overflowEx)
+            {
+                ThrowCompilationError(literal, overflowEx.Message);
+            }
+            catch
+            {
+                throw;
+            }
         }
 
         /// <summary>
@@ -2604,39 +2806,23 @@ namespace GTAdhocToolchain.Compiler
             {
                 if (binExp.Operator == BinaryOperator.LogicalOr)
                 {
-                    if (frame.Version > 10)
-                    {
-                        var orIns = new InsLogicalOr();
-                        frame.AddInstruction(orIns, 0);
-                        CompileExpression(frame, binExp.Right);
-                        orIns.InstructionJumpIndex = frame.GetLastInstructionIndex();
-                    }
-                    else
-                    {
-                        var orIns = new InsLogicalOrOld();
-                        frame.AddInstruction(orIns, 0);
+                    InsLogicalBase orIns = frame.Version >= 11 ? new InsLogicalOr() : new InsLogicalOrOld();
+                    frame.AddInstruction(orIns, 0);
+                    if(frame.Version < 11)
                         InsertPop(frame);
-                        CompileExpression(frame, binExp.Right);
-                        orIns.InstructionJumpIndex = frame.GetLastInstructionIndex();
-                    }
+
+                    CompileExpression(frame, binExp.Right);
+                    orIns.InstructionJumpIndex = frame.GetLastInstructionIndex();
                 }
                 else if (binExp.Operator == BinaryOperator.LogicalAnd)
                 {
-                    if (frame.Version > 10)
-                    {
-                        var andIns = new InsLogicalAnd();
-                        frame.AddInstruction(andIns, 0);
-                        CompileExpression(frame, binExp.Right);
-                        andIns.InstructionJumpIndex = frame.GetLastInstructionIndex();
-                    }
-                    else
-                    {
-                        var andIns = new InsLogicalAndOld();
-                        frame.AddInstruction(andIns, 0);
+                    InsLogicalBase andIns = frame.Version >= 11 ? new InsLogicalAnd() : new InsLogicalAndOld();
+                    frame.AddInstruction(andIns, 0);
+                    if (frame.Version < 11)
                         InsertPop(frame);
-                        CompileExpression(frame, binExp.Right);
-                        andIns.InstructionJumpIndex = frame.GetLastInstructionIndex();
-                    }
+
+                    CompileExpression(frame, binExp.Right);
+                    andIns.InstructionJumpIndex = frame.GetLastInstructionIndex();
                 }
                 else if (binExp.Operator == BinaryOperator.NullishCoalescing)
                 {
@@ -2646,10 +2832,10 @@ namespace GTAdhocToolchain.Compiler
                     if (frame.Version < 13)
                         AddPostCompilationWarning(CompilationMessages.Warning_UsingOptional_Code);
 
-                    var jumpIfNotNil = new InsJumpIfNotNil();
+                    var jumpIfNotNil = new InsJumpIfNil();
                     frame.AddInstruction(jumpIfNotNil, binExp.Location.Start.Line);
                     CompileExpression(frame, binExp.Right);
-                    jumpIfNotNil.InstructionIndex = frame.GetLastInstructionIndex();
+                    jumpIfNotNil.InstructionJumpIndex = frame.GetLastInstructionIndex();
                 }
                 else
                 {
@@ -2691,7 +2877,7 @@ namespace GTAdhocToolchain.Compiler
                 if (opStr is null)
                     ThrowCompilationError(binExp, $"Binary operator {binExp.Operator} not implemented");
 
-                AdhocSymbol opSymbol = SymbolMap.RegisterSymbol(opStr, convertToOperand: frame.Version > 10);
+                AdhocSymbol opSymbol = SymbolMap.RegisterSymbol(opStr, convertToOperand: frame.Version >= 11);
                 InsBinaryOperator binOpIns = new InsBinaryOperator(opSymbol);
                 frame.AddInstruction(binOpIns, binExp.Location.Start.Line);
             }
@@ -2777,7 +2963,7 @@ namespace GTAdhocToolchain.Compiler
                     UnaryOperator.Increment when preIncrement => AdhocConstants.UNARY_OPERATOR_PRE_INCREMENT,
                     UnaryOperator.Decrement when !preIncrement => AdhocConstants.UNARY_OPERATOR_POST_DECREMENT,
                     UnaryOperator.Decrement when preIncrement => AdhocConstants.UNARY_OPERATOR_PRE_DECREMENT,
-                    _ => throw new NotImplementedException("TODO"),
+                    _ => throw new UnreachableException("Invalid unary operator"),
                 };
 
                 bool opToSymbol = frame.Version >= 12;
@@ -2947,7 +3133,7 @@ namespace GTAdhocToolchain.Compiler
 
                         case NumericTokenType.UnsignedInteger:
                             if (frame.Version < 12)
-                                ThrowCompilationError(literal, "Unsigned integer literals are only available in Adhoc version 12 and above.");
+                                ThrowCompilationError(literal, CompilationMessages.Error_V12UIntLiteralUnsupported);
                             ins = new InsUIntConst((uint)literal.NumericValue);
                             break;
 
@@ -2957,13 +3143,13 @@ namespace GTAdhocToolchain.Compiler
 
                         case NumericTokenType.UnsignedLong:
                             if (frame.Version < 12)
-                                ThrowCompilationError(literal, "Unsigned long literals are only available in Adhoc version 12 and above.");
+                                ThrowCompilationError(literal, CompilationMessages.Error_V12ULongLiteralUnsupported);
                             ins = new InsULongConst((ulong)literal.NumericValue);
                             break;
 
                         case NumericTokenType.Double:
                             if (frame.Version < 12)
-                                ThrowCompilationError(literal, "Double literals are only available in Adhoc version 12 and above.");
+                                ThrowCompilationError(literal, CompilationMessages.Error_V12DoubleLiteralUnsupported);
                             ins = new InsDoubleConst((double)literal.NumericValue);
                             break;
 
@@ -3147,7 +3333,7 @@ namespace GTAdhocToolchain.Compiler
 
         private void LeaveModuleOrClass(AdhocCodeFrame frame, bool fromSubroutine = false)
         {
-            LeaveScope(frame, isModuleLeave: true, isModuleExitFromSubroutine: fromSubroutine);
+            LeaveScope(frame, insertLeaveInstruction: false, isModuleLeave: true, isModuleExitFromSubroutine: fromSubroutine);
 
             ModuleOrClassScopes.Pop();
             Modules.Pop();
@@ -3162,18 +3348,19 @@ namespace GTAdhocToolchain.Compiler
         /// <param name="statement"></param>
         private void CompileStatementWithScope(AdhocCodeFrame frame, Statement statement)
         {
-            if (statement is BlockStatement)
+            if (statement is BlockStatement blockStatement)
             {
                 InsertNopAtScopeChangeIfNeeded(frame, statement.Location.Start.Line);
 
-                CompileStatements(frame, statement);
+                CompileBlockStatement(frame, blockStatement);
 
                 InsertNopAtScopeChangeIfNeeded(frame, statement.Location.End.Line);
             }
             else if (statement is ContinueStatement
-                || statement is BreakStatement)
+                || statement is BreakStatement
+                || statement is EmptyStatement)
             {
-                // continues are not a scope
+                // continues/breaks are not a scope, neither are empty statements
                 CompileStatement(frame, statement);
             }
             else
@@ -3291,7 +3478,7 @@ namespace GTAdhocToolchain.Compiler
         // Mostly used for temp variables produced by the compiler
         private AdhocSymbol InsertNewLocalVariable(AdhocCodeFrame frame, Expression exprValue, string variable, Location location = default)
         {
-            if (frame.Version > 10)
+            if (frame.Version >= 11)
             {
                 if (exprValue is not null)
                     CompileExpression(frame, exprValue);
@@ -3364,6 +3551,18 @@ namespace GTAdhocToolchain.Compiler
         }
 
         /// <summary>
+        /// Inserts a version-aware list_assign
+        /// </summary>
+        /// <param name="frame"></param>
+        private void InsertListAssign(AdhocCodeFrame frame, int numElements, bool restElement, int lineNumber)
+        {
+            if (frame.Version >= 11)
+                frame.AddInstruction(new InsListAssign() { VariableCount = numElements, }, lineNumber);
+            else
+                frame.AddInstruction(new InsListAssignOld() { VariableCount = numElements }, lineNumber);
+        }
+
+        /// <summary>
         /// Inserts a version-aware pop
         /// </summary>
         /// <param name="frame"></param>
@@ -3393,7 +3592,7 @@ namespace GTAdhocToolchain.Compiler
         /// <param name="frame"></param>
         private void InsertVoid(AdhocCodeFrame frame)
         {
-            if (frame.Version > 10)
+            if (frame.Version >= 11)
                 frame.AddInstruction(new InsVoidConst(), 0);
             else
                 frame.AddInstruction(InsNop.Empty, 0);
@@ -3518,6 +3717,34 @@ namespace GTAdhocToolchain.Compiler
                 case AssignmentOperator.RightShiftAssign:
                 case AssignmentOperator.LeftShiftAssign:
                     return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Returns whether an expression is an identifier mapping to base numeric types.
+        /// </summary>
+        /// <param name="expression"></param>
+        /// <returns></returns>
+        private static bool IsNumberTypeIdentifier(Expression expression)
+        {
+            if (expression is Identifier identifier)
+            {
+                switch (identifier.Name)
+                {
+                    case "Byte":
+                    case "UByte":
+                    case "Short":
+                    case "UShort":
+                    case "Int":
+                    case "UInt":
+                    case "Long":
+                    case "ULong":
+                    case "Float":
+                    case "Double":
+                        return true;
+                }
             }
 
             return false;

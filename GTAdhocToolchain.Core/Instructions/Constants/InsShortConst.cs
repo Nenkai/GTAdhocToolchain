@@ -7,34 +7,34 @@ using System.Threading.Tasks;
 namespace GTAdhocToolchain.Core.Instructions
 {
     /// <summary>
-    /// Sets the current frame's state.
+    /// Pushes a signed short onto the stack.
     /// </summary>
-    public class InsSetStateOld : InstructionBase
+    public class InsShortConst : InstructionBase
     {
-        public override AdhocInstructionType InstructionType => AdhocInstructionType.SET_STATE_OLD;
+        public override AdhocInstructionType InstructionType => AdhocInstructionType.SHORT_CONST;
 
-        public override string InstructionName => "SET_STATE_OLD";
+        public override string InstructionName => "SHORT_CONST";
 
-        public AdhocRunState State { get; set; }
+        public short Value { get; set; }
 
-        public InsSetStateOld(AdhocRunState state)
+        public InsShortConst(short value)
         {
-            State = state;
+            Value = value;
         }
 
-        public InsSetStateOld()
+        public InsShortConst()
         {
 
         }
 
         public override void Serialize(AdhocStream stream)
         {
-            stream.WriteByte((byte)State);
+            stream.WriteInt16(Value);
         }
 
         public override void Deserialize(AdhocStream stream)
         {
-            State = (AdhocRunState)stream.ReadByte();
+            Value = stream.ReadInt16();
         }
 
         public override string ToString()
@@ -43,6 +43,6 @@ namespace GTAdhocToolchain.Core.Instructions
         }
 
         public override string Disassemble(bool asCompareMode = false)
-            => $"{InstructionType}: State={State} ({(byte)State})";
+            => $"{InstructionType}: {Value} (0x{Value:X4})";
     }
 }

@@ -4,37 +4,39 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
+using Syroot.BinaryData;
+
 namespace GTAdhocToolchain.Core.Instructions
 {
     /// <summary>
-    /// Deconstructs an array into elements.
+    /// Pushes an array const into the variable storage.
     /// </summary>
-    public class InsListAssignOld : InstructionBase
+    public class InsArrayConst : InstructionBase
     {
-        public override AdhocInstructionType InstructionType => AdhocInstructionType.LIST_ASSIGN_OLD;
+        public override AdhocInstructionType InstructionType => AdhocInstructionType.ARRAY_CONST;
 
-        public override string InstructionName => "LIST_ASSIGN_OLD";
+        public override string InstructionName => "ARRAY_CONST";
 
-        public int VariableCount { get; set; }
+        public uint ArraySize { get; set; }
 
-        public InsListAssignOld(int varCount)
+        public InsArrayConst(uint size)
         {
-            VariableCount = varCount;
+            ArraySize = size;
         }
 
-        public InsListAssignOld()
+        public InsArrayConst()
         {
 
         }
 
         public override void Serialize(AdhocStream stream)
         {
-            stream.WriteInt32(VariableCount);
+            stream.WriteUInt32(ArraySize);
         }
 
         public override void Deserialize(AdhocStream stream)
         {
-            VariableCount = stream.ReadInt32();
+            ArraySize = stream.ReadUInt32();
         }
 
         public override string ToString()
@@ -43,6 +45,6 @@ namespace GTAdhocToolchain.Core.Instructions
         }
 
         public override string Disassemble(bool asCompareMode = false)
-           => $"{InstructionType}: Unk={VariableCount}";
+            => $"{InstructionType}: [{ArraySize}]";
     }
 }

@@ -14,7 +14,7 @@ namespace GTAdhocToolchain.Core.Instructions
         public override AdhocInstructionType InstructionType => AdhocInstructionType.VARIABLE_PUSH;
         public override string InstructionName => "VARIABLE_PUSH";
 
-        public List<AdhocSymbol> VariableSymbols { get; set; } = new();
+        public List<AdhocSymbol> VariableSymbols { get; set; } = [];
         public bool IsStatic => VariableSymbols.Count > 1;
 
         public int VariableStorageIndex { get; set; }

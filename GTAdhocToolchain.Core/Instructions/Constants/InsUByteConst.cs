@@ -7,34 +7,34 @@ using System.Threading.Tasks;
 namespace GTAdhocToolchain.Core.Instructions
 {
     /// <summary>
-    /// Sets the current frame's state.
+    /// Pushes an unsigned byte onto the stack.
     /// </summary>
-    public class InsSetStateOld : InstructionBase
+    public class InsUByteConst : InstructionBase
     {
-        public override AdhocInstructionType InstructionType => AdhocInstructionType.SET_STATE_OLD;
+        public override AdhocInstructionType InstructionType => AdhocInstructionType.U_BYTE_CONST;
 
-        public override string InstructionName => "SET_STATE_OLD";
+        public override string InstructionName => "UBYTE_CONST";
 
-        public AdhocRunState State { get; set; }
+        public byte Value { get; set; }
 
-        public InsSetStateOld(AdhocRunState state)
+        public InsUByteConst(byte value)
         {
-            State = state;
+            Value = value;
         }
 
-        public InsSetStateOld()
+        public InsUByteConst()
         {
 
         }
 
         public override void Serialize(AdhocStream stream)
         {
-            stream.WriteByte((byte)State);
+            stream.WriteByte(Value);
         }
 
         public override void Deserialize(AdhocStream stream)
         {
-            State = (AdhocRunState)stream.ReadByte();
+            Value = stream.Read1Byte();
         }
 
         public override string ToString()
@@ -43,6 +43,6 @@ namespace GTAdhocToolchain.Core.Instructions
         }
 
         public override string Disassemble(bool asCompareMode = false)
-            => $"{InstructionType}: State={State} ({(byte)State})";
+            => $"{InstructionType}: {Value} (0x{Value:X2})";
     }
 }

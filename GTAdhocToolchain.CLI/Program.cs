@@ -1,24 +1,25 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 
-using Esprima;
-
 using CommandLine;
+
+using Esprima;
+using Esprima.Ast;
+
 using NLog;
 
-using GTAdhocToolchain.Compiler;
 using GTAdhocToolchain.CodeGen;
-using GTAdhocToolchain.Project;
+using GTAdhocToolchain.Compiler;
+using GTAdhocToolchain.Core.Instructions;
 using GTAdhocToolchain.Disasm;
 using GTAdhocToolchain.Menu;
+using GTAdhocToolchain.Menu.Fields;
 using GTAdhocToolchain.Menu.Resources;
 using GTAdhocToolchain.Packaging;
-using GTAdhocToolchain.Core.Instructions;
-using GTAdhocToolchain.Menu.Fields;
 using GTAdhocToolchain.Preprocessor;
-using GTAdhocToolchain.Analyzer;
-using Esprima.Ast;
+using GTAdhocToolchain.Project;
 
 namespace GTAdhocToolchain.CLI;
 
@@ -58,8 +59,9 @@ public class Program
             return;
         }
 
-        Parser.Default.ParseArguments<BuildVerbs, PackVerbs, UnpackVerbs, MProjectToBinVerbs, MProjectToTextVerbs>(args)
+        Parser.Default.ParseArguments<BuildVerbs, DissasemblyReplVerbs, PackVerbs, UnpackVerbs, MProjectToBinVerbs, MProjectToTextVerbs>(args)
             .WithParsed<BuildVerbs>(Build)
+            .WithParsed<DissasemblyReplVerbs>(DissasemblyRepl)
             .WithParsed<PackVerbs>(Pack)
             .WithParsed<UnpackVerbs>(Unpack)
             .WithParsed<MProjectToBinVerbs>(MProjectToBin)
@@ -408,6 +410,119 @@ public class Program
         Environment.ExitCode = -1;
     }
 
+    private static void DissasemblyRepl(DissasemblyReplVerbs replVerbs)
+    {
+        Console.Clear();
+        Console.WriteLine("REPL mode. Start typing adhoc code to dissasemble it. Enter /? for more commands.");
+        Console.WriteLine($"Adhoc Version: {replVerbs.Version}");
+
+        while (true)
+        {
+            Console.Write(">");
+            var line = Console.ReadLine();
+
+            if (line.StartsWith("/?"))
+            {
+                Console.WriteLine("/clear - Clears the console");
+                Console.WriteLine("/version - Sets adhoc version");
+                continue;
+            }
+            else if (line.StartsWith("/clear"))
+            {
+                Console.Clear();
+                continue;
+            }
+            else if (line.StartsWith("/version"))
+            {
+                ReadOnlySpan<char> range = line.AsSpan().Slice("/version".Length).Trim();
+                if (range.IsEmpty)
+                {
+                    Console.WriteLine($"Current adhoc version is set to {replVerbs.Version}.");
+                }
+                else if (int.TryParse(range, out int version))
+                {
+                    Console.WriteLine($"Now compiling for adhoc version {version}");
+                    replVerbs.Version = version;
+                }
+                else
+                {
+                    Console.WriteLine("Invalid version. Usage: /version <adhoc version>");
+                }
+
+                continue;
+            }
+
+
+            var preprocessor = new AdhocScriptPreprocessor();
+            preprocessor.SetCurrentFileName("temp.ad");
+
+            string preprocessed = preprocessor.Preprocess(line);
+
+            var errorHandler = new AdhocErrorHandler();
+            var parser = new AdhocAbstractSyntaxTree(preprocessed, new ParserOptions()
+            {
+                ErrorHandler = errorHandler
+            });
+            parser.SetFileName("temp.ad");
+
+            var program = parser.ParseScript();
+            if (errorHandler.HasErrors())
+            {
+                foreach (ParseError error in errorHandler.Errors)
+                    Logger.Error($"Syntax error: {error.Description} at {error.Source}:{error.LineNumber}");
+            }
+            else
+            {
+                try
+                {
+                    var compiler = new AdhocScriptCompiler();
+                    compiler.SetSourcePath("test.ad");
+                    compiler.Setup(replVerbs.Version);
+                    compiler.CompileScript(program);
+
+                    AdhocCodeGen codeGen = new AdhocCodeGen(compiler.MainFrame, compiler.SymbolMap);
+                    codeGen.Generate();
+
+                    for (int i = 0; i < codeGen.Frame.Instructions.Count; i++)
+                    {
+                        InstructionBase inst = codeGen.Frame.Instructions[i];
+                        Dissasemble(inst, i, 0);
+                    }
+
+                    void Dissasemble(InstructionBase inst, int instNumber, int depth)
+                    {
+                        Console.WriteLine($"{new string(' ', depth * 2)} {instNumber, 3} | {inst}");
+                        if (inst.IsFunctionOrMethod())
+                        {
+                            SubroutineBase subroutine = inst as SubroutineBase;
+                            for (int i = 0; i < subroutine.CodeFrame.Instructions.Count; i++)
+                            {
+                                InstructionBase subInst = subroutine.CodeFrame.Instructions[i];
+                                Dissasemble(subInst, i, depth + 1);
+                            }
+                        }
+                    }
+                }
+                catch (PreprocessorException preprocessException)
+                {
+                    Logger.Error($"{preprocessException.FileName}:{preprocessException.Token.Location.Start.Line}: preprocess error: {preprocessException.Message}");
+                }
+                catch (ParserException parseException)
+                {
+                    Logger.Error($"Syntax error: {parseException.Description} at {parseException.SourceText}:{parseException.LineNumber}");
+                }
+                catch (AdhocCompilationException compileException)
+                {
+                    Logger.Error($"Compilation error: {compileException.Message}");
+                }
+                catch (Exception e)
+                {
+                    Logger.Fatal(e, "Internal error in compilation");
+                }
+            }
+        }
+    }
+
     public static void MProjectToBin(MProjectToBinVerbs verbs)
     {
         if (verbs.Version == 0)
@@ -510,6 +625,13 @@ public class BuildVerbs
 
     [Option('b', "base-include-folder", Required = false, HelpText = "Set the root path for #include statements (for files, not projects).")]
     public string BaseIncludeFolder { get; set; }
+}
+
+[Verb("dissasembly-repl", HelpText = "Starts a dissasembler repl for quickly disassembling input adhoc source code.")]
+public class DissasemblyReplVerbs
+{
+    [Option('v', "version", HelpText = "Adhoc version.")]
+    public int Version { get; set; }
 }
 
 [Verb("pack", HelpText = "Pack files like gpb's, or mpackage's.")]

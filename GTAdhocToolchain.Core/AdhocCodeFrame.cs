@@ -146,7 +146,12 @@ namespace GTAdhocToolchain.Core
                 case AdhocInstructionType.VARIABLE_EVAL:
                 case AdhocInstructionType.SYMBOL_CONST:
                 case AdhocInstructionType.VOID_CONST:
-                    Stack.IncrementStackCounter(); break;
+                case AdhocInstructionType.BYTE_CONST:
+                case AdhocInstructionType.U_BYTE_CONST:
+                case AdhocInstructionType.SHORT_CONST:
+                case AdhocInstructionType.U_SHORT_CONST:
+                    Stack.IncrementStackCounter(); 
+                    break;
                 case AdhocInstructionType.FUNCTION_DEFINE:
                     InsFunctionDefine func = ins as InsFunctionDefine;
                     if (Version >= 8)
@@ -188,7 +193,7 @@ namespace GTAdhocToolchain.Core
                 case AdhocInstructionType.ASSIGN:
                 case AdhocInstructionType.JUMP_IF_FALSE:
                 case AdhocInstructionType.JUMP_IF_TRUE:
-                case AdhocInstructionType.JUMP_IF_NOT_NIL:
+                case AdhocInstructionType.JUMP_IF_NIL:
                 case AdhocInstructionType.REQUIRE:
                 case AdhocInstructionType.ARRAY_PUSH:
                 case AdhocInstructionType.MODULE_CONSTRUCTOR:
@@ -634,7 +639,7 @@ namespace GTAdhocToolchain.Core
                     }
                 }
 
-                uint unkVarHeapIndex = stream.ReadUInt32();
+                uint unkVarStackIndex = stream.ReadUInt32();
             }
 
             if (Version <= 10)
