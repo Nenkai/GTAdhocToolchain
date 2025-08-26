@@ -30,8 +30,6 @@ The toolchain is capable of compiling fully working original and custom projects
 
 ## TODOs
 * Improve syntatic analysis during compilation.
-* Further document the language and instructions themselves.
-* Examples
 * Possibly tests
 * API Documentation
 
