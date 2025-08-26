@@ -941,7 +941,7 @@ namespace GTAdhocToolchain.Compiler
                     CompileExpression(frame, swCase.Test);
 
                     // Equal check
-                    InsBinaryOperator eqOp = new InsBinaryOperator(SymbolMap.RegisterSymbol("==", convertToOperand: frame.Version > 10));
+                    InsBinaryOperator eqOp = new InsBinaryOperator(SymbolMap.RegisterSymbol(AdhocConstants.OPERATOR_EQUAL, convertToOperand: frame.Version >= 11));
                     frame.AddInstruction(eqOp, swCase.Location.Start.Line);
 
                     // Write the jump
@@ -1253,7 +1253,7 @@ namespace GTAdhocToolchain.Compiler
                 Expression? id = declarator.Id;
 
                 // In later versions, we first compile the call
-                if (frame.Version > 10)
+                if (frame.Version >= 11)
                 {
                     if (initValue is not null)
                     {
@@ -1457,10 +1457,7 @@ namespace GTAdhocToolchain.Compiler
         /// <param name="import"></param>
         public void CompileImport(AdhocCodeFrame frame, ImportDeclaration import)
         {
-            if (import.Specifiers.Count == 0)
-                ThrowCompilationError(import, CompilationMessages.Error_ImportDeclarationEmpty);
-
-            string fullImportNamespace = "";
+            string modulePath = "";
 
             InsImport importIns = new InsImport();
 
@@ -1468,38 +1465,47 @@ namespace GTAdhocToolchain.Compiler
             {
                 ImportDeclarationSpecifier specifier = import.Specifiers[i];
                 AdhocSymbol part = SymbolMap.RegisterSymbol(specifier.Local.Name);
-                importIns.ImportNamespaceParts.Add(part);
-                fullImportNamespace += specifier.Local.Name;
+                importIns.ModulePath.Add(part);
+                modulePath += specifier.Local.Name;
 
                 if (i < import.Specifiers.Count - 1)
-                    fullImportNamespace += AdhocConstants.OPERATOR_STATIC;
+                    modulePath += AdhocConstants.OPERATOR_STATIC;
             }
 
-            AdhocSymbol namespaceSymbol = SymbolMap.RegisterSymbol(fullImportNamespace);
-            AdhocSymbol value = SymbolMap.RegisterSymbol(import.Target.Name);
-            AdhocSymbol nilSymbol = SymbolMap.RegisterSymbol(AdhocConstants.NIL);
+            AdhocSymbol fullModulePathSymbol = SymbolMap.RegisterSymbol(!string.IsNullOrEmpty(modulePath) ? modulePath : AdhocConstants.NIL);
+            AdhocSymbol targetSymbol = SymbolMap.RegisterSymbol(import.Target.Name);
+            AdhocSymbol aliasSymbol = SymbolMap.RegisterSymbol(import.Alias is not null ? import.Alias.Name : AdhocConstants.NIL);
 
-            importIns.ImportNamespaceParts.Add(namespaceSymbol);
-            importIns.ModuleValue = value;
-            importIns.ImportAs = nilSymbol;
+            importIns.ModulePath.Add(fullModulePathSymbol);
+            importIns.ModuleValue = targetSymbol;
+            importIns.ImportAs = aliasSymbol;
 
-            /* Imports actually copies the static members from the target */
-            if (import.Target.Name == AdhocConstants.OPERATOR_IMPORT_ALL)
+            if (importIns.ImportAs is not null) // Alias is defined as a static
             {
-                if (TopLevelModules.TryGetValue(fullImportNamespace, out AdhocModule mod))
+                if (import.Target.Name == AdhocConstants.OPERATOR_IMPORT_ALL) // Should be caught by parser, but worth having anyway
+                    ThrowCompilationError(import, CompilationMessages.Error_ImportWildcardWithAlias);
+
+                frame.Stack.AddStaticVariable(new StaticVariable() { Symbol = aliasSymbol });
+            }
+            else if (import.Target.Name == AdhocConstants.OPERATOR_IMPORT_ALL) // Imports actually copies the static members from the target
+            {
+                if (import.Target.Name == AdhocConstants.OPERATOR_IMPORT_ALL)
                 {
-                    foreach (var memberSymbol in mod.GetAllMembers())
-                        frame.Stack.AddStaticVariable(new StaticVariable() { Symbol = memberSymbol });
-                }
-                else
-                {
-                    // TODO
-                    frame.Stack.AddStaticVariable(null);
+                    if (TopLevelModules.TryGetValue(modulePath, out AdhocModule mod))
+                    {
+                        foreach (var memberSymbol in mod.GetAllMembers())
+                            frame.Stack.AddStaticVariable(new StaticVariable() { Symbol = memberSymbol });
+                    }
+                    else
+                    {
+                        // TODO
+                        frame.Stack.AddStaticVariable(null);
+                    }
                 }
             }
             else
             {
-                frame.Stack.AddStaticVariable(new StaticVariable() { Symbol = value });
+                frame.Stack.AddStaticVariable(new StaticVariable() { Symbol = targetSymbol });
             }
 
             frame.AddInstruction(importIns, import.Location.Start.Line);
@@ -1857,7 +1863,7 @@ namespace GTAdhocToolchain.Compiler
                 frame.AddAttributeOrStaticMemberVariable(idSymb);
 
                 // Assigning to something new
-                if (frame.Version > 10)
+                if (frame.Version >= 11)
                 {
                     CompileExpression(frame, declValue);
                     CompileVariableAssignment(frame, staticDeclaration.Declaration.Id);
@@ -2099,7 +2105,7 @@ namespace GTAdhocToolchain.Compiler
 
                 // On later versions, empty strings are always a string push with 0 args, which is a short hand for a static empty string
                 // It also works on earlier versions, but that's just how they compiled it
-                if (string.IsNullOrEmpty(strElement.Value.Cooked) && frame.Version > 10)
+                if (string.IsNullOrEmpty(strElement.Value.Cooked) && frame.Version >= 11)
                 {
                     InsStringPush strPush = new InsStringPush(0);
                     frame.AddInstruction(strPush, strElement.Location.Start.Line);
@@ -2145,7 +2151,7 @@ namespace GTAdhocToolchain.Compiler
                 }
                 else
                 {
-                    if (frame.Version > 10)
+                    if (frame.Version >= 11)
                     {
                         InsStringPush strPush = new InsStringPush(0);
                         frame.AddInstruction(strPush, templateLiteral.Location.Start.Line);
@@ -2438,7 +2444,7 @@ namespace GTAdhocToolchain.Compiler
             else
             {
                 // Below, including 11 uses direct symbols
-                var indexerIns = new InsBinaryOperator(SymbolMap.RegisterSymbol(AdhocConstants.OPERATOR_SUBSCRIPT, convertToOperand: frame.Version > 10));
+                var indexerIns = new InsBinaryOperator(SymbolMap.RegisterSymbol(AdhocConstants.OPERATOR_SUBSCRIPT, convertToOperand: frame.Version >= 11));
 
                 frame.AddInstruction(indexerIns, computedMember.Location.Start.Line);
                 frame.AddInstruction(new InsEval(), 0);
@@ -2458,7 +2464,7 @@ namespace GTAdhocToolchain.Compiler
             else
             {
                 // Below, including 11 uses direct symbols
-                var indexerIns = new InsBinaryOperator(SymbolMap.RegisterSymbol(AdhocConstants.OPERATOR_SUBSCRIPT, convertToOperand: frame.Version > 10));
+                var indexerIns = new InsBinaryOperator(SymbolMap.RegisterSymbol(AdhocConstants.OPERATOR_SUBSCRIPT, convertToOperand: frame.Version >= 11));
 
                 frame.AddInstruction(indexerIns, computedMember.Location.Start.Line);
             }
@@ -2707,39 +2713,23 @@ namespace GTAdhocToolchain.Compiler
             {
                 if (binExp.Operator == BinaryOperator.LogicalOr)
                 {
-                    if (frame.Version > 10)
-                    {
-                        var orIns = new InsLogicalOr();
-                        frame.AddInstruction(orIns, 0);
-                        CompileExpression(frame, binExp.Right);
-                        orIns.InstructionJumpIndex = frame.GetLastInstructionIndex();
-                    }
-                    else
-                    {
-                        var orIns = new InsLogicalOrOld();
-                        frame.AddInstruction(orIns, 0);
+                    InsLogicalBase orIns = frame.Version >= 11 ? new InsLogicalOr() : new InsLogicalOrOld();
+                    frame.AddInstruction(orIns, 0);
+                    if(frame.Version < 11)
                         InsertPop(frame);
-                        CompileExpression(frame, binExp.Right);
-                        orIns.InstructionJumpIndex = frame.GetLastInstructionIndex();
-                    }
+
+                    CompileExpression(frame, binExp.Right);
+                    orIns.InstructionJumpIndex = frame.GetLastInstructionIndex();
                 }
                 else if (binExp.Operator == BinaryOperator.LogicalAnd)
                 {
-                    if (frame.Version > 10)
-                    {
-                        var andIns = new InsLogicalAnd();
-                        frame.AddInstruction(andIns, 0);
-                        CompileExpression(frame, binExp.Right);
-                        andIns.InstructionJumpIndex = frame.GetLastInstructionIndex();
-                    }
-                    else
-                    {
-                        var andIns = new InsLogicalAndOld();
-                        frame.AddInstruction(andIns, 0);
+                    InsLogicalBase andIns = frame.Version >= 11 ? new InsLogicalAnd() : new InsLogicalAndOld();
+                    frame.AddInstruction(andIns, 0);
+                    if (frame.Version < 11)
                         InsertPop(frame);
-                        CompileExpression(frame, binExp.Right);
-                        andIns.InstructionJumpIndex = frame.GetLastInstructionIndex();
-                    }
+
+                    CompileExpression(frame, binExp.Right);
+                    andIns.InstructionJumpIndex = frame.GetLastInstructionIndex();
                 }
                 else if (binExp.Operator == BinaryOperator.NullishCoalescing)
                 {
@@ -2752,7 +2742,7 @@ namespace GTAdhocToolchain.Compiler
                     var jumpIfNotNil = new InsJumpIfNil();
                     frame.AddInstruction(jumpIfNotNil, binExp.Location.Start.Line);
                     CompileExpression(frame, binExp.Right);
-                    jumpIfNotNil.InstructionIndex = frame.GetLastInstructionIndex();
+                    jumpIfNotNil.InstructionJumpIndex = frame.GetLastInstructionIndex();
                 }
                 else
                 {
@@ -2794,7 +2784,7 @@ namespace GTAdhocToolchain.Compiler
                 if (opStr is null)
                     ThrowCompilationError(binExp, $"Binary operator {binExp.Operator} not implemented");
 
-                AdhocSymbol opSymbol = SymbolMap.RegisterSymbol(opStr, convertToOperand: frame.Version > 10);
+                AdhocSymbol opSymbol = SymbolMap.RegisterSymbol(opStr, convertToOperand: frame.Version >= 11);
                 InsBinaryOperator binOpIns = new InsBinaryOperator(opSymbol);
                 frame.AddInstruction(binOpIns, binExp.Location.Start.Line);
             }
@@ -3394,7 +3384,7 @@ namespace GTAdhocToolchain.Compiler
         // Mostly used for temp variables produced by the compiler
         private AdhocSymbol InsertNewLocalVariable(AdhocCodeFrame frame, Expression exprValue, string variable, Location location = default)
         {
-            if (frame.Version > 10)
+            if (frame.Version >= 11)
             {
                 if (exprValue is not null)
                     CompileExpression(frame, exprValue);
@@ -3508,7 +3498,7 @@ namespace GTAdhocToolchain.Compiler
         /// <param name="frame"></param>
         private void InsertVoid(AdhocCodeFrame frame)
         {
-            if (frame.Version > 10)
+            if (frame.Version >= 11)
                 frame.AddInstruction(new InsVoidConst(), 0);
             else
                 frame.AddInstruction(InsNop.Empty, 0);

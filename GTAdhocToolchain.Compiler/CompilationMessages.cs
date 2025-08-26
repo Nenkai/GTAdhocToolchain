@@ -45,7 +45,6 @@ namespace GTAdhocToolchain.Compiler
 
         public const string Error_StatementExpressionOnly = "Only assignment, call, increment, decrement, await, and new object expressions can be used as a statement";
 
-        public const string Error_ImportDeclarationEmpty = "Import declaration is empty.";
         public const string Error_ImportWildcardWithAlias = "Wildcard import cannot be aliased.";
 
         public const string Error_ArrayPatternNoElements = "Array pattern has no elements.";
