@@ -20,12 +20,13 @@ using GTAdhocToolchain.Menu.Resources;
 using GTAdhocToolchain.Packaging;
 using GTAdhocToolchain.Preprocessor;
 using GTAdhocToolchain.Project;
+using System.Reflection;
 
 namespace GTAdhocToolchain.CLI;
 
 public class Program
 {
-    public static readonly Version Version = new(1, 1, 3);
+    public static readonly Version Version = Assembly.GetEntryAssembly().GetName().Version;
 
     private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
