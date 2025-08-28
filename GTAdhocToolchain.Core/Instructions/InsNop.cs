@@ -7,12 +7,10 @@ using System.Threading.Tasks;
 namespace GTAdhocToolchain.Core.Instructions
 {
     /// <summary>
-    /// Does nothing.
+    /// Does nothing. Intended for debugging purposes (stepping into empty statements/curly brackets).
     /// </summary>
     public class InsNop : InstructionBase
     {
-        public static readonly InsNop Empty = new();
-
         public override AdhocInstructionType InstructionType => AdhocInstructionType.NOP;
 
         public override string InstructionName => "NOP";

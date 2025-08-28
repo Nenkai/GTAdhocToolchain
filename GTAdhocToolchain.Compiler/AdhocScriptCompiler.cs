@@ -224,7 +224,7 @@ namespace GTAdhocToolchain.Compiler
                     CompileIfStatement(frame, node as IfStatement);
                     break;
                 case Nodes.BlockStatement:
-                    CompileBlockStatement(frame, node as BlockStatement);
+                    CompileStatementWithScope(frame, node as BlockStatement);
                     break;
                 case Nodes.ExpressionStatement:
                     CompileExpressionStatement(frame, node as ExpressionStatement);
@@ -279,7 +279,7 @@ namespace GTAdhocToolchain.Compiler
 
         private void CompileEmptyStatement(AdhocCodeFrame frame, Node node)
         {
-            InsertNopAtScopeChangeIfNeeded(frame, node.Location.Start.Line);
+            InsertNop(frame, node.Location.Start.Line);
         }
 
         public void CompilePrintStatement(AdhocCodeFrame frame, PrintStatement printStatement)
@@ -402,14 +402,22 @@ namespace GTAdhocToolchain.Compiler
         /// <param name="frame"></param>
         /// <param name="BlockStatement"></param>
         /// <param name="insertLeaveInstruction">Whether to compile a leave scope, which isnt needed for function returns.</param>
-        public void CompileBlockStatement(AdhocCodeFrame frame, BlockStatement BlockStatement, bool openScope = true, bool insertLeaveInstruction = true)
+        public void CompileBlockStatement(AdhocCodeFrame frame, BlockStatement BlockStatement, 
+            bool openScope = true, 
+            bool insertLeaveInstruction = true,
+            bool emitNops = true)
         {
+            if (emitNops)
+                InsertNop(frame, BlockStatement.Location.Start.Line);
             if (openScope)
                 EnterScope(frame, BlockStatement);
 
             CompileStatements(frame, BlockStatement.Body);
 
-            LeaveScope(frame, insertLeaveInstruction && BlockStatement.Body.Count > 0);
+            if (openScope)
+                LeaveScope(frame, insertLeaveInstruction && BlockStatement.Body.Count > 0);
+            if (emitNops)
+                InsertNop(frame, BlockStatement.Location.End.Line);
         }
 
         public void CompileIncludeStatement(AdhocCodeFrame frame, IncludeStatement include)
@@ -1069,7 +1077,7 @@ namespace GTAdhocToolchain.Compiler
 
 
             if (body is BlockStatement blockStatement)
-                CompileBlockStatement(subroutine.CodeFrame, blockStatement, openScope: false, insertLeaveInstruction: false);
+                CompileBlockStatement(subroutine.CodeFrame, blockStatement, openScope: false, insertLeaveInstruction: false, emitNops: false);
             else
                 ThrowCompilationError(body, "Expected subroutine body to be frame statement.");
 
@@ -3350,11 +3358,7 @@ namespace GTAdhocToolchain.Compiler
         {
             if (statement is BlockStatement blockStatement)
             {
-                InsertNopAtScopeChangeIfNeeded(frame, statement.Location.Start.Line);
-
                 CompileBlockStatement(frame, blockStatement);
-
-                InsertNopAtScopeChangeIfNeeded(frame, statement.Location.End.Line);
             }
             else if (statement is ContinueStatement
                 || statement is BreakStatement
@@ -3663,7 +3667,7 @@ namespace GTAdhocToolchain.Compiler
         /// </summary>
         /// <param name="frame"></param>
         /// <param name="bodyNode"></param>
-        private void InsertNopAtScopeChangeIfNeeded(AdhocCodeFrame frame, int line)
+        private void InsertNop(AdhocCodeFrame frame, int line)
         {
             // This was used for debugging on their end (breakpoint on scope tokens with an adhoc debugger)
             // Older versions (< 7) and release scripts just had it not stripped
