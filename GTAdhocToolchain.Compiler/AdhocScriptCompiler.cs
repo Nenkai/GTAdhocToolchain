@@ -1082,6 +1082,7 @@ namespace GTAdhocToolchain.Compiler
                 ThrowCompilationError(body, "Expected subroutine body to be frame statement.");
 
             InsertFrameExitIfNeeded(subroutine.CodeFrame, body);
+            LeaveScope(subroutine.CodeFrame);
 
             Logger.Debug($"Subroutine '{id.Name}' compiled ({subroutine.CodeFrame.Instructions.Count} ins, " +
                 $"Stack Size: {subroutine.CodeFrame.Stack.GetStackSize()}, Variable Storage Size: {subroutine.CodeFrame.Stack.GetLocalVariableStorageSize()})");
@@ -3599,7 +3600,7 @@ namespace GTAdhocToolchain.Compiler
             if (frame.Version >= 11)
                 frame.AddInstruction(new InsVoidConst(), 0);
             else
-                frame.AddInstruction(InsNop.Empty, 0);
+                frame.AddInstruction(new InsNop(), 0);
         }
 
         /// <summary>

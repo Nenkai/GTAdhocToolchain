@@ -628,7 +628,7 @@ public class BuildVerbs
     public string BaseIncludeFolder { get; set; }
 }
 
-[Verb("disassembly-repl", HelpText = "Starts a disasembler repl for quickly disassembling input adhoc source code.")]
+[Verb("disassembly-repl", HelpText = "Starts a disassembler repl for quickly disassembling input adhoc source code.")]
 public class DissasemblyReplVerbs
 {
     [Option('v', "version", HelpText = "Adhoc version.")]
