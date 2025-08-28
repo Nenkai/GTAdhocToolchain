@@ -1,0 +1,3108 @@
+GT7 Compiler input tests & reverse engineering notes.
+
+Used a shadPS4 fork to hook the game. https://github.com/Nenkai/shadPS4/tree/eboot-hooks-nenkai
+Requires a code.ad with source inside in the directory of the executable.
+CUSA24767 1.00.
+
+config.toml:
+logFilter = "*:Critical Core.Hooking:Info"
+logType = "sync"
+
+////////////////////////////////////////////////////////////////////////
+// OBJECT_SELECTOR
+////////////////////////////////////////////////////////////////////////
+// There is no unary * when object selecting.
+var a = main.*dummy;
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: main
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: dummy
+[Core.Hooking] <Info> gt7_hooks.cpp:135 DumpSubroutine: OBJECT_SELECTOR
+[Core.Hooking] <Info> gt7_hooks.cpp:135 DumpSubroutine: EVAL
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: a
+[Core.Hooking] <Info> gt7_hooks.cpp:135 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+
+////////////////////////////////////////////////////////////////////////
+// __LINE__ is uint.
+////////////////////////////////////////////////////////////////////////
+__LINE__
+[Core.Hooking] <Info> gt7_hooks.cpp:101 DumpSubroutine: U_INT_CONST: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:135 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+
+////////////////////////////////////////////////////////////////////////
+// LIST_ASSIGN
+////////////////////////////////////////////////////////////////////////
+|var a, b, c.d, e::f| = 5;
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 5
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: a
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: b
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: c
+[Core.Hooking] <Info> gt7_hooks.cpp:93 DumpSubroutine: ATTRIBUTE_PUSH: d
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: e::f
+[Core.Hooking] <Info> gt7_hooks.cpp:127 DumpSubroutine: LIST_ASSIGN: 4 elems, rest: false
+[Core.Hooking] <Info> gt7_hooks.cpp:140 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+
+|one, *two| = 1;
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: one
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: two
+[Core.Hooking] <Info> gt7_hooks.cpp:127 DumpSubroutine: LIST_ASSIGN: 2 elems, rest: false
+[Core.Hooking] <Info> gt7_hooks.cpp:140 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+
+a = |one, two| = 6;
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 6
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: one
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: two
+[Core.Hooking] <Info> gt7_hooks.cpp:127 DumpSubroutine: LIST_ASSIGN: 2 elems, rest: false
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: a
+[Core.Hooking] <Info> gt7_hooks.cpp:140 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+
+|one, {two}| = test;
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: test
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: one
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: tmp#0
+[Core.Hooking] <Info> gt7_hooks.cpp:127 DumpSubroutine: LIST_ASSIGN: 2 elems, rest: false
+[Core.Hooking] <Info> gt7_hooks.cpp:140 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: tmp#0
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: two
+[Core.Hooking] <Info> gt7_hooks.cpp:127 DumpSubroutine: LIST_ASSIGN: 1 elems, rest: false
+[Core.Hooking] <Info> gt7_hooks.cpp:140 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+
+|one, {two, three}| = test;
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: test
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: one
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: tmp#0
+[Core.Hooking] <Info> gt7_hooks.cpp:127 DumpSubroutine: LIST_ASSIGN: 2 elems, rest: false
+[Core.Hooking] <Info> gt7_hooks.cpp:140 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: tmp#0
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: two
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: three
+[Core.Hooking] <Info> gt7_hooks.cpp:127 DumpSubroutine: LIST_ASSIGN: 2 elems, rest: false
+[Core.Hooking] <Info> gt7_hooks.cpp:140 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+
+|var a, test::test, {var b, var c, {var d, var e, var f, var g}}, {x, xx}| = 5;
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 5
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: a
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: test::test
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: tmp#0
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: tmp#1
+[Core.Hooking] <Info> gt7_hooks.cpp:136 DumpSubroutine: LIST_ASSIGN: 4 elems, rest: false
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: tmp#0
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: b
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: c
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: tmp#2
+[Core.Hooking] <Info> gt7_hooks.cpp:136 DumpSubroutine: LIST_ASSIGN: 3 elems, rest: false
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: tmp#2
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: d
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: e
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: f
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: g
+[Core.Hooking] <Info> gt7_hooks.cpp:136 DumpSubroutine: LIST_ASSIGN: 4 elems, rest: false
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: tmp#1
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: x
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: xx
+[Core.Hooking] <Info> gt7_hooks.cpp:136 DumpSubroutine: LIST_ASSIGN: 2 elems, rest: false
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:131 DumpSubroutine: SET_STATE: EXIT
+
+|one, two... | = test;
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: test
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: one
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: two
+[Core.Hooking] <Info> gt7_hooks.cpp:127 DumpSubroutine: LIST_ASSIGN: 2 elems, rest: true
+[Core.Hooking] <Info> gt7_hooks.cpp:140 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+
+|a, b| = |c, d| = 5;
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 5
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: c
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: d
+[Core.Hooking] <Info> gt7_hooks.cpp:136 DumpSubroutine: LIST_ASSIGN: 2 elems, rest: false
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: a
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: b
+[Core.Hooking] <Info> gt7_hooks.cpp:136 DumpSubroutine: LIST_ASSIGN: 2 elems, rest: false
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:131 DumpSubroutine: SET_STATE: EXIT
+
+|a, b| = {c, d} = 5;
+ERROR
+
+////////////////////////////////////////////////////////////////////////
+// LIST_ASSIGN syntax in function
+////////////////////////////////////////////////////////////////////////
+// This can be applied to all subroutine types (method const, method define, function const, function define)
+// Adds the argument to the function argument list, as "arg#%d" 
+function test({a, b})
+{
+
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:140 DumpSubroutine: NIL_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:136 DumpSubroutine: FUNCTION_DEFINE - test
+  [Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: arg#0
+  [Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: a
+  [Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: b
+  [Core.Hooking] <Info> gt7_hooks.cpp:127 DumpSubroutine: LIST_ASSIGN: 2 elems, rest: false
+  [Core.Hooking] <Info> gt7_hooks.cpp:140 DumpSubroutine: POP
+  [Core.Hooking] <Info> gt7_hooks.cpp:140 DumpSubroutine: VOID_CONST
+  [Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+
+function test({var a, var b}){}
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: NIL_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:198 DumpSubroutine: FUNCTION_DEFINE - test
+  [Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: arg#0
+  [Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: a
+  [Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: b
+  [Core.Hooking] <Info> gt7_hooks.cpp:136 DumpSubroutine: LIST_ASSIGN: 2 elems, rest: false
+  [Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: POP
+  [Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: VOID_CONST
+  [Core.Hooking] <Info> gt7_hooks.cpp:131 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:131 DumpSubroutine: SET_STATE: EXIT
+
+function test({a, {b, c}}){}
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: NIL_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:198 DumpSubroutine: FUNCTION_DEFINE - test
+  [Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: arg#0
+  [Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: a
+  [Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: tmp#1
+  [Core.Hooking] <Info> gt7_hooks.cpp:136 DumpSubroutine: LIST_ASSIGN: 2 elems, rest: false
+  [Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: POP
+  [Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: tmp#1
+  [Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: b
+  [Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: c
+  [Core.Hooking] <Info> gt7_hooks.cpp:136 DumpSubroutine: LIST_ASSIGN: 2 elems, rest: false
+  [Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: POP
+  [Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: VOID_CONST
+  [Core.Hooking] <Info> gt7_hooks.cpp:131 DumpSubroutine: SET_STATE: RETURN
+  
+function test({var a, a::b}){}
+ERROR
+
+function test({a, a.b}){}
+ERROR
+
+////////////////////////////////////////////////////////////////////////
+// LIST_ASSIGN syntax in function with rest
+////////////////////////////////////////////////////////////////////////
+function test({a, b...}, c)
+{
+
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:140 DumpSubroutine: NIL_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:140 DumpSubroutine: NIL_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:136 DumpSubroutine: FUNCTION_DEFINE - test
+  [Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: arg#0
+  [Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: a
+  [Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: b
+  [Core.Hooking] <Info> gt7_hooks.cpp:127 DumpSubroutine: LIST_ASSIGN: 2 elems, rest: true
+  [Core.Hooking] <Info> gt7_hooks.cpp:140 DumpSubroutine: POP
+  [Core.Hooking] <Info> gt7_hooks.cpp:140 DumpSubroutine: VOID_CONST
+  [Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+
+function test(a = {a, b})
+{
+
+}
+ERROR
+
+function test({a, b} = c)
+{
+
+}
+ERROR
+
+|one, two|;
+ERROR
+
+|var a = 6, b| = 5;
+ERROR
+
+|attribute a, b| = 5;
+ERROR
+
+////////////////////////////////////////////////////////////////////////
+// LIST_ASSIGN (foreach)
+////////////////////////////////////////////////////////////////////////
+foreach (|var i,var j| in [1:2])
+{
+
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:140 DumpSubroutine: MAP_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 2
+[Core.Hooking] <Info> gt7_hooks.cpp:140 DumpSubroutine: MAP_INSERT
+[Core.Hooking] <Info> gt7_hooks.cpp:88 DumpSubroutine: ATTRIBUTE_EVAL: iterator
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: in#0
+[Core.Hooking] <Info> gt7_hooks.cpp:140 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: in#0
+[Core.Hooking] <Info> gt7_hooks.cpp:88 DumpSubroutine: ATTRIBUTE_EVAL: fetch_next
+[Core.Hooking] <Info> gt7_hooks.cpp:110 DumpSubroutine: JUMP_IF_FALSE: 17
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: in#0
+[Core.Hooking] <Info> gt7_hooks.cpp:140 DumpSubroutine: EVAL
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: i
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: j
+[Core.Hooking] <Info> gt7_hooks.cpp:127 DumpSubroutine: LIST_ASSIGN: 2 elems, rest: false
+[Core.Hooking] <Info> gt7_hooks.cpp:140 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:114 DumpSubroutine: JUMP: 7
+[Core.Hooking] <Info> gt7_hooks.cpp:140 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+
+////////////////////////////////////////////////////////////////////////
+// MODULE_CONSTRUCTOR
+////////////////////////////////////////////////////////////////////////
+module (test)
+{
+
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: test
+[Core.Hooking] <Info> gt7_hooks.cpp:140 DumpSubroutine: MODULE_CONSTRUCTOR
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+
+////////////////////////////////////////////////////////////////////////
+// Finally statement
+////////////////////////////////////////////////////////////////////////
+finally
+{
+
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:131 DumpSubroutine: FUNCTION_CONST
+  [Core.Hooking] <Info> gt7_hooks.cpp:140 DumpSubroutine: VOID_CONST
+  [Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: fin#0
+[Core.Hooking] <Info> gt7_hooks.cpp:93 DumpSubroutine: ATTRIBUTE_PUSH: finally
+[Core.Hooking] <Info> gt7_hooks.cpp:140 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+
+// Import
+import myModule as obj;
+[Core.Hooking] <Info> gt7_hooks.cpp:132 DumpSubroutine: IMPORT: path:nil, target:myModule, alias:obj
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+
+import myModule;
+[Core.Hooking] <Info> gt7_hooks.cpp:132 DumpSubroutine: IMPORT: path:nil, target:myModule, alias:nil
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+
+import myModule::*;
+[Core.Hooking] <Info> gt7_hooks.cpp:132 DumpSubroutine: IMPORT: path:myModule, target:__mul__, alias:nil
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+
+import myModule::* as obj;
+ERROR
+
+import *;
+ERROR
+
+////////////////////////////////////////////////////////////////////////
+// Yielding
+////////////////////////////////////////////////////////////////////////
+yield;
+[Core.Hooking] <Info> gt7_hooks.cpp:145 DumpSubroutine: VOID_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: YIELD
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+
+yield 1;
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: YIELD
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+
+////////////////////////////////////////////////////////////////////////
+// Undef
+////////////////////////////////////////////////////////////////////////
+undef myThing;
+[Core.Hooking] <Info> gt7_hooks.cpp:137 DumpSubroutine: UNDEF: myThing
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+
+undef myThing::myThing2;
+[Core.Hooking] <Info> gt7_hooks.cpp:137 DumpSubroutine: UNDEF: myThing::myThing2
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+
+undef myThing.a;
+ERROR
+
+////////////////////////////////////////////////////////////////////////
+// Async/Await
+////////////////////////////////////////////////////////////////////////
+async function myAsyncFunction(){}
+[Core.Hooking] <Info> gt7_hooks.cpp:146 DumpSubroutine: FUNCTION_DEFINE - myAsyncFunction
+  [Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: System::Async
+  [Core.Hooking] <Info> gt7_hooks.cpp:141 DumpSubroutine: FUNCTION_CONST
+    [Core.Hooking] <Info> gt7_hooks.cpp:150 DumpSubroutine: VOID_CONST
+    [Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: RETURN
+  [Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: CALL: 1 args
+  [Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+
+
+await myAsyncFunction;
+[Core.Hooking] <Info> gt7_hooks.cpp:146 DumpSubroutine: FUNCTION_DEFINE - myAsyncFunction
+  [Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: System::Async
+  [Core.Hooking] <Info> gt7_hooks.cpp:141 DumpSubroutine: FUNCTION_CONST
+    [Core.Hooking] <Info> gt7_hooks.cpp:150 DumpSubroutine: VOID_CONST
+    [Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: RETURN
+  [Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: CALL: 1 args
+  [Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: myAsyncFunction
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXCEPTION
+[Core.Hooking] <Info> gt7_hooks.cpp:150 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+
+async function myAsyncFunction(){}
+await myAsyncFunction();
+[Core.Hooking] <Info> gt7_hooks.cpp:189 DumpSubroutine: FUNCTION_DEFINE - myAsyncFunction
+  [Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: System::Async
+  [Core.Hooking] <Info> gt7_hooks.cpp:183 DumpSubroutine: FUNCTION_CONST
+    [Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: VOID_CONST
+    [Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: RETURN
+  [Core.Hooking] <Info> gt7_hooks.cpp:126 DumpSubroutine: CALL: 1 args
+  [Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: myAsyncFunction
+[Core.Hooking] <Info> gt7_hooks.cpp:126 DumpSubroutine: CALL: 0 args
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXCEPTION
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+async function a() { await b; };
+[Core.Hooking] <Info> gt7_hooks.cpp:146 DumpSubroutine: FUNCTION_DEFINE - a
+  [Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: System::Async
+  [Core.Hooking] <Info> gt7_hooks.cpp:141 DumpSubroutine: FUNCTION_CONST
+    [Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: b
+    [Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXCEPTION
+    [Core.Hooking] <Info> gt7_hooks.cpp:150 DumpSubroutine: POP
+    [Core.Hooking] <Info> gt7_hooks.cpp:150 DumpSubroutine: VOID_CONST
+    [Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: RETURN
+  [Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: CALL: 1 args
+  [Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+
+//////////////////////////////////////////////////////////////////////////
+// REQUIRE
+////////////////////////////////////////////////////////////////////////
+require "MyScript.adc"
+[Core.Hooking] <Info> gt7_hooks.cpp:155 DumpSubroutine: STRING_CONST: "MyScript.adc"
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: REQUIRE
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+////////////////////////////////////////////////////////////////////////
+// VA_CALL
+////////////////////////////////////////////////////////////////////////
+function sum(arg1, arg2)
+{
+   return arg1 + arg2;
+}
+
+call(sum, [1, 2]);
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: NIL_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: NIL_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:189 DumpSubroutine: FUNCTION_DEFINE - sum
+  [Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: arg1
+  [Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: arg2
+  [Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: BINARY_OPERATOR
+  [Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: sum
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ARRAY_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ARRAY_PUSH
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 2
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ARRAY_PUSH
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: VA_CALL
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+////////////////////////////////////////////////////////////////////////
+// Identifier literals
+////////////////////////////////////////////////////////////////////////
+var `my totally valid identifier` = "hello world";
+
+module `my module`
+{
+
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:147 DumpSubroutine: STRING_CONST: "hello world"
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: my totally valid identifier
+[Core.Hooking] <Info> gt7_hooks.cpp:161 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: MODULE_DEFINE: my module
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+
+////////////////////////////////////////////////////////////////////////
+// Delegate
+////////////////////////////////////////////////////////////////////////
+function myFunc()
+{
+    return "hello world";
+}
+
+delegate myDelegate;
+myDelegate = myFunc;
+return myDelegate();
+[Core.Hooking] <Info> gt7_hooks.cpp:162 DumpSubroutine: FUNCTION_DEFINE - myFunc
+  [Core.Hooking] <Info> gt7_hooks.cpp:147 DumpSubroutine: STRING_CONST: "hello world"
+  [Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:152 DumpSubroutine: DELEGATE_DEFINE: myDelegate
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: myFunc
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: myDelegate
+[Core.Hooking] <Info> gt7_hooks.cpp:166 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: myDelegate
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: CALL: 0 args
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+
+////////////////////////////////////////////////////////////////////////
+// Statics
+////////////////////////////////////////////////////////////////////////
+static a;
+[Core.Hooking] <Info> gt7_hooks.cpp:157 DumpSubroutine: STATIC_DEFINE: a
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+
+static a = 5;
+[Core.Hooking] <Info> gt7_hooks.cpp:157 DumpSubroutine: STATIC_DEFINE: a
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 5
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: a
+[Core.Hooking] <Info> gt7_hooks.cpp:171 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+
+// Attribute
+attribute a;
+[Core.Hooking] <Info> gt7_hooks.cpp:176 DumpSubroutine: NIL_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:162 DumpSubroutine: ATTRIBUTE_DEFINE: a
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+
+attribute a = 5;
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 5
+[Core.Hooking] <Info> gt7_hooks.cpp:162 DumpSubroutine: ATTRIBUTE_DEFINE: a
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+
+////////////////////////////////////////////////////////////////////////
+// Map const
+////////////////////////////////////////////////////////////////////////
+var array = [:];
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: MAP_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: array
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+var array = [1:2, 3:4];
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: MAP_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 2
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: MAP_INSERT
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 3
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 4
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: MAP_INSERT
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: array
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+////////////////////////////////////////////////////////////////////////
+// Module tests
+////////////////////////////////////////////////////////////////////////
+module ::test
+{
+
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:150 DumpSubroutine: MODULE_DEFINE: test,test
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+module test::test2
+{
+
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:150 DumpSubroutine: MODULE_DEFINE: test::test2
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+////////////////////////////////////////////////////////////////////////
+// Class tests
+////////////////////////////////////////////////////////////////////////
+class test
+{
+
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:192 DumpSubroutine: CLASS_DEFINE: test : System::Object
+[Core.Hooking] <Info> gt7_hooks.cpp:131 DumpSubroutine: SET_STATE: EXIT
+[Core.Hooking] <Info> gt7_hooks.cpp:131 DumpSubroutine: SET_STATE: EXIT
+
+class test : testt
+{
+
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:192 DumpSubroutine: CLASS_DEFINE: test : testt
+[Core.Hooking] <Info> gt7_hooks.cpp:131 DumpSubroutine: SET_STATE: EXIT
+[Core.Hooking] <Info> gt7_hooks.cpp:131 DumpSubroutine: SET_STATE: EXIT
+
+////////////////////////////////////////////////////////////////////////
+// Reference variables
+////////////////////////////////////////////////////////////////////////
+*x_ref = 1;
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: x_ref
+[Core.Hooking] <Info> gt7_hooks.cpp:176 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+
+&x_ref = 1;
+ERROR
+
+value = *x_ref;
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: x_ref
+[Core.Hooking] <Info> gt7_hooks.cpp:176 DumpSubroutine: EVAL
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: value
+[Core.Hooking] <Info> gt7_hooks.cpp:176 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+
+x_ref = &value;
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: value
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: x_ref
+[Core.Hooking] <Info> gt7_hooks.cpp:176 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+
+var x;
+var y;
+test(*x, *y);
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: test
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: x
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: EVAL
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: y
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: EVAL
+[Core.Hooking] <Info> gt7_hooks.cpp:126 DumpSubroutine: CALL: 2 args
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+var x = 0;
+var y = 1;
+test(&x, &y);
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 0
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: x
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: y
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: test
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: x
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: y
+[Core.Hooking] <Info> gt7_hooks.cpp:126 DumpSubroutine: CALL: 2 args
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+////////////////////////////////////////////////////////////////////////
+// OPTIONAL
+////////////////////////////////////////////////////////////////////////
+var i = test?.test2;
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: test
+[Core.Hooking] <Info> gt7_hooks.cpp:176 DumpSubroutine: LOGICAL_OPTIONAL
+[Core.Hooking] <Info> gt7_hooks.cpp:88 DumpSubroutine: ATTRIBUTE_EVAL: test2
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: i
+[Core.Hooking] <Info> gt7_hooks.cpp:176 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+
+var i = test?[test2];
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: test
+[Core.Hooking] <Info> gt7_hooks.cpp:176 DumpSubroutine: LOGICAL_OPTIONAL
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: test2
+[Core.Hooking] <Info> gt7_hooks.cpp:176 DumpSubroutine: ELEMENT_EVAL
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: i
+[Core.Hooking] <Info> gt7_hooks.cpp:176 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+
+var i = test?.*test2;
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: test
+[Core.Hooking] <Info> gt7_hooks.cpp:176 DumpSubroutine: LOGICAL_OPTIONAL
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: test2
+[Core.Hooking] <Info> gt7_hooks.cpp:176 DumpSubroutine: LOGICAL_OPTIONAL
+[Core.Hooking] <Info> gt7_hooks.cpp:176 DumpSubroutine: OBJECT_SELECTOR
+[Core.Hooking] <Info> gt7_hooks.cpp:176 DumpSubroutine: EVAL
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: i
+[Core.Hooking] <Info> gt7_hooks.cpp:176 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+
+////////////////////////////////////////////////////////////////////////
+// OPTIONAL IF NOT NIL ASSIGNMENT
+////////////////////////////////////////////////////////////////////////
+var i = test ?? a;
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: test
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP_IF_NIL: 3
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: a
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: i
+[Core.Hooking] <Info> gt7_hooks.cpp:180 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:126 DumpSubroutine: SET_STATE: EXIT
+
+// METHOD_CONST
+var delay_load_complete = method(context)
+{
+    self.Info::FadeEffect.start();
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:83 CompileImpl: NIL_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:83 CompileImpl: METHOD_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:83 CompileImpl: VARIABLE_PUSH
+[Core.Hooking] <Info> gt7_hooks.cpp:83 CompileImpl: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:83 CompileImpl: SET_STATE
+
+// Function with variable argument count
+function myFunction(args...)
+{
+
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: NIL_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:189 DumpSubroutine: FUNCTION_DEFINE - myFunction
+  [Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: VOID_CONST
+  [Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+////////////////////////////////////////////////////////////////////////
+// PRINT (not supported or been removed?)
+////////////////////////////////////////////////////////////////////////
+print "a";
+ERROR
+
+pr "a";
+ERROR
+
+pr("test");
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: __toplevel__::System::pr
+[Core.Hooking] <Info> gt7_hooks.cpp:151 DumpSubroutine: STRING_CONST: "test"
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: CALL: 1 args
+[Core.Hooking] <Info> gt7_hooks.cpp:180 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:126 DumpSubroutine: SET_STATE: EXIT
+
+print("a"); // This just thinks it's a regular function call
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: print
+[Core.Hooking] <Info> gt7_hooks.cpp:151 DumpSubroutine: STRING_CONST: "a"
+[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: CALL: 1 args
+[Core.Hooking] <Info> gt7_hooks.cpp:180 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:126 DumpSubroutine: SET_STATE: EXIT
+
+// Raw Literals (not supported? but the get token function seems to support it...)
+return R"aaa
+bbb
+ccc";
+ERROR
+
+return R"aaa";
+ERROR
+
+////////////////////////////////////////////////////////////////////////
+// Hex strings
+////////////////////////////////////////////////////////////////////////
+var test = "\x68\x65\x6C\x6C\x6F\x20\x77\x6F\x72\x6C\x64";
+[Core.Hooking] <Info> gt7_hooks.cpp:157 DumpSubroutine: STRING_CONST: "hello world"
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: test
+[Core.Hooking] <Info> gt7_hooks.cpp:202 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:131 DumpSubroutine: SET_STATE: EXIT
+
+var test = "\x68\x65\x6C\x6C\x6F world";
+[Core.Hooking] <Info> gt7_hooks.cpp:157 DumpSubroutine: STRING_CONST: "hello world"
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: test
+[Core.Hooking] <Info> gt7_hooks.cpp:202 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:131 DumpSubroutine: SET_STATE: EXIT
+
+////////////////////////////////////////////////////////////////////////
+// Unicode strings (partially broken from their side. inserts 'u' everywhere)
+////////////////////////////////////////////////////////////////////////
+var test = "\u00A9"
+[Core.Hooking] <Info> gt7_hooks.cpp:157 DumpSubroutine: STRING_CONST: "©u"
+
+var test = "\u0068\u0065\u006C\u006C\u006F\u0020\u0077\u006F\u0072\u006C\u0064"
+[Core.Hooking] <Info> gt7_hooks.cpp:157 DumpSubroutine: STRING_CONST: "hueululuou uwuouruludu"
+
+////////////////////////////////////////////////////////////////////////
+// String interpolation
+////////////////////////////////////////////////////////////////////////
+
+return "aaa%{b}ccc";
+[Core.Hooking] <Info> gt7_hooks.cpp:151 DumpSubroutine: STRING_CONST: "aaa"
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: b
+[Core.Hooking] <Info> gt7_hooks.cpp:151 DumpSubroutine: STRING_CONST: "ccc"
+[Core.Hooking] <Info> gt7_hooks.cpp:155 DumpSubroutine: STRING_PUSH: 3 elems
+[Core.Hooking] <Info> gt7_hooks.cpp:126 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:126 DumpSubroutine: SET_STATE: EXIT
+
+return "aaa%{b}";
+[Core.Hooking] <Info> gt7_hooks.cpp:151 DumpSubroutine: STRING_CONST: "aaa"
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: b
+[Core.Hooking] <Info> gt7_hooks.cpp:155 DumpSubroutine: STRING_PUSH: 2 elems
+[Core.Hooking] <Info> gt7_hooks.cpp:126 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:126 DumpSubroutine: SET_STATE: EXIT
+
+return "%{b}";
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: b
+[Core.Hooking] <Info> gt7_hooks.cpp:155 DumpSubroutine: STRING_PUSH: 1 elems
+[Core.Hooking] <Info> gt7_hooks.cpp:126 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:126 DumpSubroutine: SET_STATE: EXIT
+
+// Multi-strings
+return "aaa" "bbb";
+[Core.Hooking] <Info> gt7_hooks.cpp:151 DumpSubroutine: STRING_CONST: "aaa"
+[Core.Hooking] <Info> gt7_hooks.cpp:151 DumpSubroutine: STRING_CONST: "bbb"
+[Core.Hooking] <Info> gt7_hooks.cpp:155 DumpSubroutine: STRING_PUSH: 2 elems
+[Core.Hooking] <Info> gt7_hooks.cpp:126 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:126 DumpSubroutine: SET_STATE: EXIT
+
+return "aaa"
+"bbb";
+[Core.Hooking] <Info> gt7_hooks.cpp:151 DumpSubroutine: STRING_CONST: "aaa"
+[Core.Hooking] <Info> gt7_hooks.cpp:151 DumpSubroutine: STRING_CONST: "bbb"
+[Core.Hooking] <Info> gt7_hooks.cpp:155 DumpSubroutine: STRING_PUSH: 2 elems
+[Core.Hooking] <Info> gt7_hooks.cpp:126 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:126 DumpSubroutine: SET_STATE: EXIT
+
+return "aaa"
+"bbb"
+   "c"                  "d%{e}";
+[Core.Hooking] <Info> gt7_hooks.cpp:151 DumpSubroutine: STRING_CONST: "aaa"
+[Core.Hooking] <Info> gt7_hooks.cpp:151 DumpSubroutine: STRING_CONST: "bbb"
+[Core.Hooking] <Info> gt7_hooks.cpp:151 DumpSubroutine: STRING_CONST: "c"
+[Core.Hooking] <Info> gt7_hooks.cpp:151 DumpSubroutine: STRING_CONST: "d"
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: e
+[Core.Hooking] <Info> gt7_hooks.cpp:155 DumpSubroutine: STRING_PUSH: 5 elems
+[Core.Hooking] <Info> gt7_hooks.cpp:126 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:126 DumpSubroutine: SET_STATE: EXIT
+
+// Symbol Const
+return 'a'
+[Core.Hooking] <Info> gt7_hooks.cpp:160 DumpSubroutine: SYMBOL_CONST: 'a'
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+return 'a' 'b'
+ERROR
+
+////////////////////////////////////////////////////////////////////////
+// Literals
+////////////////////////////////////////////////////////////////////////
+return 0.0;
+[Core.Hooking] <Info> gt7_hooks.cpp:105 DumpSubroutine: FLOAT_CONST: 0
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+return 0.0f
+ERROR
+
+return 0x123
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 291
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+return 0x89ABCDEF
+[Core.Hooking] <Info> gt7_hooks.cpp:83 CompileImpl: LONG_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:83 CompileImpl: SET_STATE
+[Core.Hooking] <Info> gt7_hooks.cpp:83 CompileImpl: SET_STATE
+
+return 0x89ABCDEF89ABCDEF
+[Core.Hooking] <Info> gt7_hooks.cpp:83 CompileImpl: LONG_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:83 CompileImpl: SET_STATE
+[Core.Hooking] <Info> gt7_hooks.cpp:83 CompileImpl: SET_STATE
+
+return 0x89ABCDEF89ABCDEFu
+[Core.Hooking] <Info> gt7_hooks.cpp:83 CompileImpl: U_LONG_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:83 CompileImpl: SET_STATE
+[Core.Hooking] <Info> gt7_hooks.cpp:83 CompileImpl: SET_STATE
+
+return 0x89ABCDEF89ABCDEFul
+[Core.Hooking] <Info> gt7_hooks.cpp:83 CompileImpl: U_LONG_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:83 CompileImpl: SET_STATE
+[Core.Hooking] <Info> gt7_hooks.cpp:83 CompileImpl: SET_STATE
+
+return 0x89ABCDEF89ABCDEFull
+ERROR
+
+return 0x89ABCDEF89ABCDEFd
+ERROR
+
+return 12345d
+ERROR
+
+return 12345.0d
+[Core.Hooking] <Info> gt7_hooks.cpp:83 CompileImpl: DOUBLE_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:83 CompileImpl: SET_STATE
+[Core.Hooking] <Info> gt7_hooks.cpp:83 CompileImpl: SET_STATE
+
+return 12345.0u
+ERROR
+
+return 0b1111
+[Core.Hooking] <Info> gt7_hooks.cpp:83 CompileImpl: INT_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:83 CompileImpl: SET_STATE
+[Core.Hooking] <Info> gt7_hooks.cpp:83 CompileImpl: SET_STATE
+
+return 0b1111u
+[Core.Hooking] <Info> gt7_hooks.cpp:101 DumpSubroutine: U_INT_CONST: 15
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+return 0b1111ul
+[Core.Hooking] <Info> gt7_hooks.cpp:83 CompileImpl: U_LONG_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:83 CompileImpl: SET_STATE
+[Core.Hooking] <Info> gt7_hooks.cpp:83 CompileImpl: SET_STATE
+
+return 010
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 8
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+// Literals as call (supported: 'Byte', 'UByte', 'Short', 'UShort', 'Int', 'UInt', 'Long', 'ULong', 'Float', 'Double'
+return UInt(1);
+[Core.Hooking] <Info> gt7_hooks.cpp:101 DumpSubroutine: U_INT_CONST: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+return Float(1);
+[Core.Hooking] <Info> gt7_hooks.cpp:105 DumpSubroutine: FLOAT_CONST: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+return Float(0x55);
+[Core.Hooking] <Info> gt7_hooks.cpp:105 DumpSubroutine: FLOAT_CONST: 85
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+// Test regex?
+return /ab+c/;
+ERROR
+
+////////////////////////////////////////////////////////////////////////
+// Try catch throw
+////////////////////////////////////////////////////////////////////////
+throw test;
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: test
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: THROW
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+try
+{
+
+}
+catch (e)
+{
+
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: TRY_CATCH
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 10
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 0
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: e
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: catch#0
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 9
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+try
+{
+
+}
+finally
+{
+    return "hello";
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: TRY_CATCH
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 5
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 0
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:183 DumpSubroutine: FUNCTION_CONST
+  [Core.Hooking] <Info> gt7_hooks.cpp:155 DumpSubroutine: STRING_CONST: "hello"
+  [Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: fin#0
+[Core.Hooking] <Info> gt7_hooks.cpp:93 DumpSubroutine: ATTRIBUTE_PUSH: finally
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+try
+{
+
+}
+catch (e)
+{
+
+}
+finally
+{
+    return "hello";
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: TRY_CATCH
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 10
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 0
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: e
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: catch#0
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 9
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:183 DumpSubroutine: FUNCTION_CONST
+  [Core.Hooking] <Info> gt7_hooks.cpp:155 DumpSubroutine: STRING_CONST: "hello"
+  [Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: fin#1
+[Core.Hooking] <Info> gt7_hooks.cpp:93 DumpSubroutine: ATTRIBUTE_PUSH: finally
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+try
+{
+
+}
+catch
+{
+
+}
+ERROR
+
+////////////////////////////////////////////////////////////////////////
+// Function tests
+////////////////////////////////////////////////////////////////////////
+function test()
+{
+
+}
+
+[Core.Hooking] <Info> gt7_hooks.cpp:189 DumpSubroutine: FUNCTION_DEFINE - test
+  [Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: VOID_CONST
+  [Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+function test()
+{
+   return 1;
+}
+
+[Core.Hooking] <Info> gt7_hooks.cpp:189 DumpSubroutine: FUNCTION_DEFINE - test
+  [Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 1
+  [Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+function test()
+{
+   return 1;
+   return 2;
+}
+
+[Core.Hooking] <Info> gt7_hooks.cpp:189 DumpSubroutine: FUNCTION_DEFINE - test
+  [Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 1
+  [Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: RETURN
+  [Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 2
+  [Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+function(){}
+[Core.Hooking] <Info> gt7_hooks.cpp:186 DumpSubroutine: FUNCTION_CONST
+  [Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: VOID_CONST
+  [Core.Hooking] <Info> gt7_hooks.cpp:131 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:131 DumpSubroutine: SET_STATE: EXIT
+
+Test(function() {});
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: Test
+[Core.Hooking] <Info> gt7_hooks.cpp:183 DumpSubroutine: FUNCTION_CONST
+  [Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: VOID_CONST
+  [Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:126 DumpSubroutine: CALL: 1 args
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+function() return true;
+ERROR
+
+function() = true;
+ERROR
+
+function();
+ERROR
+
+function hello();
+ERROR
+
+function a() => b;
+ERROR
+
+function a => b;
+ERROR
+
+mdl.find_static(pair => pair[1] == value);
+ERROR
+
+Test(() => {});
+ERROR
+
+Test(function() => {});
+ERROR
+
+Template::ScrolledWindow::clip::space::LoginBonusGetNum::slider.format_function = (value, scale, range, format, zero_text) => {
+    var num = value;
+    return "%d".format(num);
+};
+ERROR
+		
+	
+////////////////////////////////////////////////////////////////////////
+// For Loop tests
+////////////////////////////////////////////////////////////////////////
+for (var i = 0; i < 10; i++)
+{
+    var str = "hello world";
+}
+
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 0
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: i
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: i
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 10
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: BINARY_OPERATOR
+[Core.Hooking] <Info> gt7_hooks.cpp:114 DumpSubroutine: JUMP_IF_FALSE: 15
+[Core.Hooking] <Info> gt7_hooks.cpp:155 DumpSubroutine: STRING_CONST: "hello world"
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: str
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: i
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: UNARY_ASSIGN_OPERATOR
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 3
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+for (;;)
+{
+    var str = "hello world";
+}
+
+[Core.Hooking] <Info> gt7_hooks.cpp:155 DumpSubroutine: STRING_CONST: "hello world"
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: str
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 0
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+for (var i = 0; i < 10; i++)
+{
+    var str = "hello world";
+    break;
+    var str2 = "hello world2";
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 0
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: i
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: i
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 10
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: BINARY_OPERATOR
+[Core.Hooking] <Info> gt7_hooks.cpp:114 DumpSubroutine: JUMP_IF_FALSE: 19
+[Core.Hooking] <Info> gt7_hooks.cpp:155 DumpSubroutine: STRING_CONST: "hello world"
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: str
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 19
+[Core.Hooking] <Info> gt7_hooks.cpp:155 DumpSubroutine: STRING_CONST: "hello world2"
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: str2
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: i
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: UNARY_ASSIGN_OPERATOR
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 3
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+for (var i = 0; i < 10; i++)
+{
+    var str = "hello world";
+    continue;
+    var str2 = "hello world2";
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 0
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: i
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: i
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 10
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: BINARY_OPERATOR
+[Core.Hooking] <Info> gt7_hooks.cpp:114 DumpSubroutine: JUMP_IF_FALSE: 19
+[Core.Hooking] <Info> gt7_hooks.cpp:155 DumpSubroutine: STRING_CONST: "hello world"
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: str
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 15
+[Core.Hooking] <Info> gt7_hooks.cpp:155 DumpSubroutine: STRING_CONST: "hello world2"
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: str2
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: i
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: UNARY_ASSIGN_OPERATOR
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 3
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+////////////////////////////////////////////////////////////////////////
+// While Loop Tests
+////////////////////////////////////////////////////////////////////////
+while (true)
+{
+    var str = "hello world";
+}
+
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: BOOL_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:114 DumpSubroutine: JUMP_IF_FALSE: 7
+[Core.Hooking] <Info> gt7_hooks.cpp:155 DumpSubroutine: STRING_CONST: "hello world"
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: str
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 0
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+while (true)
+{
+    var str = "hello world";
+    break;
+    var str2 = "hello world2";
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: BOOL_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:114 DumpSubroutine: JUMP_IF_FALSE: 11
+[Core.Hooking] <Info> gt7_hooks.cpp:155 DumpSubroutine: STRING_CONST: "hello world"
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: str
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 11
+[Core.Hooking] <Info> gt7_hooks.cpp:155 DumpSubroutine: STRING_CONST: "hello world2"
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: str2
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 0
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+while (true)
+{
+    var str = "hello world";
+    continue;
+    var str2 = "hello world2";
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: BOOL_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:114 DumpSubroutine: JUMP_IF_FALSE: 11
+[Core.Hooking] <Info> gt7_hooks.cpp:155 DumpSubroutine: STRING_CONST: "hello world"
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: str
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 10
+[Core.Hooking] <Info> gt7_hooks.cpp:155 DumpSubroutine: STRING_CONST: "hello world2"
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: str2
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 0
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+while ()
+{
+
+}
+ERROR
+
+while
+{
+
+}
+ERROR
+
+////////////////////////////////////////////////////////////////////////
+// Do While Tests
+////////////////////////////////////////////////////////////////////////
+do
+{
+    var str = "hello world";
+}
+while (true);
+[Core.Hooking] <Info> gt7_hooks.cpp:155 DumpSubroutine: STRING_CONST: "hello world"
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: str
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: BOOL_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:114 DumpSubroutine: JUMP_IF_FALSE: 7
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 0
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+do 
+	var str = "hello world"; 
+while (true);
+[Core.Hooking] <Info> gt7_hooks.cpp:155 DumpSubroutine: STRING_CONST: "hello world"
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: str
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: BOOL_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:114 DumpSubroutine: JUMP_IF_FALSE: 7
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 0
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+do ; while (true);
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: BOOL_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:114 DumpSubroutine: JUMP_IF_FALSE: 3
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 0
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+do 5; while (true);
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 5
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: BOOL_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:114 DumpSubroutine: JUMP_IF_FALSE: 6
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 0
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:131 DumpSubroutine: SET_STATE: EXIT
+
+do while (true);
+ERROR
+
+do
+{
+    var str = "hello world";
+    break;
+    var str2 = "hello world2";
+}
+while (true)
+[Core.Hooking] <Info> gt7_hooks.cpp:155 DumpSubroutine: STRING_CONST: "hello world"
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: str
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 11
+[Core.Hooking] <Info> gt7_hooks.cpp:155 DumpSubroutine: STRING_CONST: "hello world2"
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: str2
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: BOOL_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:114 DumpSubroutine: JUMP_IF_FALSE: 11
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 0
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+do
+{
+    var str = "hello world";
+    continue;
+    var str2 = "hello world2";
+}
+while (true)
+[Core.Hooking] <Info> gt7_hooks.cpp:155 DumpSubroutine: STRING_CONST: "hello world"
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: str
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 8
+[Core.Hooking] <Info> gt7_hooks.cpp:155 DumpSubroutine: STRING_CONST: "hello world2"
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: str2
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: BOOL_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:114 DumpSubroutine: JUMP_IF_FALSE: 11
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 0
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+////////////////////////////////////////////////////////////////////////
+// Switch tests
+////////////////////////////////////////////////////////////////////////
+
+switch (type)
+{
+
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: type
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: case#0
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 4
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+switch (type)
+{
+    case 1:
+        return 1;
+    case 2:
+        return 2;
+    case 3:
+        break;
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: type
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: case#0
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: case#0
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: BINARY_OPERATOR
+[Core.Hooking] <Info> gt7_hooks.cpp:109 DumpSubroutine: JUMP_IF_TRUE: 16
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: case#0
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 2
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: BINARY_OPERATOR
+[Core.Hooking] <Info> gt7_hooks.cpp:109 DumpSubroutine: JUMP_IF_TRUE: 18
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: case#0
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 3
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: BINARY_OPERATOR
+[Core.Hooking] <Info> gt7_hooks.cpp:109 DumpSubroutine: JUMP_IF_TRUE: 20
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 21
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 2
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 21
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+switch (type)
+{
+    case 1:
+    default:
+        return 1;
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: type
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: case#0
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: case#0
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: BINARY_OPERATOR
+[Core.Hooking] <Info> gt7_hooks.cpp:109 DumpSubroutine: JUMP_IF_TRUE: 8
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 8
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+switch (type)
+{
+    case 1:
+        break;
+    default:
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: type
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: case#0
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: case#0
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: BINARY_OPERATOR
+[Core.Hooking] <Info> gt7_hooks.cpp:109 DumpSubroutine: JUMP_IF_TRUE: 8
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 9
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 9
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+////////////////////////////////////////////////////////////////////////
+// Ternary tests
+////////////////////////////////////////////////////////////////////////
+var variable = "hello" == "world" ? 1 : 0;
+[Core.Hooking] <Info> gt7_hooks.cpp:155 DumpSubroutine: STRING_CONST: "hello"
+[Core.Hooking] <Info> gt7_hooks.cpp:155 DumpSubroutine: STRING_CONST: "world"
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: BINARY_OPERATOR
+[Core.Hooking] <Info> gt7_hooks.cpp:114 DumpSubroutine: JUMP_IF_FALSE: 7
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 8
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 0
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: variable
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+////////////////////////////////////////////////////////////////////////
+// Scope tests
+////////////////////////////////////////////////////////////////////////
+{
+
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+var i;
+{
+    i = 0;
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 0
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: i
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+var i;
+{
+    i = 0;
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 0
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: i
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+var i = 0;
+{
+
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 0
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: i
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+var i;
+{
+    i = 0;
+}
+i = 0;
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 0
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: i
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 0
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: i
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+////////////////////////////////////////////////////////////////////////
+// Logical Or/And
+////////////////////////////////////////////////////////////////////////
+
+if (one == 1 || two == 2)
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: one
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: BINARY_OPERATOR
+[Core.Hooking] <Info> gt7_hooks.cpp:207 DumpSubroutine: LOGICAL_OR: 7
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: two
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 2
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: BINARY_OPERATOR
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:131 DumpSubroutine: SET_STATE: EXIT
+
+if (one == 1 || (two == 2 && three == 3))
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: one
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: BINARY_OPERATOR
+[Core.Hooking] <Info> gt7_hooks.cpp:207 DumpSubroutine: LOGICAL_OR: 11
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: two
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 2
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: BINARY_OPERATOR
+[Core.Hooking] <Info> gt7_hooks.cpp:203 DumpSubroutine: LOGICAL_AND: 11
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: three
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 3
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: BINARY_OPERATOR
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:131 DumpSubroutine: SET_STATE: EXIT
+
+if ((one == 1 || two == 2) && three == 3)
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: one
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: BINARY_OPERATOR
+[Core.Hooking] <Info> gt7_hooks.cpp:207 DumpSubroutine: LOGICAL_OR: 7
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: two
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 2
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: BINARY_OPERATOR
+[Core.Hooking] <Info> gt7_hooks.cpp:203 DumpSubroutine: LOGICAL_AND: 11
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: three
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 3
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: BINARY_OPERATOR
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:131 DumpSubroutine: SET_STATE: EXIT
+
+if ((one == 1 && two == 2) || three == 3)
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: one
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: BINARY_OPERATOR
+[Core.Hooking] <Info> gt7_hooks.cpp:203 DumpSubroutine: LOGICAL_AND: 7
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: two
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 2
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: BINARY_OPERATOR
+[Core.Hooking] <Info> gt7_hooks.cpp:207 DumpSubroutine: LOGICAL_OR: 11
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: three
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 3
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: BINARY_OPERATOR
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:131 DumpSubroutine: SET_STATE: EXIT
+
+////////////////////////////////////////////////////////////////////////
+// If tests
+////////////////////////////////////////////////////////////////////////
+if (true)
+{
+        var str = "hello from if";
+}
+else if (true)
+{
+        var str = "hello from else if";
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: BOOL_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:114 DumpSubroutine: JUMP_IF_FALSE: 7
+[Core.Hooking] <Info> gt7_hooks.cpp:157 DumpSubroutine: STRING_CONST: "hello from if"
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: str
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 14
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: BOOL_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:114 DumpSubroutine: JUMP_IF_FALSE: 13
+[Core.Hooking] <Info> gt7_hooks.cpp:157 DumpSubroutine: STRING_CONST: "hello from else if"
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: str
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:131 DumpSubroutine: SET_STATE: EXIT
+
+if (true)
+{
+        var str = "hello from if";
+}
+else if (true)
+{
+        var str = "hello from else if";
+}
+else
+{
+        var str = "hello from else";
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: BOOL_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:114 DumpSubroutine: JUMP_IF_FALSE: 7
+[Core.Hooking] <Info> gt7_hooks.cpp:157 DumpSubroutine: STRING_CONST: "hello from if"
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: str
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 19
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: BOOL_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:114 DumpSubroutine: JUMP_IF_FALSE: 14
+[Core.Hooking] <Info> gt7_hooks.cpp:157 DumpSubroutine: STRING_CONST: "hello from else if"
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: str
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 18
+[Core.Hooking] <Info> gt7_hooks.cpp:157 DumpSubroutine: STRING_CONST: "hello from else"
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: str
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:131 DumpSubroutine: SET_STATE: EXIT
+
+if (i = 1)
+{
+
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: i
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: ASSIGN
+[Core.Hooking] <Info> gt7_hooks.cpp:114 DumpSubroutine: JUMP_IF_FALSE: 4
+[Core.Hooking] <Info> gt7_hooks.cpp:131 DumpSubroutine: SET_STATE: EXIT
+
+if (var i = 1, i)
+{
+
+}
+ERROR
+
+if (var i = 1; i)
+{
+
+}
+ERROR
+
+if (i = 1; i)
+{
+
+}
+ERROR
+
+
+// Optimizations? The only optimizations in the entire compiler
+if (a) ; else if (b) ;
+
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: a,a
+[Core.Hooking] <Info> gt7_hooks.cpp:109 DumpSubroutine: JUMP_IF_TRUE: 5
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: b,b
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:131 DumpSubroutine: SET_STATE: EXIT
+
+if (a) {} else if (b) ;
+
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: a,a
+[Core.Hooking] <Info> gt7_hooks.cpp:114 DumpSubroutine: JUMP_IF_FALSE: 3
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 6
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: b,b
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:131 DumpSubroutine: SET_STATE: EXIT
+
+if (a) ; else if (b) {};
+
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: a,a
+[Core.Hooking] <Info> gt7_hooks.cpp:109 DumpSubroutine: JUMP_IF_TRUE: 5
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: b,b
+[Core.Hooking] <Info> gt7_hooks.cpp:114 DumpSubroutine: JUMP_IF_FALSE: 4
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:131 DumpSubroutine: SET_STATE: EXIT
+
+if (a) {} else if (b) {} else ;
+
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: a,a
+[Core.Hooking] <Info> gt7_hooks.cpp:114 DumpSubroutine: JUMP_IF_FALSE: 3
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 6
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: b,b
+[Core.Hooking] <Info> gt7_hooks.cpp:114 DumpSubroutine: JUMP_IF_FALSE: 5
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:131 DumpSubroutine: SET_STATE: EXIT
+
+// Leave weirdness
+
+if (two) {}
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: two,two
+[Core.Hooking] <Info> gt7_hooks.cpp:114 DumpSubroutine: JUMP_IF_FALSE: 2
+[Core.Hooking] <Info> gt7_hooks.cpp:131 DumpSubroutine: SET_STATE: EXIT
+
+foreach (var car in cars)
+{
+
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: cars,cars
+[Core.Hooking] <Info> gt7_hooks.cpp:88 DumpSubroutine: ATTRIBUTE_EVAL: iterator
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: in#0
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: in#0
+[Core.Hooking] <Info> gt7_hooks.cpp:88 DumpSubroutine: ATTRIBUTE_EVAL: fetch_next
+[Core.Hooking] <Info> gt7_hooks.cpp:114 DumpSubroutine: JUMP_IF_FALSE: 12
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: in#0
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: EVAL
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: car
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 4
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:131 DumpSubroutine: SET_STATE: EXIT
+
+foreach (var car in cars)
+{
+    if (two)
+    {
+	}
+}
+
+foreach (var car in cars)
+{
+    if (two)
+    {
+	
+    }
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: cars,cars
+[Core.Hooking] <Info> gt7_hooks.cpp:88 DumpSubroutine: ATTRIBUTE_EVAL: iterator
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: in#0
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: in#0
+[Core.Hooking] <Info> gt7_hooks.cpp:88 DumpSubroutine: ATTRIBUTE_EVAL: fetch_next
+[Core.Hooking] <Info> gt7_hooks.cpp:114 DumpSubroutine: JUMP_IF_FALSE: 15
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: in#0
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: EVAL
+[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: car
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: two,two
+[Core.Hooking] <Info> gt7_hooks.cpp:114 DumpSubroutine: JUMP_IF_FALSE: 13
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: LEAVE // <-- ?
+[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 4
+[Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:131 DumpSubroutine: SET_STATE: EXIT
+
+///////////////////////////////////////////////////////
+____COMPILER REVERSE ENGINEERING NOTES_________________
+
+Checks for UTF8 marker (0xEF 0xBB 0xBF)
+Supports raw string R""
+
+Scanner token types (returned by hParser::GetToken, 0x3229310 GT7 1.00):
+
+  // Matches ascii table
+  % = 37
+  & = 38
+  * = 42
+  + = 43
+  - = 45
+  . = 46
+  / = 47
+  : = 58
+  < = 60
+  > = 62
+  ? = 63
+  ^ = 94
+  | = 124  
+
+  bool = 258
+  int literal = 259
+  long literal = 260
+  unsigned int literal = 261
+  unsigned long literal = 262
+  float literal = 263
+  double literal = 264
+  string related = 265
+  string related = 266
+  identifier literal (`) = 267?
+  operator assignment i.e (^=, |=, %=, &=, *=, **=, +=, -=, /=, >>=, <<=) = 268
+  symbol string = 269?
+  ... = 270 (va args)
+  
+  try = 271;
+  catch = 272;
+  throw = 273;
+  finally = 274;
+  var = 275;
+  undef = 276;
+  method = 277;
+  class = 278;
+  module = 279;
+  default = 280;
+  function = 281;
+  nil = 282;
+  if = 283;
+  else = 284;
+  do = 285;
+  while = 286;
+  switch = 287;
+  case = 288;
+  for = 289;
+  break = 290;
+  return = 292;
+  yield = 293;
+  async = 294;
+  await = 295;
+  import = 296;
+  require = 297;
+  foreach = 298;
+  call = 299;
+  static = 300;
+  attribute = 301;
+  delegate = 302;
+  __FILE__ = 303;
+  __LINE__ = 304;
+  use_strict = 305;
+  no_strict = 306;
+  push_strict = 307;
+  pop_strict = 308;
+  dump = 309;
+  unknown = 310;
+  exec = 311;
+  link = 312;
+  current_module = 313;
+  include = 314;
+ 
+  ?? = 315
+  || = 316 (or comparison)
+  && = 317 (and comparison)
+  == = 318 (equals)
+  != = 319 (not equal)
+  >= = 320 (greater or equal to)
+  <= = 321 (lesser or equal to)
+  << = 322 (left shift)
+  >> = 323 (right shift)
+  ** = 324 (pow)
+  .* = 325 (object selector)
+  ?.* = 326 (optional object selector)
+  ++ = 331
+  -- = 332
+  ?. = 333 (optional accessor)
+  ?[ = 334 (optional array accessor)
+  :: = 335 (static)
+
+parser type (switch, hParser::ParseNode, 0x31D85F0 GT7 1.00):
+	3 = Script?
+	232 = dump
+	
+NodeType (used by switch table in mCompiler::CompileExpression, 0x30E36D0 GT7 1.00):
+	0 = array_expr
+	1 = 2x expression & ASSIGN
+	2 = attribute_assign_expr
+	3 = attribute_define
+	4 = ? set_state - trivial body expression?
+	5 = binary_operator_expr (2 expr)
+	6 = binary_assign_operator_expr (2 expr)
+	7 = ? frame?
+	8 = bool_const
+	9 = loop?
+	10 = call
+	12 = try_catch
+	13 = class_define
+	15 = loop? continue?
+	16 = delegate_define
+	17 = double_const
+	18 = if_statement
+	19 = element_push?
+	20/21 = eval expression
+	22 = finalizer_statement
+	23 = finalizer_statement (2?)
+	24 = float_const
+	25 = foreach_statement
+	26 = loop (which?)
+	27 = function_define
+	28 = function_const
+	29 = loop (which?)
+	30 = import_statement
+	31 = int_const
+	32/69 = expression_list?
+	33 = list_assign
+	34/35 = ?
+	36 = logical_and_expr?
+	37 = logical_or_expr?
+	38 = long_const
+	39 = map_const
+	40 = method_define
+	41 = method_const
+	42 = module_define
+	43 = module_constructor
+	44 = multi_line_string
+	45 = multi_line_string part 2
+	46 = nil_const
+	47 = jump_if_not_nil
+	48 = logical_conditional
+	50 = object_selector_expr
+	51 = assign pop 2 expression then pop?
+	52 = print - NOTE: the parser does not return a node with this number, compiler supports it, not the parser
+	53 = require
+	54 = ? expresison then set state
+	55 = static_define
+	56 = static_define 2
+	57 = string_const
+	58 = string_template
+	59 = switch_statement
+	60 = symbol_const
+	61 = ternary_operator
+	62 = throw
+	63 = try_catch
+	64 = uint_const
+	65 = ulong_const
+	64 = unary_operator
+	67 = unary_assign
+	68 = undef
+	70 = var push? (?)
+	71 = va_call
+	72 = void_const
+	73 = ?
+	74 = yield
+	75 = ?
+	76 = ?
+	78 = exec code?
+	79 = ? import?
+	80 = ? import?
+	81 = ? file open?
+	82 = ?
+	83 = ?
+	84 = ?
+	85 = ?
+	86 = ?
+	87 = ?
+	88 = ?
+	89 = ?
+	
+--- 
+
+table 48D92B0 (TokenType g_ParserTokenToTokenType[337]) converts a token to a token type, essentially filters it.
+table 0x5BCDCD0 is a list of strings for all token types (0-107) and the rest for node types. Presumably some node types past ~70 ish are missing, probably preprocessing purposes)
+table 0x48D9410 (__int16 g_ParserAllowedTokenTypeLUT[2190] is an optimized lookup table for allowed tokens given current context (context represented as an index))
+table 0x48DB650 (__int16 g_ParserStartValueToUnk[544]) maps current context to parser node type
+table 0x48D8A90 (unsigned __int8 g_NodeKindTable[288]) ?
+table 0x48DA530 (__int16 _0x48DA530[2190]) ?
+
+for dump/exec/current_module, etc:
+"if i have to guess, exec/dump/current_module/include etc are not really implemented in this parser in that the allowed token list per context only holds the wider range of keywords but no specific handling for each keyword, can't see any specialization in code either, so it's essentally just parsed as a plain identifier
+the compiler does have some switch cases for what would likely be exec node types
+coincidentally that would be the statement types 78 and above, which is all marked as unknown from my side (list above)
+yeah i think this matches what i'm seeing in code
+tokens range 476 to 480 I THINK but not sure - maps to parser types 100->106 (0x48DB650) which handle these keywords, but they're marked as invalid/no tokens
+then ast node types 81-86 would specifically then handle parser type 100-106
+
+so probably the parser has preprocessing stripped, or it's not available in debug mode, even though the compiler itself supports these very specific node types, see compiler type 78 and 81"
+
+table g_ParserAllowedTokenTypeLUT:
+0 = invalid
+1 = 48 (0<->107)
+Allowed Tokens: $end
+
+2 = 531 (0<->107)
+Allowed Tokens: $end, tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kTRY, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kFUNCTION, kNIL, kIF, kSWITCH, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE, ';', '@', '{'
+
+3 = invalid
+4 = invalid
+5 = invalid
+6 = invalid
+7 = invalid
+8 = invalid
+9 = invalid
+10 = invalid
+11 = invalid
+12 = invalid
+13 = -6 (6<->107)
+Allowed Tokens: ':'
+
+14 = invalid
+15 = 1046 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kTRY, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kFUNCTION, kNIL, kIF, kSWITCH, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE, ';', '@', '{'
+
+16 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+17 = -31 (31<->107)
+Allowed Tokens: '{'
+
+18 = invalid
+19 = 1366 (0<->107)
+Allowed Tokens: tIDENT, kTRY, kCATCH, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kELSE, kDO, kWHILE, kSWITCH, kCASE, kFOR, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kFOREACH, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__, tSCOPE
+
+20 = 1449 (0<->107)
+Allowed Tokens: tIDENT, kTRY, kCATCH, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kELSE, kDO, kWHILE, kSWITCH, kCASE, kFOR, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kFOREACH, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__, '('
+
+21 = 2097 (0<->94)
+Allowed Tokens: tIDENT, kTRY, kCATCH, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kELSE, kDO, kWHILE, kSWITCH, kCASE, kFOR, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kFOREACH, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__
+
+22 = 1328 (0<->107)
+Allowed Tokens: tIDENT, kTRY, kCATCH, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kELSE, kDO, kWHILE, kSWITCH, kCASE, kFOR, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kFOREACH, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__, '(', tSCOPE
+
+23 = 1528 (0<->107)
+Allowed Tokens: tIDENT, kTRY, kCATCH, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kELSE, kDO, kWHILE, kSWITCH, kCASE, kFOR, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kFOREACH, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__, '('
+
+24 = invalid
+25 = -10 (10<->107)
+Allowed Tokens: '('
+
+26 = -7 (7<->107)
+Allowed Tokens: '('
+
+27 = 67 (0<->107)
+Allowed Tokens: tIDENT
+
+28 = 67 (0<->107)
+Allowed Tokens: tIDENT
+
+29 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+30 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+31 = 23 (0<->107)
+Allowed Tokens: kMETHOD, kFUNCTION
+
+32 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+33 = 1366 (0<->107)
+Allowed Tokens: tIDENT, kTRY, kCATCH, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kELSE, kDO, kWHILE, kSWITCH, kCASE, kFOR, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kFOREACH, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__, tSCOPE
+
+34 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+35 = -3 (3<->107)
+Allowed Tokens: '('
+
+36 = invalid
+37 = invalid
+38 = 2097 (0<->94)
+Allowed Tokens: tIDENT, kTRY, kCATCH, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kELSE, kDO, kWHILE, kSWITCH, kCASE, kFOR, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kFOREACH, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__
+
+39 = invalid
+40 = invalid
+41 = 253 (0<->107)
+Allowed Tokens: tSTRING, "multi_string", tIDENT, tSYMBOL, kVAR, kNIL, kCALL, kSTATIC, k__FILE__, k__LINE__, '*', tPOW, '(', '[', tSCOPE, '{'
+
+42 = 319 (0<->107)
+Allowed Tokens: tSTRING, "multi_string", tIDENT, tSYMBOL, kNIL, kCALL, k__FILE__, k__LINE__, '*', tPOW, '(', '[', tSCOPE
+
+43 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+44 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+45 = 319 (0<->107)
+Allowed Tokens: tSTRING, "multi_string", tIDENT, tSYMBOL, kNIL, kCALL, k__FILE__, k__LINE__, '*', tPOW, '(', '[', tSCOPE
+
+46 = 319 (0<->107)
+Allowed Tokens: tSTRING, "multi_string", tIDENT, tSYMBOL, kNIL, kCALL, k__FILE__, k__LINE__, '*', tPOW, '(', '[', tSCOPE
+
+47 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+48 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+49 = 319 (0<->107)
+Allowed Tokens: tSTRING, "multi_string", tIDENT, tSYMBOL, kNIL, kCALL, k__FILE__, k__LINE__, '*', tPOW, '(', '[', tSCOPE
+
+50 = 319 (0<->107)
+Allowed Tokens: tSTRING, "multi_string", tIDENT, tSYMBOL, kNIL, kCALL, k__FILE__, k__LINE__, '*', tPOW, '(', '[', tSCOPE
+
+51 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+52 = 633 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, ':', '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE, ']'
+
+53 = 2097 (0<->94)
+Allowed Tokens: tIDENT, kTRY, kCATCH, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kELSE, kDO, kWHILE, kSWITCH, kCASE, kFOR, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kFOREACH, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__
+
+54 = invalid
+55 = invalid
+56 = invalid
+57 = 27 (0<->107)
+Allowed Tokens: kDO, kWHILE, kFOR, kFOREACH
+
+58 = 37 (0<->107)
+Allowed Tokens: ';'
+
+59 = invalid
+60 = -4 (4<->107)
+Allowed Tokens: tSCOPE
+
+61 = 1478 (0<->107)
+Allowed Tokens: kUNDEF, kMETHOD, kCLASS, kMODULE, kFUNCTION, kIMPORT, kSTATIC, kATTRIBUTE, kDELEGATE, kUSE_STRICT, kNO_STRICT, kPUSH_STRICT, kPOP_STRICT, kDUMP, kUNKNOWN, kEXEC, kLINK, kCURRENT_MODULE, kINCLUDE
+
+62 = invalid
+63 = 54 (0<->107)
+Allowed Tokens: ';'
+
+64 = 2097 (0<->94)
+Allowed Tokens: tIDENT, kTRY, kCATCH, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kELSE, kDO, kWHILE, kSWITCH, kCASE, kFOR, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kFOREACH, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__
+
+65 = 2097 (0<->94)
+Allowed Tokens: tIDENT, kTRY, kCATCH, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kELSE, kDO, kWHILE, kSWITCH, kCASE, kFOR, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kFOREACH, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__
+
+66 = invalid
+67 = 57 (0<->107)
+Allowed Tokens: ';'
+
+68 = invalid
+69 = invalid
+70 = invalid
+71 = invalid
+72 = invalid
+73 = invalid
+74 = invalid
+75 = invalid
+76 = invalid
+77 = invalid
+78 = 2108 (0<->83)
+Allowed Tokens: '?', tNILC, tOROR, tANDAND, tEQ, tNE, '>', tGE, '<', tLE, '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW
+
+79 = invalid
+80 = invalid
+81 = 212 (0<->107)
+Allowed Tokens: tOPASGN, '=', tOBJSEL, tNILOBJSEL, tINCR, tDECR, '.', '(', '[', tNILATTR, tNILELEM
+
+82 = 59 (0<->107)
+Allowed Tokens: tOPASGN, '=', tINCR, tDECR
+
+83 = invalid
+84 = 1 (0<->107)
+Allowed Tokens: tSTRING, '{'
+
+85 = -1 (1<->107)
+Allowed Tokens:
+
+86 = invalid
+87 = invalid
+88 = 100 (0<->107)
+Allowed Tokens: kCATCH
+
+89 = invalid
+90 = 71 (0<->107)
+Allowed Tokens: '('
+
+91 = 84 (0<->107)
+Allowed Tokens: '('
+
+92 = 49 (0<->107)
+Allowed Tokens: kMETHOD, kFUNCTION
+
+93 = 1974 (0<->107)
+Allowed Tokens: '?', tNILC, tOROR, tANDAND, tEQ, tNE, '>', tGE, '<', tLE, '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW, ';'
+
+94 = invalid
+95 = invalid
+96 = invalid
+97 = invalid
+98 = invalid
+99 = invalid
+100 = invalid
+101 = invalid
+102 = invalid
+103 = invalid
+104 = invalid
+105 = invalid
+106 = invalid
+107 = invalid
+108 = invalid
+109 = invalid
+110 = invalid
+111 = invalid
+112 = invalid
+113 = invalid
+114 = invalid
+115 = invalid
+116 = invalid
+117 = invalid
+118 = invalid
+119 = invalid
+120 = invalid
+121 = invalid
+122 = invalid
+123 = invalid
+124 = invalid
+125 = invalid
+126 = invalid
+127 = invalid
+128 = invalid
+129 = invalid
+130 = 2097 (0<->94)
+Allowed Tokens: tIDENT, kTRY, kCATCH, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kELSE, kDO, kWHILE, kSWITCH, kCASE, kFOR, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kFOREACH, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__
+
+131 = invalid
+132 = invalid
+133 = -34 (34<->107)
+Allowed Tokens: tSCOPE, ';'
+
+134 = 17 (0<->107)
+Allowed Tokens: tIDENT, kVAR, '{'
+
+135 = 90 (0<->107)
+Allowed Tokens: '('
+
+136 = -35 (35<->107)
+Allowed Tokens: ':', '{'
+
+137 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+138 = -16 (16<->107)
+Allowed Tokens: tSCOPE, '{'
+
+139 = 17 (0<->107)
+Allowed Tokens: tIDENT, kVAR, '{'
+
+140 = 105 (0<->107)
+Allowed Tokens: '('
+
+141 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+142 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+143 = invalid
+144 = 103 (0<->107)
+Allowed Tokens: ';'
+
+145 = 126 (0<->107)
+Allowed Tokens: ';'
+
+146 = 127 (0<->107)
+Allowed Tokens: ';'
+
+147 = 2108 (0<->83)
+Allowed Tokens: '?', tNILC, tOROR, tANDAND, tEQ, tNE, '>', tGE, '<', tLE, '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW
+
+148 = 130 (0<->107)
+Allowed Tokens: ';'
+
+149 = 1566 (0<->107)
+Allowed Tokens: tIDENT, kTRY, kCATCH, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kELSE, kDO, kWHILE, kSWITCH, kCASE, kFOR, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kFOREACH, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__, '('
+
+150 = 1607 (0<->107)
+Allowed Tokens: tIDENT, kTRY, kCATCH, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kELSE, kDO, kWHILE, kSWITCH, kCASE, kFOR, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kFOREACH, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__, '('
+
+151 = invalid
+152 = 3 (0<->107)
+Allowed Tokens: tIDENT, tSCOPE
+
+153 = 2012 (0<->107)
+Allowed Tokens: '?', tNILC, tOROR, tANDAND, tEQ, tNE, '>', tGE, '<', tLE, '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW, ';'
+
+154 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+155 = 134 (0<->107)
+Allowed Tokens: ';'
+
+156 = 120 (0<->107)
+Allowed Tokens: tIDENT
+
+157 = 11 (0<->107)
+Allowed Tokens: tIDENT, tVARG, '|', ')', ',', '}'
+
+158 = 2097 (0<->94)
+Allowed Tokens: tIDENT, kTRY, kCATCH, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kELSE, kDO, kWHILE, kSWITCH, kCASE, kFOR, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kFOREACH, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__
+
+159 = 253 (0<->107)
+Allowed Tokens: tSTRING, "multi_string", tIDENT, tSYMBOL, kVAR, kNIL, kCALL, kSTATIC, k__FILE__, k__LINE__, '*', tPOW, '(', '[', tSCOPE, '{'
+
+160 = 38 (0<->107)
+Allowed Tokens: tIDENT, tVARG, '|', ')', ',', '}'
+
+161 = 2 (0<->107)
+Allowed Tokens: tOBJSEL, tNILOBJSEL, '.', '(', '[', tNILATTR, tNILELEM
+
+162 = 76 (0<->107)
+Allowed Tokens: '|'
+
+163 = 5 (0<->107)
+Allowed Tokens: tVARG, ','
+
+164 = invalid
+165 = 2 (0<->107)
+Allowed Tokens: tOBJSEL, tNILOBJSEL, '.', '(', '[', tNILATTR, tNILELEM
+
+166 = invalid
+167 = invalid
+168 = invalid
+169 = 66 (0<->107)
+Allowed Tokens: '.', '(', '[', tNILATTR, tNILELEM
+
+170 = 66 (0<->107)
+Allowed Tokens: '.', '(', '[', tNILATTR, tNILELEM
+
+171 = invalid
+172 = invalid
+173 = invalid
+174 = invalid
+175 = 726 (0<->107)
+Allowed Tokens: '?', tNILC, tOROR, tANDAND, tEQ, tNE, '>', tGE, '<', tLE, '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW, ')'
+
+176 = 129 (0<->107)
+Allowed Tokens: ']'
+
+177 = invalid
+178 = 1698 (0<->107)
+Allowed Tokens: '?', ':', tNILC, tOROR, tANDAND, tEQ, tNE, '>', tGE, '<', tLE, '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW
+
+179 = 136 (0<->107)
+Allowed Tokens: ','
+
+180 = invalid
+181 = invalid
+182 = 943 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kTRY, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kFUNCTION, kNIL, kIF, kSWITCH, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE, ';', '@', '{', '}'
+
+183 = 1046 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kTRY, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kFUNCTION, kNIL, kIF, kSWITCH, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE, ';', '@', '{'
+
+184 = 142 (0<->107)
+Allowed Tokens: '('
+
+185 = 147 (0<->107)
+Allowed Tokens: '('
+
+186 = 148 (0<->107)
+Allowed Tokens: '('
+
+187 = invalid
+188 = 2097 (0<->94)
+Allowed Tokens: tIDENT, kTRY, kCATCH, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kELSE, kDO, kWHILE, kSWITCH, kCASE, kFOR, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kFOREACH, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__
+
+189 = invalid
+190 = invalid
+191 = invalid
+192 = invalid
+193 = invalid
+194 = invalid
+195 = invalid
+196 = invalid
+197 = invalid
+198 = invalid
+199 = invalid
+200 = invalid
+201 = invalid
+202 = invalid
+203 = invalid
+204 = invalid
+205 = invalid
+206 = invalid
+207 = invalid
+208 = invalid
+209 = invalid
+210 = 40 (0<->107)
+Allowed Tokens: '=', ':'
+
+211 = 154 (0<->107)
+Allowed Tokens: ','
+
+212 = invalid
+213 = 63 (0<->107)
+Allowed Tokens: '=', ':'
+
+214 = 156 (0<->107)
+Allowed Tokens: ','
+
+215 = invalid
+216 = invalid
+217 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+218 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+219 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+220 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+221 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+222 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+223 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+224 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+225 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+226 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+227 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+228 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+229 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+230 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+231 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+232 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+233 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+234 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+235 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+236 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+237 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+238 = 319 (0<->107)
+Allowed Tokens: tSTRING, "multi_string", tIDENT, tSYMBOL, kNIL, kCALL, k__FILE__, k__LINE__, '*', tPOW, '(', '[', tSCOPE
+
+239 = 319 (0<->107)
+Allowed Tokens: tSTRING, "multi_string", tIDENT, tSYMBOL, kNIL, kCALL, k__FILE__, k__LINE__, '*', tPOW, '(', '[', tSCOPE
+
+240 = 1366 (0<->107)
+Allowed Tokens: tIDENT, kTRY, kCATCH, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kELSE, kDO, kWHILE, kSWITCH, kCASE, kFOR, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kFOREACH, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__, tSCOPE
+
+241 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+242 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+243 = 1366 (0<->107)
+Allowed Tokens: tIDENT, kTRY, kCATCH, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kELSE, kDO, kWHILE, kSWITCH, kCASE, kFOR, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kFOREACH, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__, tSCOPE
+
+244 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+245 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+246 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+247 = invalid
+248 = invalid
+249 = invalid
+250 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+251 = invalid
+252 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+253 = 166 (0<->107)
+Allowed Tokens: '('
+
+254 = invalid
+255 = 176 (0<->107)
+Allowed Tokens: '('
+
+256 = 180 (0<->107)
+Allowed Tokens: '('
+
+257 = invalid
+258 = invalid
+259 = 1645 (0<->107)
+Allowed Tokens: tIDENT, kTRY, kCATCH, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kELSE, kDO, kWHILE, kSWITCH, kCASE, kFOR, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kFOREACH, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__, '*'
+
+260 = invalid
+261 = 206 (0<->107)
+Allowed Tokens: '='
+
+262 = 263 (0<->107)
+Allowed Tokens: tIDENT
+
+263 = 17 (0<->107)
+Allowed Tokens: tIDENT, kVAR, '{'
+
+264 = 175 (0<->107)
+Allowed Tokens: ')'
+
+265 = 13 (0<->107)
+Allowed Tokens: tVARG, ','
+
+266 = invalid
+267 = 17 (0<->107)
+Allowed Tokens: tIDENT, kVAR, '{'
+
+268 = 1366 (0<->107)
+Allowed Tokens: tIDENT, kTRY, kCATCH, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kELSE, kDO, kWHILE, kSWITCH, kCASE, kFOR, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kFOREACH, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__, tSCOPE
+
+269 = invalid
+270 = 829 (0<->107)
+Allowed Tokens: '?', tNILC, tOROR, tANDAND, tEQ, tNE, '>', tGE, '<', tLE, '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW, ')'
+
+271 = 2097 (0<->94)
+Allowed Tokens: tIDENT, kTRY, kCATCH, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kELSE, kDO, kWHILE, kSWITCH, kCASE, kFOR, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kFOREACH, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__
+
+272 = invalid
+273 = 177 (0<->107)
+Allowed Tokens: ')'
+
+274 = 17 (0<->107)
+Allowed Tokens: tIDENT, kVAR, '{'
+
+275 = 932 (0<->107)
+Allowed Tokens: '?', tNILC, tOROR, tANDAND, tEQ, tNE, '>', tGE, '<', tLE, '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW, ')'
+
+276 = 1035 (0<->107)
+Allowed Tokens: '?', tNILC, tOROR, tANDAND, tEQ, tNE, '>', tGE, '<', tLE, '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW, ')'
+
+277 = invalid
+278 = invalid
+279 = invalid
+280 = invalid
+281 = 17 (0<->107)
+Allowed Tokens: tIDENT, kVAR, '{'
+
+282 = 183 (0<->107)
+Allowed Tokens: '('
+
+283 = 17 (0<->107)
+Allowed Tokens: tIDENT, kVAR, '{'
+
+284 = 185 (0<->107)
+Allowed Tokens: '('
+
+285 = invalid
+286 = 1709 (0<->107)
+Allowed Tokens: tIDENT, kTRY, kCATCH, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kELSE, kDO, kWHILE, kSWITCH, kCASE, kFOR, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kFOREACH, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__, '*'
+
+287 = 184 (0<->107)
+Allowed Tokens: ';'
+
+288 = 2097 (0<->94)
+Allowed Tokens: tIDENT, kTRY, kCATCH, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kELSE, kDO, kWHILE, kSWITCH, kCASE, kFOR, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kFOREACH, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__
+
+289 = invalid
+290 = 2108 (0<->83)
+Allowed Tokens: '?', tNILC, tOROR, tANDAND, tEQ, tNE, '>', tGE, '<', tLE, '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW
+
+291 = 7 (0<->107)
+Allowed Tokens: ')', ','
+
+292 = invalid
+293 = invalid
+294 = invalid
+295 = 178 (0<->107)
+Allowed Tokens: '}'
+
+296 = 225 (0<->107)
+Allowed Tokens: '='
+
+297 = invalid
+298 = 253 (0<->107)
+Allowed Tokens: tSTRING, "multi_string", tIDENT, tSYMBOL, kVAR, kNIL, kCALL, kSTATIC, k__FILE__, k__LINE__, '*', tPOW, '(', '[', tSCOPE, '{'
+
+299 = invalid
+300 = invalid
+301 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+302 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+303 = 181 (0<->107)
+Allowed Tokens: ']'
+
+304 = invalid
+305 = 255 (0<->107)
+Allowed Tokens: kWHILE
+
+306 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+307 = 1148 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kFINALLY, kVAR, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, kSTATIC, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+308 = 32 (0<->107)
+Allowed Tokens: tSTRING, "multi_string", tIDENT, tSYMBOL, kVAR, kNIL, kCALL, kSTATIC, k__FILE__, k__LINE__, '|', '*', tPOW, '(', '[', tSCOPE, '{'
+
+309 = invalid
+310 = 1366 (0<->107)
+Allowed Tokens: tIDENT, kTRY, kCATCH, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kELSE, kDO, kWHILE, kSWITCH, kCASE, kFOR, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kFOREACH, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__, tSCOPE
+
+311 = 2097 (0<->94)
+Allowed Tokens: tIDENT, kTRY, kCATCH, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kELSE, kDO, kWHILE, kSWITCH, kCASE, kFOR, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kFOREACH, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__
+
+312 = 1366 (0<->107)
+Allowed Tokens: tIDENT, kTRY, kCATCH, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kELSE, kDO, kWHILE, kSWITCH, kCASE, kFOR, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kFOREACH, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__, tSCOPE
+
+313 = 1411 (0<->107)
+Allowed Tokens: tIDENT, kTRY, kCATCH, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kELSE, kDO, kWHILE, kSWITCH, kCASE, kFOR, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kFOREACH, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__, tSCOPE
+
+314 = 191 (0<->107)
+Allowed Tokens: ';'
+
+315 = 192 (0<->107)
+Allowed Tokens: ';'
+
+316 = 168 (0<->107)
+Allowed Tokens: tBOOL, tINT
+
+317 = 199 (0<->107)
+Allowed Tokens: ';'
+
+318 = 1366 (0<->107)
+Allowed Tokens: tIDENT, kTRY, kCATCH, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kELSE, kDO, kWHILE, kSWITCH, kCASE, kFOR, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kFOREACH, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__, tSCOPE
+
+319 = -31 (31<->107)
+Allowed Tokens: '{'
+
+320 = 290 (0<->107)
+Allowed Tokens: tSTRING
+
+321 = 1366 (0<->107)
+Allowed Tokens: tIDENT, kTRY, kCATCH, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kELSE, kDO, kWHILE, kSWITCH, kCASE, kFOR, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kFOREACH, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__, tSCOPE
+
+322 = 305 (0<->107)
+Allowed Tokens: tSTRING
+
+323 = 1366 (0<->107)
+Allowed Tokens: tIDENT, kTRY, kCATCH, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kELSE, kDO, kWHILE, kSWITCH, kCASE, kFOR, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kFOREACH, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__, tSCOPE
+
+324 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+325 = 1366 (0<->107)
+Allowed Tokens: tIDENT, kTRY, kCATCH, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kELSE, kDO, kWHILE, kSWITCH, kCASE, kFOR, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kFOREACH, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__, tSCOPE
+
+326 = 2097 (0<->94)
+Allowed Tokens: tIDENT, kTRY, kCATCH, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kELSE, kDO, kWHILE, kSWITCH, kCASE, kFOR, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kFOREACH, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__
+
+327 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+328 = 1366 (0<->107)
+Allowed Tokens: tIDENT, kTRY, kCATCH, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kELSE, kDO, kWHILE, kSWITCH, kCASE, kFOR, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kFOREACH, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__, tSCOPE
+
+329 = 2097 (0<->94)
+Allowed Tokens: tIDENT, kTRY, kCATCH, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kELSE, kDO, kWHILE, kSWITCH, kCASE, kFOR, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kFOREACH, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__
+
+330 = 1762 (0<->107)
+Allowed Tokens: '?', ':', tNILC, tOROR, tANDAND, tEQ, tNE, '>', tGE, '<', tLE, '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW
+
+331 = 1913 (0<->107)
+Allowed Tokens: tNILC, tOROR, tANDAND, tEQ, tNE, '>', tGE, '<', tLE, '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW
+
+332 = 517 (0<->107)
+Allowed Tokens: tOROR, tANDAND, tEQ, tNE, '>', tGE, '<', tLE, '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW
+
+333 = 1637 (0<->107)
+Allowed Tokens: tANDAND, tEQ, tNE, '>', tGE, '<', tLE, '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW
+
+334 = 1950 (0<->107)
+Allowed Tokens: '>', tGE, '<', tLE, '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW
+
+335 = 1950 (0<->107)
+Allowed Tokens: '>', tGE, '<', tLE, '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW
+
+336 = 358 (0<->107)
+Allowed Tokens: '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW
+
+337 = 358 (0<->107)
+Allowed Tokens: '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW
+
+338 = 358 (0<->107)
+Allowed Tokens: '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW
+
+339 = 358 (0<->107)
+Allowed Tokens: '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW
+
+340 = 113 (0<->107)
+Allowed Tokens: '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW
+
+341 = 262 (0<->107)
+Allowed Tokens: '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW
+
+342 = 329 (0<->107)
+Allowed Tokens: tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW
+
+343 = 167 (0<->107)
+Allowed Tokens: '+', '-', '*', '/', '%', tPOW
+
+344 = 167 (0<->107)
+Allowed Tokens: '+', '-', '*', '/', '%', tPOW
+
+345 = 172 (0<->107)
+Allowed Tokens: '*', '/', '%', tPOW
+
+346 = 172 (0<->107)
+Allowed Tokens: '*', '/', '%', tPOW
+
+347 = 234 (0<->107)
+Allowed Tokens: tPOW
+
+348 = 234 (0<->107)
+Allowed Tokens: tPOW
+
+349 = 234 (0<->107)
+Allowed Tokens: tPOW
+
+350 = 234 (0<->107)
+Allowed Tokens: tPOW
+
+351 = 66 (0<->107)
+Allowed Tokens: '.', '(', '[', tNILATTR, tNILELEM
+
+352 = 66 (0<->107)
+Allowed Tokens: '.', '(', '[', tNILATTR, tNILELEM
+
+353 = 219 (0<->107)
+Allowed Tokens: tSCOPE
+
+354 = 218 (0<->107)
+Allowed Tokens: ')'
+
+355 = 220 (0<->107)
+Allowed Tokens: ','
+
+356 = 419 (0<->107)
+Allowed Tokens: '?', tNILC, tOROR, tANDAND, tEQ, tNE, '>', tGE, '<', tLE, '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW, ']'
+
+357 = 219 (0<->107)
+Allowed Tokens: tSCOPE
+
+358 = 1826 (0<->107)
+Allowed Tokens: '?', tNILC, tOROR, tANDAND, tEQ, tNE, '>', tGE, '<', tLE, '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW, ']'
+
+359 = 2108 (0<->83)
+Allowed Tokens: '?', tNILC, tOROR, tANDAND, tEQ, tNE, '>', tGE, '<', tLE, '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW
+
+360 = 2108 (0<->83)
+Allowed Tokens: '?', tNILC, tOROR, tANDAND, tEQ, tNE, '>', tGE, '<', tLE, '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW
+
+361 = 1870 (0<->107)
+Allowed Tokens: '?', tNILC, tOROR, tANDAND, tEQ, tNE, '>', tGE, '<', tLE, '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW, '}'
+
+362 = 1892 (0<->107)
+Allowed Tokens: '?', tNILC, tOROR, tANDAND, tEQ, tNE, '>', tGE, '<', tLE, '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW, '}'
+
+363 = 253 (0<->107)
+Allowed Tokens: tSTRING, "multi_string", tIDENT, tSYMBOL, kVAR, kNIL, kCALL, kSTATIC, k__FILE__, k__LINE__, '*', tPOW, '(', '[', tSCOPE, '{'
+
+364 = 245 (0<->107)
+Allowed Tokens: ';'
+
+365 = invalid
+366 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+367 = 274 (0<->107)
+Allowed Tokens: '='
+
+368 = 244 (0<->107)
+Allowed Tokens: '}'
+
+369 = -31 (31<->107)
+Allowed Tokens: '{'
+
+370 = invalid
+371 = 17 (0<->107)
+Allowed Tokens: tIDENT, kVAR, '{'
+
+372 = 249 (0<->107)
+Allowed Tokens: ')'
+
+373 = -16 (16<->107)
+Allowed Tokens: tSCOPE, '{'
+
+374 = -31 (31<->107)
+Allowed Tokens: '{'
+
+375 = -31 (31<->107)
+Allowed Tokens: '{'
+
+376 = 251 (0<->107)
+Allowed Tokens: ')'
+
+377 = 1046 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kTRY, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kFUNCTION, kNIL, kIF, kSWITCH, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE, ';', '@', '{'
+
+378 = 250 (0<->107)
+Allowed Tokens: '{'
+
+379 = 254 (0<->107)
+Allowed Tokens: ')'
+
+380 = 17 (0<->107)
+Allowed Tokens: tIDENT, kVAR, '{'
+
+381 = 257 (0<->107)
+Allowed Tokens: ')'
+
+382 = 17 (0<->107)
+Allowed Tokens: tIDENT, kVAR, '{'
+
+383 = 256 (0<->107)
+Allowed Tokens: ';'
+
+384 = invalid
+385 = invalid
+386 = invalid
+387 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+388 = invalid
+389 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+390 = invalid
+391 = 2108 (0<->83)
+Allowed Tokens: '?', tNILC, tOROR, tANDAND, tEQ, tNE, '>', tGE, '<', tLE, '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW
+
+392 = invalid
+393 = invalid
+394 = 265 (0<->107)
+Allowed Tokens: '('
+
+395 = 1137 (0<->107)
+Allowed Tokens: '?', tNILC, tOROR, tANDAND, tEQ, tNE, '>', tGE, '<', tLE, '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW, ')'
+
+396 = invalid
+397 = 2097 (0<->94)
+Allowed Tokens: tIDENT, kTRY, kCATCH, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kELSE, kDO, kWHILE, kSWITCH, kCASE, kFOR, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kFOREACH, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__
+
+398 = 2097 (0<->94)
+Allowed Tokens: tIDENT, kTRY, kCATCH, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kELSE, kDO, kWHILE, kSWITCH, kCASE, kFOR, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kFOREACH, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__
+
+399 = 260 (0<->107)
+Allowed Tokens: ';'
+
+400 = 259 (0<->107)
+Allowed Tokens: ','
+
+401 = invalid
+402 = 2108 (0<->83)
+Allowed Tokens: '?', tNILC, tOROR, tANDAND, tEQ, tNE, '>', tGE, '<', tLE, '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW
+
+403 = 253 (0<->107)
+Allowed Tokens: tSTRING, "multi_string", tIDENT, tSYMBOL, kVAR, kNIL, kCALL, kSTATIC, k__FILE__, k__LINE__, '*', tPOW, '(', '[', tSCOPE, '{'
+
+404 = 353 (0<->107)
+Allowed Tokens: tIDENT
+
+405 = invalid
+406 = -8 (8<->107)
+Allowed Tokens: tSCOPE, ';'
+
+407 = -31 (31<->107)
+Allowed Tokens: '{'
+
+408 = -16 (16<->107)
+Allowed Tokens: tSCOPE, '{'
+
+409 = 359 (0<->107)
+Allowed Tokens: tSTRING
+
+410 = 360 (0<->107)
+Allowed Tokens: tSTRING
+
+411 = 20 (0<->107)
+Allowed Tokens: tIDENT, tSCOPE
+
+412 = 361 (0<->107)
+Allowed Tokens: tSTRING
+
+413 = invalid
+414 = invalid
+415 = invalid
+416 = invalid
+417 = 272 (0<->107)
+Allowed Tokens: ';'
+
+418 = invalid
+419 = 33 (0<->107)
+Allowed Tokens: tSCOPE, ';'
+
+420 = invalid
+421 = -31 (31<->107)
+Allowed Tokens: '{'
+
+422 = 47 (0<->107)
+Allowed Tokens: tSCOPE, ';'
+
+423 = 273 (0<->107)
+Allowed Tokens: ';'
+
+424 = 219 (0<->107)
+Allowed Tokens: tSCOPE
+
+425 = 98 (0<->107)
+Allowed Tokens: ';', ','
+
+426 = 2108 (0<->83)
+Allowed Tokens: '?', tNILC, tOROR, tANDAND, tEQ, tNE, '>', tGE, '<', tLE, '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW
+
+427 = -24 (24<->107)
+Allowed Tokens: '=', tSCOPE
+
+428 = invalid
+429 = 2108 (0<->83)
+Allowed Tokens: '?', tNILC, tOROR, tANDAND, tEQ, tNE, '>', tGE, '<', tLE, '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW
+
+430 = -20 (20<->107)
+Allowed Tokens: '=', tSCOPE
+
+431 = invalid
+432 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+433 = invalid
+434 = invalid
+435 = invalid
+436 = invalid
+437 = invalid
+438 = 277 (0<->107)
+Allowed Tokens: ')'
+
+439 = invalid
+440 = 2108 (0<->83)
+Allowed Tokens: '?', tNILC, tOROR, tANDAND, tEQ, tNE, '>', tGE, '<', tLE, '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW
+
+441 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+442 = invalid
+443 = invalid
+444 = invalid
+445 = -31 (31<->107)
+Allowed Tokens: '{'
+
+446 = invalid
+447 = invalid
+448 = invalid
+449 = -31 (31<->107)
+Allowed Tokens: '{'
+
+450 = 346 (0<->107)
+Allowed Tokens: kELSE
+
+451 = invalid
+452 = -31 (31<->107)
+Allowed Tokens: '{'
+
+453 = 278 (0<->107)
+Allowed Tokens: ')'
+
+454 = -31 (31<->107)
+Allowed Tokens: '{'
+
+455 = 279 (0<->107)
+Allowed Tokens: ')'
+
+456 = invalid
+457 = 2108 (0<->83)
+Allowed Tokens: '?', tNILC, tOROR, tANDAND, tEQ, tNE, '>', tGE, '<', tLE, '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW
+
+458 = 2108 (0<->83)
+Allowed Tokens: '?', tNILC, tOROR, tANDAND, tEQ, tNE, '>', tGE, '<', tLE, '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW
+
+459 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+460 = 1046 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kTRY, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kFUNCTION, kNIL, kIF, kSWITCH, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE, ';', '@', '{'
+
+461 = invalid
+462 = invalid
+463 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+464 = 1148 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kFINALLY, kVAR, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, kSTATIC, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+465 = 312 (0<->107)
+Allowed Tokens: '|'
+
+466 = invalid
+467 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+468 = 1773 (0<->107)
+Allowed Tokens: tIDENT, kTRY, kCATCH, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kELSE, kDO, kWHILE, kSWITCH, kCASE, kFOR, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kFOREACH, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__, '*'
+
+469 = invalid
+470 = invalid
+471 = invalid
+472 = 1837 (0<->107)
+Allowed Tokens: tIDENT, kTRY, kCATCH, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kELSE, kDO, kWHILE, kSWITCH, kCASE, kFOR, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kFOREACH, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__, '*'
+
+473 = 285 (0<->107)
+Allowed Tokens: ';'
+
+474 = 286 (0<->107)
+Allowed Tokens: ';'
+
+475 = invalid
+476 = invalid
+477 = invalid
+478 = invalid
+479 = invalid
+480 = invalid
+481 = 1366 (0<->107)
+Allowed Tokens: tIDENT, kTRY, kCATCH, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kELSE, kDO, kWHILE, kSWITCH, kCASE, kFOR, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kFOREACH, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__, tSCOPE
+
+482 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+483 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+484 = 2108 (0<->83)
+Allowed Tokens: '?', tNILC, tOROR, tANDAND, tEQ, tNE, '>', tGE, '<', tLE, '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW
+
+485 = 377 (0<->107)
+Allowed Tokens: tSTRING
+
+486 = 378 (0<->107)
+Allowed Tokens: "multi_string"
+
+487 = 284 (0<->107)
+Allowed Tokens: '{'
+
+488 = 2108 (0<->83)
+Allowed Tokens: '?', tNILC, tOROR, tANDAND, tEQ, tNE, '>', tGE, '<', tLE, '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW
+
+489 = invalid
+490 = invalid
+491 = 1046 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kTRY, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kFUNCTION, kNIL, kIF, kSWITCH, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE, ';', '@', '{'
+
+492 = 737 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kTRY, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kSWITCH, kCASE, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE, ';', '@', '{', '}'
+
+493 = invalid
+494 = -31 (31<->107)
+Allowed Tokens: '{'
+
+495 = invalid
+496 = -31 (31<->107)
+Allowed Tokens: '{'
+
+497 = 1233 (0<->107)
+Allowed Tokens: '?', tNILC, tOROR, tANDAND, tEQ, tNE, '>', tGE, '<', tLE, '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW, ')'
+
+498 = invalid
+499 = 292 (0<->107)
+Allowed Tokens: ';'
+
+500 = 2108 (0<->83)
+Allowed Tokens: '?', tNILC, tOROR, tANDAND, tEQ, tNE, '>', tGE, '<', tLE, '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW
+
+501 = invalid
+502 = invalid
+503 = 1935 (0<->107)
+Allowed Tokens: '?', tNILC, tOROR, tANDAND, tEQ, tNE, '>', tGE, '<', tLE, '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW, ')'
+
+504 = 293 (0<->107)
+Allowed Tokens: ';'
+
+505 = 294 (0<->107)
+Allowed Tokens: ';'
+
+506 = invalid
+507 = invalid
+508 = 219 (0<->107)
+Allowed Tokens: tSCOPE
+
+509 = 2108 (0<->83)
+Allowed Tokens: '?', tNILC, tOROR, tANDAND, tEQ, tNE, '>', tGE, '<', tLE, '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW
+
+510 = 2108 (0<->83)
+Allowed Tokens: '?', tNILC, tOROR, tANDAND, tEQ, tNE, '>', tGE, '<', tLE, '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW
+
+511 = invalid
+512 = invalid
+513 = invalid
+514 = invalid
+515 = 29 (0<->107)
+Allowed Tokens: kDEFAULT, kCASE, '}'
+
+516 = invalid
+517 = invalid
+518 = invalid
+519 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+520 = 1046 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kTRY, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kFUNCTION, kNIL, kIF, kSWITCH, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE, ';', '@', '{'
+
+521 = invalid
+522 = invalid
+523 = 737 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kTRY, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kSWITCH, kCASE, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE, ';', '@', '{', '}'
+
+524 = 328 (0<->107)
+Allowed Tokens: ':'
+
+525 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+526 = invalid
+527 = invalid
+528 = 295 (0<->107)
+Allowed Tokens: ')'
+
+529 = 297 (0<->107)
+Allowed Tokens: ','
+
+530 = invalid
+531 = invalid
+532 = 30 (0<->107)
+Allowed Tokens: kDEFAULT, kCASE, '}'
+
+533 = invalid
+534 = 2086 (0<->105)
+Allowed Tokens: '?', ':', tNILC, tOROR, tANDAND, tEQ, tNE, '>', tGE, '<', tLE, '|', '^', '&', tLSHIFT, tRSHIFT, '+', '-', '*', '/', '%', tPOW
+
+535 = 840 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kTRY, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kDEFAULT, kFUNCTION, kNIL, kIF, kSWITCH, kCASE, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE, ';', '@', '{', '}'
+
+536 = 1046 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kTRY, kTHROW, kFINALLY, kVAR, kUNDEF, kMETHOD, kCLASS, kMODULE, kFUNCTION, kNIL, kIF, kSWITCH, kBREAK, kCONTINUE, kRETURN, kYIELD, kASYNC, kAWAIT, kIMPORT, kREQUIRE, kCALL, kSTATIC, kATTRIBUTE, kDELEGATE, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE, ';', '@', '{'
+
+537 = 1244 (0<->107)
+Allowed Tokens: tBOOL, tINT, tLONG, tUINT, tULONG, tFLOAT, tDOUBLE, tSTRING, "multi_string", tIDENT, tSYMBOL, kMETHOD, kFUNCTION, kNIL, kASYNC, kAWAIT, kCALL, k__FILE__, k__LINE__, '|', '&', '+', '-', '*', tPOW, '!', '~', tINCR, tDECR, '(', '[', tSCOPE
+
+538 = invalid
+539 = invalid
+540 = invalid
+541 = invalid
