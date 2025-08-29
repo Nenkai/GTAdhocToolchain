@@ -208,12 +208,4 @@ namespace GTAdhocToolchain.Core.Instructions
         SHORT_CONST = 74,
         U_SHORT_CONST = 75,
     }
-
-    enum AdhocVersion
-    {
-        GT5P, // V11 -> V12, adds 3 instructions
-        GT5TT, // Adds 6 instructions
-        GT6, // Adds 2 instructions
-        GTSport, // Adds 3 instructions
-    }
 }

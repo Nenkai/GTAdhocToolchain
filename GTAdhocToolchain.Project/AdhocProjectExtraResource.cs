@@ -4,11 +4,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace GTAdhocToolchain.Project
+namespace GTAdhocToolchain.Project;
+
+public class AdhocProjectExtraResource
 {
-    public class AdhocProjectExtraResource
-    {
-        public string FullPath { get; set; }
-        public string Name { get; set; }
-    }
+    public string FullPath { get; set; }
+    public string Name { get; set; }
 }

@@ -5,189 +5,188 @@ using System.Text;
 using System.Threading.Tasks;
 using GTAdhocToolchain.Core.Variables;
 
-namespace GTAdhocToolchain.Core.Stack
+namespace GTAdhocToolchain.Core.Stack;
+
+public class AdhocStack : IAdhocStack
 {
-    public class AdhocStack : IAdhocStack
+    /// <summary>
+    /// Heap for all variables for the current block.
+    /// </summary>
+    public List<LocalVariable> LocalVariableStorage { get; set; } =
+    [
+        null, // Always an empty one
+    ];
+
+    /// <summary>
+    /// Heap for all variables for the current block.
+    /// </summary>
+    public List<StaticVariable> StaticVariableStorage { get; set; } = [];
+
+    public int LocalVariableStorageSize { get; set; } = 1;
+
+    public int StaticVariableStorageSize { get; set; } = 0;
+
+    // Used for counting the stack size within a block
+    private int _stackSizeCounter;
+    public int StackSizeCounter
     {
-        /// <summary>
-        /// Heap for all variables for the current block.
-        /// </summary>
-        public List<LocalVariable> LocalVariableStorage { get; set; } = new()
+        get => _stackSizeCounter;
+        set
         {
-            null, // Always an empty one
-        };
+            if (value > StackSize)
+                StackSize = value;
 
-        /// <summary>
-        /// Heap for all variables for the current block.
-        /// </summary>
-        public List<StaticVariable> StaticVariableStorage { get; set; } = new();
+            _stackSizeCounter = value;
+        }
+    }
 
-        public int LocalVariableStorageSize { get; set; } = 1;
+    /// <summary>
+    /// Max stack space used for this block.
+    /// </summary>
+    public int StackSize { get; set; }
 
-        public int StaticVariableStorageSize { get; set; } = 0;
+    public void IncrementStackCounter()
+    {
+        StackSizeCounter++;
+    }
 
-        // Used for counting the stack size within a block
-        private int _stackSizeCounter;
-        public int StackSizeCounter
+    public void IncreaseStackCounter(int count)
+    {
+        StackSizeCounter += count;
+    }
+
+    public void DecrementStackCounter()
+    {
+        StackSizeCounter--;
+    }
+
+    public void DecreaseStackCounter(int count)
+    {
+        StackSizeCounter -= count;
+    }
+
+    public int GetStackSize()
+    {
+        return StackSize;
+    }
+
+    public bool TryAddStaticVariable(AdhocSymbol symbol, out Variable variable)
+    {
+        variable = StaticVariableStorage.Find(e => e?.Symbol == symbol);
+        if (variable is null)
         {
-            get => _stackSizeCounter;
-            set
-            {
-                if (value > StackSize)
-                    StackSize = value;
+            var newVar = new StaticVariable() { Symbol = symbol };
+            AddStaticVariable(newVar);
 
-                _stackSizeCounter = value;
-            }
+            variable = newVar;
+            return true;
         }
 
-        /// <summary>
-        /// Max stack space used for this block.
-        /// </summary>
-        public int StackSize { get; set; }
+        return false;
+    }
 
-        public void IncrementStackCounter()
+    public bool TryAddLocalVariable(AdhocSymbol symbol, out Variable variable)
+    {
+        variable = GetLocalVariableBySymbol(symbol);
+        if (variable is null)
         {
-            StackSizeCounter++;
+            var newVar = new LocalVariable() { Symbol = symbol };
+            AddLocalVariable(newVar);
+
+            variable = newVar;
+            return true;
         }
 
-        public void IncreaseStackCounter(int count)
+        return false;
+    }
+
+    public void AddLocalVariable(LocalVariable variable)
+    {
+        int freeIdx = LocalVariableStorage.IndexOf(null, 1);
+        if (freeIdx == -1) // No free space? If so grow storage
         {
-            StackSizeCounter += count;
+            LocalVariableStorage.Add(variable); // Expand
+            if (LocalVariableStorage.Count > LocalVariableStorageSize)
+                LocalVariableStorageSize = LocalVariableStorage.Count;
         }
-
-        public void DecrementStackCounter()
+        else
         {
-            StackSizeCounter--;
+            LocalVariableStorage[freeIdx] = variable;
         }
+    }
 
-        public void DecreaseStackCounter(int count)
+    public void AddStaticVariable(StaticVariable variable)
+    {
+        StaticVariableStorage.Add(variable); // Expand
+        if (StaticVariableStorage.Count > StaticVariableStorageSize)
+            StaticVariableStorageSize = StaticVariableStorage.Count;
+    }
+
+    public bool HasStaticVariable(AdhocSymbol symbol)
+    {
+        return StaticVariableStorage.Find(e => e?.Symbol == symbol) != null;
+    }
+
+    public bool HasLocalVariable(AdhocSymbol symbol)
+    {
+        return LocalVariableStorage.Find(e => e?.Symbol == symbol) != null;
+    }
+
+    public LocalVariable GetLocalVariableBySymbol(AdhocSymbol symbol)
+    {
+        return LocalVariableStorage.Find(e => e?.Symbol == symbol);
+    }
+
+    public StaticVariable GetStaticVariableBySymbol(AdhocSymbol symbol)
+    {
+        return StaticVariableStorage.Find(e => e?.Symbol == symbol);
+    }
+
+    public int GetLocalVariableIndex(LocalVariable local)
+    {
+        return LocalVariableStorage.IndexOf(local);
+    }
+
+    public int GetStaticVariableIndex(StaticVariable local)
+    {
+        return StaticVariableStorage.IndexOf(local);
+    }
+
+    public int GetLastLocalVariableIndex()
+    {
+        int highestTakenIndex = LocalVariableStorage.Count;
+        for (int i = LocalVariableStorage.Count - 1; i >= 1; i--) // x -> 1 (0 is reserved by self)
         {
-            StackSizeCounter -= count;
-        }
-
-        public int GetStackSize()
-        {
-            return StackSize;
-        }
-
-        public bool TryAddStaticVariable(AdhocSymbol symbol, out Variable variable)
-        {
-            variable = StaticVariableStorage.Find(e => e?.Symbol == symbol);
-            if (variable is null)
-            {
-                var newVar = new StaticVariable() { Symbol = symbol };
-                AddStaticVariable(newVar);
-
-                variable = newVar;
-                return true;
-            }
-
-            return false;
-        }
-
-        public bool TryAddLocalVariable(AdhocSymbol symbol, out Variable variable)
-        {
-            variable = GetLocalVariableBySymbol(symbol);
-            if (variable is null)
-            {
-                var newVar = new LocalVariable() { Symbol = symbol };
-                AddLocalVariable(newVar);
-
-                variable = newVar;
-                return true;
-            }
-
-            return false;
-        }
-
-        public void AddLocalVariable(LocalVariable variable)
-        {
-            int freeIdx = LocalVariableStorage.IndexOf(null, 1);
-            if (freeIdx == -1) // No free space? If so grow storage
-            {
-                LocalVariableStorage.Add(variable); // Expand
-                if (LocalVariableStorage.Count > LocalVariableStorageSize)
-                    LocalVariableStorageSize = LocalVariableStorage.Count;
-            }
+            if (LocalVariableStorage[i] == null) // Free'd up space
+                highestTakenIndex = i;
             else
-            {
-                LocalVariableStorage[freeIdx] = variable;
-            }
+                return highestTakenIndex;
         }
 
-        public void AddStaticVariable(StaticVariable variable)
-        {
-            StaticVariableStorage.Add(variable); // Expand
-            if (StaticVariableStorage.Count > StaticVariableStorageSize)
-                StaticVariableStorageSize = StaticVariableStorage.Count;
-        }
+        return highestTakenIndex;
+    }
 
-        public bool HasStaticVariable(AdhocSymbol symbol)
-        {
-            return StaticVariableStorage.Find(e => e?.Symbol == symbol) != null;
-        }
+    public void FreeLocalVariable(LocalVariable var)
+    {
+        var idx = GetLocalVariableIndex(var);
+        if (idx != -1)
+            LocalVariableStorage[idx] = null;
+    }
 
-        public bool HasLocalVariable(AdhocSymbol symbol)
-        {
-            return LocalVariableStorage.Find(e => e?.Symbol == symbol) != null;
-        }
+    public void FreeStaticVariable(StaticVariable var)
+    {
+        var idx = GetStaticVariableIndex(var);
+        if (idx != -1)
+            StaticVariableStorage[idx] = null;
+    }
 
-        public LocalVariable GetLocalVariableBySymbol(AdhocSymbol symbol)
-        {
-            return LocalVariableStorage.Find(e => e?.Symbol == symbol);
-        }
+    public int GetLocalVariableStorageSize()
+    {
+        return LocalVariableStorageSize;
+    }
 
-        public StaticVariable GetStaticVariableBySymbol(AdhocSymbol symbol)
-        {
-            return StaticVariableStorage.Find(e => e?.Symbol == symbol);
-        }
-
-        public int GetLocalVariableIndex(LocalVariable local)
-        {
-            return LocalVariableStorage.IndexOf(local);
-        }
-
-        public int GetStaticVariableIndex(StaticVariable local)
-        {
-            return StaticVariableStorage.IndexOf(local);
-        }
-
-        public int GetLastLocalVariableIndex()
-        {
-            int highestTakenIndex = LocalVariableStorage.Count;
-            for (int i = LocalVariableStorage.Count - 1; i >= 1; i--) // x -> 1 (0 is reserved by self)
-            {
-                if (LocalVariableStorage[i] == null) // Free'd up space
-                    highestTakenIndex = i;
-                else
-                    return highestTakenIndex;
-            }
-
-            return highestTakenIndex;
-        }
-
-        public void FreeLocalVariable(LocalVariable var)
-        {
-            var idx = GetLocalVariableIndex(var);
-            if (idx != -1)
-                LocalVariableStorage[idx] = null;
-        }
-
-        public void FreeStaticVariable(StaticVariable var)
-        {
-            var idx = GetStaticVariableIndex(var);
-            if (idx != -1)
-                StaticVariableStorage[idx] = null;
-        }
-
-        public int GetLocalVariableStorageSize()
-        {
-            return LocalVariableStorageSize;
-        }
-
-        public int GetStaticVariableStorageSize()
-        {
-            return StaticVariableStorageSize;
-        }
+    public int GetStaticVariableStorageSize()
+    {
+        return StaticVariableStorageSize;
     }
 }

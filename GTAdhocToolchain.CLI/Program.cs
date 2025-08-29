@@ -369,13 +369,12 @@ public class Program
                 return;
             }
 
-            var compiler = new AdhocScriptCompiler();
+            var compiler = new AdhocScriptCompiler(version);
             if (!string.IsNullOrWhiteSpace(baseIncludeFolder))
             {
                 compiler.SetBaseIncludeFolder(absoluteIncludePath);
             }
             compiler.SetSourcePath(inputPath);
-            compiler.Setup(version);
 
             if (debugExceptions)
                 compiler.BuildTryCatchDebugStatements();
@@ -435,7 +434,7 @@ public class Program
             }
             else if (line.StartsWith("/version"))
             {
-                ReadOnlySpan<char> range = line.AsSpan().Slice("/version".Length).Trim();
+                ReadOnlySpan<char> range = line.AsSpan()["/version".Length..].Trim();
                 if (range.IsEmpty)
                 {
                     Console.WriteLine($"Current adhoc version is set to {replVerbs.Version}.");
@@ -476,9 +475,8 @@ public class Program
             {
                 try
                 {
-                    var compiler = new AdhocScriptCompiler();
+                    var compiler = new AdhocScriptCompiler(replVerbs.Version);
                     compiler.SetSourcePath("test.ad");
-                    compiler.Setup(replVerbs.Version);
                     compiler.CompileScript(program);
 
                     AdhocCodeGen codeGen = new AdhocCodeGen(compiler.MainFrame, compiler.SymbolMap);

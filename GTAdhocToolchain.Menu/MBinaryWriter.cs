@@ -10,38 +10,37 @@ using Syroot.BinaryData;
 using GTAdhocToolchain.Core;
 using GTAdhocToolchain.Menu.Fields;
 
-namespace GTAdhocToolchain.Menu
+namespace GTAdhocToolchain.Menu;
+
+public class MBinaryWriter : IDisposable
 {
-    public class MBinaryWriter : IDisposable
+    public string OutputFileName { get; set; }
+
+    public bool Debug { get; set; }
+
+    public BinaryStream Stream { get; set; }
+
+    public int Version { get; set; }
+
+    public MBinaryWriter(string fileName)
     {
-        public string OutputFileName { get; set; }
+        OutputFileName = fileName;
+    }
 
-        public bool Debug { get; set; }
+    public void WriteNode(mNode node)
+    {
+        using var fs = new FileStream(OutputFileName, FileMode.Create);
 
-        public BinaryStream Stream { get; set; }
+        Stream = new BinaryStream(fs, ByteConverter.Big);
+        Stream.WriteString("MPRJ", StringCoding.Raw);
+        Stream.WriteVarInt(Version);
 
-        public int Version { get; set; }
+        node.Write(this);
+    }
 
-        public MBinaryWriter(string fileName)
-        {
-            OutputFileName = fileName;
-        }
-
-        public void WriteNode(mNode node)
-        {
-            using var fs = new FileStream(OutputFileName, FileMode.Create);
-
-            Stream = new BinaryStream(fs, ByteConverter.Big);
-            Stream.WriteString("MPRJ", StringCoding.Raw);
-            Stream.WriteVarInt(Version);
-
-            node.Write(this);
-        }
-
-        public void Dispose()
-        {
-            Stream.Dispose();
-            GC.SuppressFinalize(this);
-        }
+    public void Dispose()
+    {
+        Stream.Dispose();
+        GC.SuppressFinalize(this);
     }
 }

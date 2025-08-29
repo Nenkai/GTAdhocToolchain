@@ -7,205 +7,167 @@ using System.Threading.Tasks;
 using Syroot.BinaryData;
 using Syroot.BinaryData.Memory;
 
-namespace GTAdhocToolchain.Core
+namespace GTAdhocToolchain.Core;
+
+public static class Utils
 {
-    public static class Utils
+    public static string OperatorNameToPunctuator(string @operator)
     {
-        public static string OperatorNameToPunctuator(string @operator)
+        if (string.IsNullOrEmpty(@operator))
+            throw new Exception("Tried to call GetHumanReadable while name was null. Did you even call deserialize?");
+
+        return @operator switch
         {
-            if (string.IsNullOrEmpty(@operator))
-                throw new Exception("Tried to call GetHumanReadable while name was null. Did you even call deserialize?");
+            "__elem__" => "[]",
 
-            switch (@operator)
-            {
-                case "__elem__":
-                    return "[]";
+            "__eq__" => "==",
+            "__ge__" => ">=",
+            "__gt__" => ">",
+            "__le__" => "<=",
+            "__ne__" => "!=",
+            "__lt__" => "<",
 
-                case "__eq__":
-                    return "==";
-                case "__ge__":
-                    return ">=";
-                case "__gt__":
-                    return ">";
-                case "__le__":
-                    return "<=";
-                case "__lt__":
-                    return "<";
+            "__invert__" => "~",
+            "__or__" => "|",
 
-                case "__invert__":
-                    return "~";
-                case "__lshift__":
-                    return "<<";
+            "__lshift__" => "<<",
+            "__rshift__" => ">>",
 
-                case "__mod__":
-                    return "%";
+            "__not__" => "!",
 
-                case "__ne__":
-                    return "!=";
+            "__post_decr__" => "@--",
+            "__post_incr__" => "@++",
+            "__pre_decr__" => "--@",
+            "__pre_incr__" => "++@",
+            "__pow__" => "** (power)",
+            
+            "__minus__" => "-",
+            "__uminus__" => "-@",
+            "__uplus__" => "+@",
 
-                case "__not__":
-                    return "!";
+            "__xor__" => "^",
+            "__div__" => "/",
+            "__mul__" => "*",
+            "__add__" => "+",
+            "__min__" => "-",
+            "__mod__" => "%",
+            _ => @operator,
+        };
+    }
 
-                case "__or__":
-                    return "|";
+    public static string Read7BitString(this BinaryStream sr)
+    {
+        ulong strLen = DecodeBitsAndAdvance(sr);
+        return Encoding.UTF8.GetString(sr.ReadBytes((int)strLen));
+    }
 
-                case "__post_decr__":
-                    return "@--";
-                case "__post_incr__":
-                    return "@++";
+    public static byte[] Read7BitStringBytes(this BinaryStream sr)
+    {
+        ulong strLen = DecodeBitsAndAdvance(sr);
+        return sr.ReadBytes((int)strLen);
+    }
 
-                case "__pre_decr__":
-                    return "--@";
-                case "__pre_incr__":
-                    return "++@";
+    public static void WriteVarInt(this BinaryStream bs, int val)
+    {
+        Span<byte> buffer = [];
 
-                case "__pow__":
-                    return "** (power)";
-
-                case "__rshift__":
-                    return ">>";
-
-                case "__minus__":
-                    return "-";
-
-                case "__uminus__":
-                    return "-@";
-
-                case "__uplus__":
-                    return "+@";
-
-                case "__xor__":
-                    return "^";
-
-                case "__div__":
-                    return "/";
-                case "__mul__":
-                    return "*";
-                case "__add__":
-                    return "+";
-                case "__min__":
-                    return "-";
-
-
-                default:
-                    return @operator;
-            }
+        if (val <= 0x7F)
+        {
+            bs.WriteByte((byte)val);
+            return;
+        }
+        else if (val <= 0x3FFF)
+        {
+            Span<byte> tempBuf = BitConverter.GetBytes(val).AsSpan();
+            tempBuf.Reverse();
+            buffer = tempBuf.Slice(2, 2);
+        }
+        else if (val <= 0x1FFFFF)
+        {
+            Span<byte> tempBuf = BitConverter.GetBytes(val).AsSpan();
+            tempBuf.Reverse();
+            buffer = tempBuf.Slice(1, 3);
+        }
+        else if (val <= 0xFFFFFFF)
+        {
+            buffer = BitConverter.GetBytes(val).AsSpan();
+            buffer.Reverse();
+        }
+        else if (val <= 0xFFFFFFFF)
+        {
+            buffer = BitConverter.GetBytes(val);
+            buffer.Reverse();
+            buffer = new byte[] { 0, buffer[0], buffer[1], buffer[2], buffer[3] };
         }
 
-        public static string Read7BitString(this BinaryStream sr)
+        uint mask = 0x80;
+        for (int i = 1; i < buffer.Length; i++)
         {
-            ulong strLen = DecodeBitsAndAdvance(sr);
-            return Encoding.UTF8.GetString(sr.ReadBytes((int)strLen));
+            buffer[0] += (byte)mask;
+            mask >>= 1;
         }
 
-        public static byte[] Read7BitStringBytes(this BinaryStream sr)
+        bs.Write(buffer);
+    }
+
+    public static void WriteVarString(this BinaryStream bs, string str)
+    {
+        var bytes = Encoding.UTF8.GetBytes(str);
+        WriteVarInt(bs, bytes.Length);
+        bs.Write(bytes);
+    }
+
+    public static ulong DecodeBitsAndAdvance(this BinaryStream sr)
+    {
+        ulong value = (ulong)sr.ReadByte();
+        ulong mask = 0x80;
+
+        while ((value & mask) != 0)
         {
-            ulong strLen = DecodeBitsAndAdvance(sr);
-            return sr.ReadBytes((int)strLen);
+            value = ((value - mask) << 8) | (sr.Read1Byte());
+            mask <<= 7;
         }
+        return value;
+    }
 
-        public static void WriteVarInt(this BinaryStream bs, int val)
+    public static ulong DecodeBitsAndAdvance(this ref SpanReader sr)
+    {
+        ulong value = sr.ReadByte();
+        ulong mask = 0x80;
+
+        while ((value & mask) != 0)
         {
-            Span<byte> buffer = Array.Empty<byte>();
-
-            if (val <= 0x7F)
-            {
-                bs.WriteByte((byte)val);
-                return;
-            }
-            else if (val <= 0x3FFF)
-            {
-                Span<byte> tempBuf = BitConverter.GetBytes(val).AsSpan();
-                tempBuf.Reverse();
-                buffer = tempBuf.Slice(2, 2);
-            }
-            else if (val <= 0x1FFFFF)
-            {
-                Span<byte> tempBuf = BitConverter.GetBytes(val).AsSpan();
-                tempBuf.Reverse();
-                buffer = tempBuf.Slice(1, 3);
-            }
-            else if (val <= 0xFFFFFFF)
-            {
-                buffer = BitConverter.GetBytes(val).AsSpan();
-                buffer.Reverse();
-            }
-            else if (val <= 0xFFFFFFFF)
-            {
-                buffer = BitConverter.GetBytes(val);
-                buffer.Reverse();
-                buffer = new byte[] { 0, buffer[0], buffer[1], buffer[2], buffer[3] };
-            }
-
-            uint mask = 0x80;
-            for (int i = 1; i < buffer.Length; i++)
-            {
-                buffer[0] += (byte)mask;
-                mask >>= 1;
-            }
-
-            bs.Write(buffer);
+            value = ((value - mask) << 8) | (sr.ReadByte());
+            mask <<= 7;
         }
+        return value;
+    }
 
-        public static void WriteVarString(this BinaryStream bs, string str)
+    public static void AlignWithValue(this BinaryStream bs, int alignment, byte value, bool grow = false)
+    {
+        long basePos = bs.Position;
+        long newPos = bs.Align(alignment);
+
+        bs.Position = basePos;
+        for (long i = basePos; i < newPos; i++)
+            bs.WriteByte(value);
+    }
+
+    public static int AlphaNumericStringSorter(string v1, string v2)
+    {
+        int min = v1.Length > v2.Length ? v2.Length : v1.Length;
+        for (int i = 0; i < min; i++)
         {
-            var bytes = Encoding.UTF8.GetBytes(str);
-            WriteVarInt(bs, bytes.Length);
-            bs.Write(bytes);
-        }
-
-        public static ulong DecodeBitsAndAdvance(this BinaryStream sr)
-        {
-            ulong value = (ulong)sr.ReadByte();
-            ulong mask = 0x80;
-
-            while ((value & mask) != 0)
-            {
-                value = ((value - mask) << 8) | (sr.Read1Byte());
-                mask <<= 7;
-            }
-            return value;
-        }
-
-        public static ulong DecodeBitsAndAdvance(this ref SpanReader sr)
-        {
-            ulong value = sr.ReadByte();
-            ulong mask = 0x80;
-
-            while ((value & mask) != 0)
-            {
-                value = ((value - mask) << 8) | (sr.ReadByte());
-                mask <<= 7;
-            }
-            return value;
-        }
-
-        public static void AlignWithValue(this BinaryStream bs, int alignment, byte value, bool grow = false)
-        {
-            long basePos = bs.Position;
-            long newPos = bs.Align(alignment);
-
-            bs.Position = basePos;
-            for (long i = basePos; i < newPos; i++)
-                bs.WriteByte(value);
-        }
-
-        public static int AlphaNumericStringSorter(string v1, string v2)
-        {
-            int min = v1.Length > v2.Length ? v2.Length : v1.Length;
-            for (int i = 0; i < min; i++)
-            {
-                if (v1[i] < v2[i])
-                    return -1;
-                else if (v1[i] > v2[i])
-                    return 1;
-            }
-            if (v1.Length < v2.Length)
+            if (v1[i] < v2[i])
                 return -1;
-            else if (v1.Length > v2.Length)
+            else if (v1[i] > v2[i])
                 return 1;
-
-            return 0;
         }
+        if (v1.Length < v2.Length)
+            return -1;
+        else if (v1.Length > v2.Length)
+            return 1;
+
+        return 0;
     }
 }

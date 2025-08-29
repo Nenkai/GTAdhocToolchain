@@ -13,7 +13,7 @@ namespace GTAdhocToolchain.Preprocessor;
 
 public class AdhocExpressionEvaluator
 {
-    static Dictionary<string, int> BinaryPrecedence = new()
+    static readonly Dictionary<string, int> BinaryPrecedence = new()
     {
         { "**", 1 },
         { "*", 2 },
@@ -36,7 +36,7 @@ public class AdhocExpressionEvaluator
         { "||" , 11 }
     };
 
-    static Dictionary<string, Func<int, int, int>> BinaryOperations = new()
+    static readonly Dictionary<string, Func<int, int, int>> BinaryOperations = new()
     {
         { "**", (a, b) => (int)Math.Pow(a, b) },
         { "*", (a, b) => a * b },
@@ -59,7 +59,7 @@ public class AdhocExpressionEvaluator
         { "||" , (a, b) => (a != 0 || b != 0) ? 1 : 0 }
     };
 
-    static Dictionary<string, Func<int, int>> UnaryOperations = new()
+    static readonly Dictionary<string, Func<int, int>> UnaryOperations = new()
     {
         { "!", (v) => v == 0 ? 1 : 0 },
         { "~",  (v) => ~v },
@@ -67,7 +67,7 @@ public class AdhocExpressionEvaluator
         { "-",  (v) => -v },
     };
 
-    private List<Token> _tokens;
+    private readonly List<Token> _tokens;
     private int _index = 0;
     private Token _lookahead;
 

@@ -31,20 +31,20 @@ public class AdhocScriptPreprocessor
 {
     private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
-    private Dictionary<string, Macro> _definedMacros { get; set; } = new Dictionary<string, Macro>();
+    private readonly Dictionary<string, Macro> _definedMacros = [];
 
     // Current preprocessing state. This will change when we are preprocessing includes or built-in macros
     // Not the most pretty to always refer to it, ideally we should pass it across ALL functions (or make it do stuff)
     public AdhocPreprocessorUnit _state = new AdhocPreprocessorUnit();
 
-    private StringWriter _writer;
-    private StringBuilder _sb = new();
+    private readonly StringWriter _writer;
+    private readonly StringBuilder _sb = new();
 
     /// <summary>
     /// For the __COUNTER__ directive
     /// </summary>
     private int _counter;
-    private DateTime _time;
+    private readonly DateTime _time;
 
     private int _includeDepth = 0;
 
@@ -661,7 +661,7 @@ public class AdhocScriptPreprocessor
 
         for (int i = 0; i < define.Content.Count; i++)
         {
-            Token? token = define.Content[i];
+            Token token = define.Content[i];
 
             // Stringification?
             if (token.Type == TokenType.Punctuator && (string)token.Value == "#")
@@ -906,7 +906,7 @@ public class AdhocScriptPreprocessor
     /// <returns></returns>
     private List<Token> CollectArgument()
     {
-        List<Token> tokens = new List<Token>();
+        List<Token> tokens = [];
         int depth = 0;
 
         while (true)
@@ -939,7 +939,7 @@ public class AdhocScriptPreprocessor
     /// <returns></returns>
     private List<Token> EvalCollectArgument(List<Token> tokensToEval, ref int currentIndex)
     {
-        List<Token> tokens = new List<Token>();
+        List<Token> tokens = [];
         int depth = 0;
 
         var token = tokensToEval[currentIndex];

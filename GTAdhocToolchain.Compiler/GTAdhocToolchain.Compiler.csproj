@@ -4,7 +4,6 @@
     <OutputType>Library</OutputType>
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>disable</Nullable>
     <AnalysisLevel>latest</AnalysisLevel>
   </PropertyGroup>
 

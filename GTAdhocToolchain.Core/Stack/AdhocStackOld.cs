@@ -16,10 +16,7 @@ namespace GTAdhocToolchain.Core.Stack
         /// <summary>
         /// Storage for all variables for the current block.
         /// </summary>
-        public List<Variable> VariableStorage { get; set; } = new()
-        {
-            
-        };
+        public List<Variable> VariableStorage { get; set; } = [];
 
         public int VariableStorageSize { get; set; } = 1;
 

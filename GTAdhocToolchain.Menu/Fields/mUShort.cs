@@ -8,48 +8,49 @@ using System.Diagnostics;
 
 using GTAdhocToolchain.Core;
 
-namespace GTAdhocToolchain.Menu.Fields
+namespace GTAdhocToolchain.Menu.Fields;
+
+[DebuggerDisplay("mUShort: {Name} ({Value})")]
+#pragma warning disable IDE1006 // Naming Styles
+public class mUShort : mTypeBase
+#pragma warning restore IDE1006 // Naming Styles
 {
-    [DebuggerDisplay("mUShort: {Name} ({Value})")]
-    public class mUShort : mTypeBase
+    public ushort Value { get; set; }
+
+    public override void Read(MBinaryIO io)
     {
-        public ushort Value { get; set; }
+        Value = io.Stream.ReadUInt16();
+    }
 
-        public override void Read(MBinaryIO io)
-        {
-            Value = io.Stream.ReadUInt16();
-        }
+    public override void Read(MTextIO io)
+    {
+        var numbToken = io.GetNumberToken();
+        if (ushort.TryParse(numbToken, out ushort val))
+            Value = val;
+        else
+            throw new UISyntaxError($"Unexpected ushort token for mUShort. Got {numbToken}.");
 
-        public override void Read(MTextIO io)
-        {
-            var numbToken = io.GetNumberToken();
-            if (ushort.TryParse(numbToken, out ushort val))
-                Value = val;
-            else
-                throw new UISyntaxError($"Unexpected ushort token for mUShort. Got {numbToken}.");
+        string end = io.GetToken();
+        if (end != MTextIO.SCOPE_END.ToString())
+            throw new UISyntaxError($"Expected mUShort scope end ({MTextIO.SCOPE_END}), got {end}");
+    }
 
-            string end = io.GetToken();
-            if (end != MTextIO.SCOPE_END.ToString())
-                throw new UISyntaxError($"Expected mUShort scope end ({MTextIO.SCOPE_END}), got {end}");
-        }
+    public override void Write(MBinaryWriter writer)
+    {
+        writer.Stream.WriteVarInt((int)FieldType.UShort);
+        writer.Stream.WriteUInt16(Value);
+    }
 
-        public override void Write(MBinaryWriter writer)
-        {
-            writer.Stream.WriteVarInt((int)FieldType.UShort);
-            writer.Stream.WriteUInt16(Value);
-        }
+    public override void WriteText(MTextWriter writer)
+    {
+        writer.WriteString(Name);
+        writer.WriteSpace();
+        writer.WriteString("digit");
+        writer.WriteString("{"); writer.WriteString(Value.ToString()); writer.WriteString("}");
 
-        public override void WriteText(MTextWriter writer)
-        {
-            writer.WriteString(Name);
-            writer.WriteSpace();
-            writer.WriteString("digit");
-            writer.WriteString("{"); writer.WriteString(Value.ToString()); writer.WriteString("}");
+        if (writer.Debug)
+            writer.WriteString(" // mUShort");
 
-            if (writer.Debug)
-                writer.WriteString(" // mUShort");
-
-            writer.SetNeedNewLine();
-        }
+        writer.SetNeedNewLine();
     }
 }

@@ -13,7 +13,13 @@ namespace GTAdhocToolchain.Core.Instructions
     {
         public AdhocSymbol Name { get; set; }
 
-        public AdhocCodeFrame CodeFrame { get; set; } = new();
+        public AdhocCodeFrame CodeFrame { get; set; }
+
+        public SubroutineBase() { }
+        public SubroutineBase(AdhocVersion version)
+        {
+            CodeFrame = new AdhocCodeFrame(version);
+        }
 
         public override string ToString()
         {

@@ -4,11 +4,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace GTAdhocToolchain.Menu
+namespace GTAdhocToolchain.Menu;
+
+public class UISyntaxError : Exception
 {
-    public class UISyntaxError : Exception
-    {
-        public UISyntaxError(string message)
-            : base(message) { }
-    }
+    public UISyntaxError(string message)
+        : base(message) { }
 }
