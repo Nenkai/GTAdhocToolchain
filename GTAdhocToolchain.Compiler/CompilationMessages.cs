@@ -46,6 +46,7 @@ namespace GTAdhocToolchain.Compiler
         public const string Error_StatementExpressionOnly = "Only assignment, call, increment, decrement, await, and new object expressions can be used as a statement";
 
         public const string Error_ImportWildcardWithAlias = "Wildcard import cannot be aliased.";
+        public const string Error_ImportAliasNotSupported = "Import aliases are only supported in Adhoc Version 10 and above.";
 
         public const string Error_ArrayPatternNoElements = "Array pattern has no elements.";
 
@@ -82,5 +83,6 @@ namespace GTAdhocToolchain.Compiler
         public const string Error_V13ShortLiteralsUnsupported = "Short literals is only available in Adhoc Version 13 and above (GT7).";
         public const string Error_V13UShortLiteralsUnsupported = "UShort literals is only available in Adhoc Version 13 and above (GT7).";
 
+        
     }
 }

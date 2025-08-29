@@ -32,14 +32,14 @@ namespace GTAdhocToolchain.Core.Instructions
         public override void Serialize(AdhocStream stream)
         {
             stream.WriteInt32(VariableCount);
-            if (stream.Version > 11)
+            if (stream.Version.SupportsRestElement())
                 stream.WriteBoolean(HasRestElement);
         }
 
         public override void Deserialize(AdhocStream stream)
         {
             VariableCount = stream.ReadInt32();
-            if (stream.Version > 11)
+            if (stream.Version.SupportsRestElement())
                 HasRestElement = stream.ReadBoolean();
         }
 

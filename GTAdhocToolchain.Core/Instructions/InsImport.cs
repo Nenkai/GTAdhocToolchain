@@ -29,7 +29,7 @@ namespace GTAdhocToolchain.Core.Instructions
             stream.WriteSymbols(ModulePath);
             stream.WriteSymbol(ModuleValue);
 
-            if (stream.Version > 9)
+            if (stream.Version.SupportsImportAlias())
                 stream.WriteSymbol(ImportAs);
         }
 
@@ -38,7 +38,7 @@ namespace GTAdhocToolchain.Core.Instructions
             ModulePath = stream.ReadSymbols();
             ModuleValue = stream.ReadSymbol();
 
-            if (stream.Version > 9)
+            if (stream.Version.SupportsImportAlias())
                 ImportAs = stream.ReadSymbol();
         }
 

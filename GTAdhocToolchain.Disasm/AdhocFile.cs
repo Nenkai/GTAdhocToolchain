@@ -32,14 +32,14 @@ namespace GTAdhocToolchain.Disasm
             List<AdhocFile> scripts = new List<AdhocFile>();
 
             using var fs = new FileStream(path, FileMode.Open);
-            using var stream = new AdhocStream(fs, 12);
+            using var stream = new AdhocStream(fs, new AdhocVersion(12));
 
             string magic = stream.ReadString(StringCoding.ZeroTerminated);
             if (magic.AsSpan(0, 4).ToString() != MAGIC)
                 throw new Exception("Invalid MAGIC, doesn't match ADCH.");
 
             byte version = (byte)int.Parse(magic.AsSpan(4, 3));
-            stream.Version = version;
+            stream.Version = new AdhocVersion(version);
 
             var adhoc = new AdhocFile(version);
             if (version >= 9 && version <= 12)
@@ -49,7 +49,7 @@ namespace GTAdhocToolchain.Disasm
             }
 
             adhoc.TopLevelFrame = new AdhocCodeFrame();
-            adhoc.TopLevelFrame.Version = version;
+            adhoc.TopLevelFrame.Version = new AdhocVersion(version);
             adhoc.TopLevelFrame.CreateStack();
             adhoc.TopLevelFrame.Read(stream);
 
@@ -86,7 +86,7 @@ namespace GTAdhocToolchain.Disasm
                 sw.WriteLine($"({SymbolTable.Count} strings)");
             sw.WriteLine($"Root Instructions: {TopLevelFrame.Instructions.Count}");
             sw.Write($"  > Stack Size: {TopLevelFrame.Stack.GetStackSize()} - Variable Storage Size: {TopLevelFrame.Stack.GetLocalVariableStorageSize()} - " +
-                $"Variable Storage Size Static: {(TopLevelFrame.Version <= 10 ? "=Variable Storage Size" : $"{TopLevelFrame.Stack.GetStaticVariableStorageSize()}")}");
+                $"Variable Storage Size Static: {(!TopLevelFrame.Version.UsesNewSplitStack() ? "=Variable Storage Size" : $"{TopLevelFrame.Stack.GetStaticVariableStorageSize()}")}");
             sw.WriteLine();
 
             Stack<object> modOrClass = new Stack<object>();
@@ -146,7 +146,7 @@ namespace GTAdhocToolchain.Disasm
 
         public void PrintStrings(string outPath)
         {
-            if (TopLevelFrame.Version < 12)
+            if (TopLevelFrame.Version.VersionNumber < 12)
             {
                 Console.WriteLine("Not printing strings, script is version < 12");
                 return;

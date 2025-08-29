@@ -37,7 +37,7 @@ namespace GTAdhocToolchain.Project
         /// </summary>
         public AdhocProjectExtraResource[] ExtraWidgetResources { get; set; } = new AdhocProjectExtraResource[0];
 
-        public int Version { get; set; } = 12; // Default to version 12, used by GTPSP, GT5, GT6, GT Sport
+        public uint Version { get; set; } = 12; // Default to version 12, used by GTPSP, GT5, GT6, GT Sport
 
         /// <summary>
         /// ../../projects/<code>/<project_name>

@@ -14,7 +14,7 @@ namespace GTAdhocToolchain.Core
 {
     public class AdhocStream : BinaryStream
     {
-        public int Version { get; set; }
+        public AdhocVersion Version { get; set; }
 
         public List<AdhocSymbol> Symbols { get; set; } = new();
 
@@ -24,7 +24,7 @@ namespace GTAdhocToolchain.Core
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         }
 
-        public AdhocStream(Stream baseStream, int version)
+        public AdhocStream(Stream baseStream, AdhocVersion version)
             : base(baseStream)
         {
             Version = version;
@@ -33,7 +33,7 @@ namespace GTAdhocToolchain.Core
              * "ぐわあああ\n" in boot/CheckRoot.ad
              * 
              * So set the encoding to it if it's earlier than EUC-JP */
-            if (Version < 10)
+            if (Version.VersionNumber < 10)
                 Encoding = Encoding.GetEncoding("EUC-JP");
         }
 
@@ -65,7 +65,7 @@ namespace GTAdhocToolchain.Core
 
         public void WriteSymbol(AdhocSymbol symbol)
         {
-            if (Version <= 8)
+            if (!Version.HasSymbolTable())
             {
                 WriteInt16((short)Encoding.GetByteCount(symbol.Name));
                 WriteBytes(Encoding.GetBytes(symbol.Name));
@@ -91,7 +91,7 @@ namespace GTAdhocToolchain.Core
 
         public AdhocSymbol ReadSymbol()
         {
-            if (Version >= 9)
+            if (Version.HasSymbolTable())
             {
                 uint symbolTableIdx = (uint)DecodeBitsAndAdvance();
                 return Symbols[(int)symbolTableIdx];

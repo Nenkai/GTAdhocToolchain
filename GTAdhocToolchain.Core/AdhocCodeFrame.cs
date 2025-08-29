@@ -21,7 +21,7 @@ namespace GTAdhocToolchain.Core
         /// </summary>
         public const int ADHOC_VERSION_DEFAULT = 12;
 
-        public int Version { get; set; } = ADHOC_VERSION_DEFAULT;
+        public AdhocVersion Version { get; set; } = new AdhocVersion(12);
 
         /// <summary>
         /// Current instructions for this block.
@@ -107,7 +107,7 @@ namespace GTAdhocToolchain.Core
         /// </summary>
         public void CreateStack()
         {
-            if (Version >= 11)
+            if (Version.UsesNewSplitStack())
                 Stack = new AdhocStack();
             else
                 Stack = new AdhocStackOld();
@@ -154,36 +154,36 @@ namespace GTAdhocToolchain.Core
                     break;
                 case AdhocInstructionType.FUNCTION_DEFINE:
                     InsFunctionDefine func = ins as InsFunctionDefine;
-                    if (Version >= 8)
+                    if (Version.VersionNumber >= 8)
                         Stack.DecreaseStackCounter(func.CodeFrame.FunctionParameters.Count);
 
-                    if (Version >= 8)
+                    if (Version.VersionNumber >= 8)
                         Stack.DecreaseStackCounter(func.CodeFrame.CapturedCallbackVariables.Count);
                     break;
                 case AdhocInstructionType.METHOD_DEFINE:
                     InsMethodDefine method = ins as InsMethodDefine;
-                    if (Version >= 8)
+                    if (Version.VersionNumber >= 8)
                         Stack.DecreaseStackCounter(method.CodeFrame.FunctionParameters.Count);
 
-                    if (Version >= 8)
+                    if (Version.VersionNumber >= 8)
                         Stack.DecreaseStackCounter(method.CodeFrame.CapturedCallbackVariables.Count);
                     break;
                 case AdhocInstructionType.FUNCTION_CONST:
                     InsFunctionConst funcConst = ins as InsFunctionConst;
-                    if (Version >= 8)
+                    if (Version.VersionNumber >= 8)
                         Stack.DecreaseStackCounter(funcConst.CodeFrame.FunctionParameters.Count); // Ver > 8
 
-                    if (Version >= 8)
+                    if (Version.VersionNumber >= 8)
                         Stack.DecreaseStackCounter(funcConst.CodeFrame.CapturedCallbackVariables.Count);
 
                     Stack.IncrementStackCounter(); // Function itself
                     break;
                 case AdhocInstructionType.METHOD_CONST:
                     InsMethodConst methodConst = ins as InsMethodConst;
-                    if (Version >= 8)
+                    if (Version.VersionNumber >= 8)
                         Stack.DecreaseStackCounter(methodConst.CodeFrame.FunctionParameters.Count); // Ver > 8
 
-                    if (Version >= 8)
+                    if (Version.VersionNumber >= 8)
                         Stack.DecreaseStackCounter(methodConst.CodeFrame.CapturedCallbackVariables.Count);
 
                     Stack.IncrementStackCounter(); // method itself
@@ -202,7 +202,7 @@ namespace GTAdhocToolchain.Core
                     break;
 
                 case AdhocInstructionType.ATTRIBUTE_DEFINE: // Note: Investigate check potential pop by attribute_define only if Version > 6
-                    if (Version > 6)
+                    if (Version.VersionNumber > 6)
                         Stack.DecrementStackCounter();
                     break;
 
@@ -524,31 +524,31 @@ namespace GTAdhocToolchain.Core
 
         public void Write(AdhocStream stream)
         {
-            if (Version >= 8 && Version <= 12)
+            if (Version.VersionNumber >= 8 && Version.VersionNumber <= 12)
             {
                 stream.WriteBoolean(HasDebuggingInformation);
-                stream.WriteByte((byte)Version);
+                stream.WriteByte((byte)Version.VersionNumber);
             }
 
             if (SourceFilePath != null)
                 stream.WriteSymbol(SourceFilePath);
 
-            if (Version >= 12)
+            if (Version.VersionNumber >= 12)
                 stream.WriteBoolean(HasRestElement); // Not sure for Version 14
 
-            if (Version > 3)
+            if (Version.VersionNumber > 3)
             {
                 stream.WriteInt32(FunctionParameters.Count);
                 for (int i = 0; i < FunctionParameters.Count; i++)
                 {
                     stream.WriteSymbol(FunctionParameters[i]);
 
-                    if (Version >= 8)
+                    if (Version.VersionNumber >= 8)
                         stream.WriteInt32(1 + i); // TODO: Proper Index?
                 }
             }
 
-            if (Version >= 8)
+            if (Version.VersionNumber >= 8)
             {
                 stream.WriteInt32(CapturedCallbackVariables.Count);
                 for (int i = 0; i < CapturedCallbackVariables.Count; i++)
@@ -562,7 +562,7 @@ namespace GTAdhocToolchain.Core
             }
 
 
-            if (Version <= 10)
+            if (!Version.UsesNewSplitStack())
             {
                 stream.WriteInt32(Stack.GetLocalVariableStorageSize());
                 stream.WriteInt32(Stack.GetStackSize());
@@ -588,12 +588,12 @@ namespace GTAdhocToolchain.Core
 
         public void Read(AdhocStream stream)
         {
-            if (Version < 8)
+            if (Version.VersionNumber < 8)
             {
                 HasDebuggingInformation = true; // Not in code paths, but its forced to read
                 SourceFilePath = stream.ReadSymbol();
 
-                if (Version > 3)
+                if (Version.VersionNumber > 3)
                 {
                     uint argCount = stream.ReadUInt32();
                     for (int i = 0; i < argCount; i++)
@@ -604,17 +604,16 @@ namespace GTAdhocToolchain.Core
             {
 
                 HasDebuggingInformation = stream.ReadBoolean();
-                Version = stream.ReadByte();
+                Version = new AdhocVersion((uint)stream.ReadByte());
 
-
-                if (Version != 8) // Why PDI? Changed your mind after 8?
+                if (Version.VersionNumber != 8) // Why PDI? Changed your mind after 8?
                 {
                     if (HasDebuggingInformation)
                         SourceFilePath = stream.ReadSymbol();
                 }
 
 
-                if (Version >= 12)
+                if (Version.SupportsRestElement())
                     HasRestElement = stream.ReadBoolean();
 
                 uint argCount = stream.ReadUInt32();
@@ -642,7 +641,7 @@ namespace GTAdhocToolchain.Core
                 uint unkVarStackIndex = stream.ReadUInt32();
             }
 
-            if (Version <= 10)
+            if (!Version.UsesNewSplitStack())
             {
                 var stackOld = Stack as AdhocStackOld;
                 stackOld.VariableStorageSize = stream.ReadInt32();
@@ -722,7 +721,7 @@ namespace GTAdhocToolchain.Core
                 sb.Append(" (").Append(InstructionCountOffset.ToString("X2")).Append(')');
             sb.AppendLine();
 
-            sb.Append($"  > Stack Size: {Stack.GetStackSize()} - Variable Heap Size: {Stack.GetLocalVariableStorageSize()} - Variable Heap Size Static: {(Version <= 10 ? "=Variable Heap Size" : $"{Stack.GetStaticVariableStorageSize()}")}");
+            sb.Append($"  > Stack Size: {Stack.GetStackSize()} - Variable Heap Size: {Stack.GetLocalVariableStorageSize()} - Variable Heap Size Static: {(!Version.UsesNewSplitStack() ? "=Variable Heap Size" : $"{Stack.GetStaticVariableStorageSize()}")}");
 
             return sb.ToString();
         }

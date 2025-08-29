@@ -80,9 +80,9 @@ namespace GTAdhocToolchain.Compiler
         /// Setups the compiler's version and the stack along with it.
         /// </summary>
         /// <param name="version"></param>
-        public void Setup(int version)
+        public void Setup(uint version)
         {
-            MainFrame.Version = version;
+            MainFrame.Version = new AdhocVersion(version);
             MainFrame.CreateStack();
             _setup = true;
         }
@@ -99,7 +99,7 @@ namespace GTAdhocToolchain.Compiler
             Logger.Info("Started script compilation.");
 
             // Always an empty one in old versions (same in subroutines)
-            if (MainFrame.Version <= 10)
+            if (MainFrame.Version.HasReservedLocalInFrame())
                 MainFrame.Stack.AddLocalVariable(null);
 
             EnterScope(MainFrame, script);
@@ -309,7 +309,7 @@ namespace GTAdhocToolchain.Compiler
         public void CompileSourceFileStatement(AdhocCodeFrame frame, SourceFileStatement srcFileStatement)
         {
             // Source file instructions are supported starting in version 7
-            if (frame.Version < 7)
+            if (!frame.Version.HasSourceFileInstructionSupport())
                 return;
 
             InsSourceFile srcFileIns = new InsSourceFile(SymbolMap.RegisterSymbol(srcFileStatement.Path, false));
@@ -571,7 +571,7 @@ namespace GTAdhocToolchain.Compiler
                 else
                 {
                     // Not provided, inherits from base object (System::Object, or Object if old)
-                    if (frame.Version >= 10)
+                    if (frame.Version.ObjectInheritsFromSystemObject())
                     {
                         @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol(AdhocConstants.SYSTEM));
                         @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol(AdhocConstants.OBJECT));
@@ -636,7 +636,7 @@ namespace GTAdhocToolchain.Compiler
             }
             else // No else block
             {
-                if (frame.Version >= 7 && frame.Version < 11) // Version 7-10 and under has an implicit, alternate jump instruction anyway
+                if (frame.Version.IfConditionAlwaysHasAlternateJump())
                 {
                     InsJump skipAlternateJmp = new InsJump();
                     frame.AddInstruction(skipAlternateJmp, 0);
@@ -864,7 +864,7 @@ namespace GTAdhocToolchain.Compiler
 
         public void CompileForeach(AdhocCodeFrame frame, ForeachStatement foreachStatement)
         {
-            if (frame.Version < 11)
+            if (!frame.Version.HasForeachSupport())
                 ThrowCompilationError(foreachStatement, CompilationMessages.Error_ForeachUnsupported);
 
             LoopContext loopCtx = EnterLoop(frame, foreachStatement);
@@ -954,7 +954,7 @@ namespace GTAdhocToolchain.Compiler
                     CompileExpression(frame, swCase.Test);
 
                     // Equal check
-                    InsBinaryOperator eqOp = new InsBinaryOperator(SymbolMap.RegisterSymbol(AdhocConstants.OPERATOR_EQUAL, convertToOperand: frame.Version >= 11));
+                    InsBinaryOperator eqOp = new InsBinaryOperator(SymbolMap.RegisterSymbol(AdhocConstants.OPERATOR_EQUAL, convertToOperand: frame.Version.ShouldUseInternalOperatorNames()));
                     frame.AddInstruction(eqOp, swCase.Location.Start.Line);
 
                     // Write the jump
@@ -1055,7 +1055,7 @@ namespace GTAdhocToolchain.Compiler
 
             // Methods always reserve a variable slot for 'self'
             // For older versions it's always there anyway.
-            if (isMethod || frame.Version <= 10)
+            if (isMethod || frame.Version.ShouldAllocateVariableForSelf())
             {
                 // It's also after parameters
                 subroutine.CodeFrame.Stack.AddLocalVariable(null);
@@ -1064,7 +1064,7 @@ namespace GTAdhocToolchain.Compiler
             if (frame.CurrentScope.StaticScopeVariables.ContainsKey(subroutine.Name.Name))
                 ThrowCompilationError(parentNode, $"Static subroutine name '{subroutine.Name.Name}' is already defined in this scope.");
 
-            if (frame.Version >= 10)
+            if (frame.Version.ShouldDefineFunctionAsStaticVariables())
                 frame.AddAttributeOrStaticMemberVariable(subroutine.Name);
             else
             {
@@ -1106,7 +1106,7 @@ namespace GTAdhocToolchain.Compiler
                 subroutine.CodeFrame.FunctionParameters.Add(paramSymb);
                 subroutine.CodeFrame.AddScopeVariable(paramSymb, isAssignment: true, isLocalDeclaration: true);
 
-                if (frame.Version >= 7)
+                if (frame.Version.HasSupportForFunctionParametersDefaultValues())
                 {
                     // Subroutine param does not have a default parameter, push nil into current frame
                     frame.AddInstruction(new InsNilConst(), paramIdent.Location.Start.Line);
@@ -1139,7 +1139,7 @@ namespace GTAdhocToolchain.Compiler
             }
             else
             {
-                if (frame.Version < 7)
+                if (!frame.Version.HasSupportForFunctionParametersDefaultValues())
                     ThrowCompilationError(param, CompilationMessages.Error_DefaultParameterValuesUnsupported);
 
                 if (param is AssignmentExpression assignmentExpression) // Parameter default value set to another variable or static value
@@ -1233,16 +1233,14 @@ namespace GTAdhocToolchain.Compiler
                 if (retStatement.Argument is AssignmentExpression assignmentExpr)
                     CompileExpression(frame, assignmentExpr.Left); // If we are returning an assignment i.e return <variable or path> += "hi", we need to eval str again
 
-                if (frame.Version < 11)
-                {
-                    // Initial return indicates a return value in older versions
+                // Initial return indicates a return value in older versions
+                if (frame.Version.ShouldPopOnReturnStatementWithValue())
                     InsertPop(frame);
-                }
             }
             else
             {
                 
-                if (frame.Version >= 11)
+                if (frame.Version.ShouldReturnVoidForEmptyFunctionReturn())
                     InsertVoid(frame); // Void const is returned
             }
 
@@ -1267,7 +1265,7 @@ namespace GTAdhocToolchain.Compiler
                 Expression? id = declarator.Id;
 
                 // In later versions, we first compile the call
-                if (frame.Version >= 11)
+                if (frame.Version.ExpressionBeforeEvalOrPush())
                 {
                     if (initValue is not null)
                     {
@@ -1378,10 +1376,10 @@ namespace GTAdhocToolchain.Compiler
         /// <param name="pushWhenNoInit"></param>
         public void CompileListAssignmentStatement(AdhocCodeFrame frame, ListAssignementStatement listAssignment)
         {
-            if (frame.Version >= 11) // Must be before in late versions
+            if (frame.Version.ExpressionBeforeEvalOrPush()) // Must be before in late versions
                 CompileExpression(frame, listAssignment.Right);
 
-            var before = frame.Version < 11 ? listAssignment.Right : null;
+            var before = !frame.Version.ExpressionBeforeEvalOrPush() ? listAssignment.Right : null;
             CompileListAsssignmentExpression(frame, listAssignment.Left, init: before);
         }
 
@@ -1393,7 +1391,7 @@ namespace GTAdhocToolchain.Compiler
         /// <param name="init"></param>
         private void CompileListAsssignmentExpression(AdhocCodeFrame frame, ListAssignementExpression list, Expression? init = null, bool popResult = true)
         {
-            if (list.HasRestElement && frame.Version < 12)
+            if (list.HasRestElement && !frame.Version.SupportsRestElement())
                 ThrowCompilationError(list, CompilationMessages.Error_ListAssignementRestElementUnsupported);
 
             Dictionary<ListAssignementExpression, AdhocSymbol> nestedLists = [];
@@ -1431,7 +1429,7 @@ namespace GTAdhocToolchain.Compiler
             }
 
             // FIXME: Logic can probably be improved
-            if (frame.Version < 11 && init is not null)
+            if (!frame.Version.ExpressionBeforeEvalOrPush() && init is not null)
             {
                 if (init.Type == Nodes.AssignmentExpression)
                 {
@@ -1457,7 +1455,7 @@ namespace GTAdhocToolchain.Compiler
                 ListAssignementExpression nestedList = nestedListAndTmpVarPair.Key;
                 AdhocSymbol tempListVariable = nestedListAndTmpVarPair.Value;
 
-                if (frame.Version >= 11)
+                if (frame.Version.ExpressionBeforeEvalOrPush())
                     InsertVariableEvalFromSymbol(frame, tempListVariable);
 
                 CompileListAsssignmentExpression(frame, nestedList, new Identifier(tempListVariable.Name), popResult: true); // In a nested list, we are not reusing the result. pop it.
@@ -1487,7 +1485,7 @@ namespace GTAdhocToolchain.Compiler
             }
 
             AdhocSymbol fullModulePathSymbol = SymbolMap.RegisterSymbol(!string.IsNullOrEmpty(modulePath) ? modulePath : AdhocConstants.NIL);
-            AdhocSymbol targetSymbol = SymbolMap.RegisterSymbol(import.Target.Name);
+            AdhocSymbol targetSymbol = SymbolMap.RegisterSymbol(import.Target.Name, convertToOperand: frame.Version.ShouldUseInternalOperatorNames());
             AdhocSymbol aliasSymbol = SymbolMap.RegisterSymbol(import.Alias is not null ? import.Alias.Name : AdhocConstants.NIL);
 
             importIns.ModulePath.Add(fullModulePathSymbol);
@@ -1496,10 +1494,14 @@ namespace GTAdhocToolchain.Compiler
 
             if (import.Alias is not null) // Alias is defined as a static
             {
+                if (!frame.Version.SupportsImportAlias())
+                    ThrowCompilationError(import, CompilationMessages.Error_ImportAliasNotSupported);
+
                 if (import.Target.Name == AdhocConstants.OPERATOR_IMPORT_ALL) // Should be caught by parser, but worth having anyway
                     ThrowCompilationError(import, CompilationMessages.Error_ImportWildcardWithAlias);
 
                 frame.Stack.AddStaticVariable(new StaticVariable() { Symbol = aliasSymbol });
+                
             }
             else if (import.Target.Name == AdhocConstants.OPERATOR_IMPORT_ALL) // Imports actually copies the static members from the target
             {
@@ -1623,7 +1625,7 @@ namespace GTAdhocToolchain.Compiler
         /// <param name="chainExpression"></param>
         private void CompileDelegateDefinition(AdhocCodeFrame frame, DelegateDeclaration delegateDefinition)
         {
-            if (frame.Version < 12)
+            if (frame.Version.IsMinimumVersionForDelegateSupport())
                 ThrowCompilationError(delegateDefinition, CompilationMessages.Error_DelegatesUnsupported);
 
             var idSymb = SymbolMap.RegisterSymbol(delegateDefinition.Identifier.Name);
@@ -1635,7 +1637,7 @@ namespace GTAdhocToolchain.Compiler
 
             frame.AddAttributeOrStaticMemberVariable(idSymb);
 
-            if (frame.Version < 13)
+            if (frame.Version.IsMinimumVersionForDelegateSupport())
                 AddPostCompilationWarning(CompilationMessages.Warning_UsingDelegateCode);
         }
 
@@ -1656,7 +1658,7 @@ namespace GTAdhocToolchain.Compiler
         /// <param name="spreadElement"></param>
         private void CompileSelfExpression(AdhocCodeFrame frame, SelfExpression selfExpression)
         {
-            if (frame.Version < 7)
+            if (!frame.Version.HasSelfSupport())
                 ThrowCompilationError(selfExpression, CompilationMessages.Error_SelfUnsupported);
 
             AdhocSymbol symb = SymbolMap.RegisterSymbol(AdhocConstants.SELF);
@@ -1841,7 +1843,7 @@ namespace GTAdhocToolchain.Compiler
                 frame.AddAttributeOrStaticMemberVariable(idSymb);
                 
                 // Statics starting V7 until V10 are always set to a nil if not explicitly set to a value
-                if (frame.Version >= 7 && frame.Version < 10)
+                if (frame.Version.ShouldInsertNilForStaticDefinition())
                 {
                     InsertVariablePush(frame, ident, isVariableDeclaration: false);
                     frame.AddInstruction(new InsNilConst(), ident.Location.Start.Line);
@@ -1869,7 +1871,7 @@ namespace GTAdhocToolchain.Compiler
                 frame.AddAttributeOrStaticMemberVariable(idSymb);
 
                 // Assigning to something new
-                if (frame.Version >= 11)
+                if (frame.Version.ExpressionBeforeEvalOrPush())
                 {
                     CompileExpression(frame, declValue);
                     CompileVariableAssignment(frame, staticDeclaration.Declaration.Id);
@@ -1894,7 +1896,7 @@ namespace GTAdhocToolchain.Compiler
                 // attribute definition with no value
 
                 // defaults to nil (when default values are supported)
-                if (frame.Version >= 7)
+                if (frame.Version.HasSupportForAttributeDefinitionDefaultValues())
                     frame.AddInstruction(new InsNilConst(), ident.Location.Start.Line);
 
                 var idSymb = SymbolMap.RegisterSymbol(ident.Name);
@@ -1908,7 +1910,7 @@ namespace GTAdhocToolchain.Compiler
             }
             else
             {
-                if (frame.Version < 7)
+                if (!frame.Version.HasSupportForFunctionParametersDefaultValues())
                     ThrowCompilationError(attrVariableDefinition.VarExpression, CompilationMessages.Error_DefaultAttributeValuesUnsupported);
 
                 if (attrVariableDefinition.VarExpression is not AssignmentExpression)
@@ -1942,7 +1944,7 @@ namespace GTAdhocToolchain.Compiler
         /// <param name="arrayExpression"></param>
         private void CompileArrayExpression(AdhocCodeFrame frame, ArrayExpression arrayExpression)
         {
-            if (frame.Version >= 11)
+            if (frame.Version.HasNewArrayConstSupport())
             {
                 // Version 11 and above - array is defined
                 frame.AddInstruction(new InsArrayConst((uint)arrayExpression.Elements.Count), arrayExpression.Location.Start.Line);
@@ -1981,7 +1983,7 @@ namespace GTAdhocToolchain.Compiler
         /// <param name="mapExpression"></param>
         private void CompileMapExpression(AdhocCodeFrame frame, MapExpression mapExpression)
         {
-            if (frame.Version < 11)
+            if (!frame.Version.HasMapSupport())
                 ThrowCompilationError(mapExpression, CompilationMessages.Error_MapUnsupported);
 
             frame.AddInstruction(new InsMapConst(), mapExpression.Location.Start.Line);
@@ -2111,7 +2113,7 @@ namespace GTAdhocToolchain.Compiler
 
                 // On later versions, empty strings are always a string push with 0 args, which is a short hand for a static empty string
                 // It also works on earlier versions, but that's just how they compiled it
-                if (string.IsNullOrEmpty(strElement.Value.Cooked) && frame.Version >= 11)
+                if (string.IsNullOrEmpty(strElement.Value.Cooked) && frame.Version.ShouldUseStringPushForEmptyStrings())
                 {
                     InsStringPush strPush = new InsStringPush(0);
                     frame.AddInstruction(strPush, strElement.Location.Start.Line);
@@ -2157,7 +2159,7 @@ namespace GTAdhocToolchain.Compiler
                 }
                 else
                 {
-                    if (frame.Version >= 11)
+                    if (frame.Version.ShouldUseStringPushForEmptyStrings())
                     {
                         InsStringPush strPush = new InsStringPush(0);
                         frame.AddInstruction(strPush, templateLiteral.Location.Start.Line);
@@ -2178,7 +2180,7 @@ namespace GTAdhocToolchain.Compiler
             // Assigning to a variable or literal directly?
             if (assignExpression.Operator == AssignmentOperator.Assign)
             {
-                if (frame.Version >= 11)
+                if (frame.Version.ExpressionBeforeEvalOrPush())
                 {
                     // a = b = c?
                     if (assignExpression.Right.Type == Nodes.AssignmentExpression)
@@ -2387,7 +2389,7 @@ namespace GTAdhocToolchain.Compiler
             InsJump altSkipJump = new InsJump();
             frame.AddInstruction(altSkipJump, 0);
 
-            if (frame.Version >= 11)
+            if (frame.Version.ShouldPopInTernary())
                 InsertPop(frame);
 
             // Update alternate jump index now that we've compiled the consequent
@@ -2434,10 +2436,9 @@ namespace GTAdhocToolchain.Compiler
 
             if (computedMember.Optional)
             {
-                if (frame.Version < 12)
+                if (!frame.Version.IsMinimumVersionForOptionalSupport())
                     ThrowCompilationError(computedMember, CompilationMessages.Error_OptionalComputedMemberUnsupported);
-
-                if (frame.Version < 13)
+                else
                     AddPostCompilationWarning(CompilationMessages.Warning_UsingOptional_Code);
 
                 frame.AddInstruction(new InsLogicalOptional(), computedMember.Location.Start.Line);
@@ -2445,12 +2446,12 @@ namespace GTAdhocToolchain.Compiler
 
             CompileExpression(frame, computedMember.Property);
 
-            if (frame.Version >= 12)
+            if (frame.Version.HasElementEvalSupport())
                 frame.AddInstruction(InsElementEval.Default, 0);
             else
             {
                 // Below, including 11 uses direct symbols
-                var indexerIns = new InsBinaryOperator(SymbolMap.RegisterSymbol(AdhocConstants.OPERATOR_SUBSCRIPT, convertToOperand: frame.Version >= 11));
+                var indexerIns = new InsBinaryOperator(SymbolMap.RegisterSymbol(AdhocConstants.OPERATOR_SUBSCRIPT, convertToOperand: frame.Version.ShouldUseInternalOperatorNames()));
 
                 frame.AddInstruction(indexerIns, computedMember.Location.Start.Line);
                 frame.AddInstruction(new InsEval(), 0);
@@ -2465,12 +2466,12 @@ namespace GTAdhocToolchain.Compiler
             CompileExpression(frame, computedMember.Object);
             CompileExpression(frame, computedMember.Property);
 
-            if (frame.Version >= 12)
+            if (frame.Version.HasElementPushSupport())
                 frame.AddInstruction(InsElementPush.Default, 0);
             else
             {
                 // Below, including 11 uses direct symbols
-                var indexerIns = new InsBinaryOperator(SymbolMap.RegisterSymbol(AdhocConstants.OPERATOR_SUBSCRIPT, convertToOperand: frame.Version >= 11));
+                var indexerIns = new InsBinaryOperator(SymbolMap.RegisterSymbol(AdhocConstants.OPERATOR_SUBSCRIPT, convertToOperand: frame.Version.ShouldUseInternalOperatorNames()));
 
                 frame.AddInstruction(indexerIns, computedMember.Location.Start.Line);
             }
@@ -2495,10 +2496,9 @@ namespace GTAdhocToolchain.Compiler
 
             if (attrExp.Optional)
             {
-                if (frame.Version < 12)
+                if (frame.Version.IsMinimumVersionForOptionalSupport())
                     ThrowCompilationError(attrExp, CompilationMessages.Error_OptionalMemberUnsupported);
-
-                if (frame.Version < 13)
+                else
                     AddPostCompilationWarning(CompilationMessages.Warning_UsingOptional_Code);
 
                 frame.AddInstruction(new InsLogicalOptional(), attrExp.Location.Start.Line);
@@ -2538,7 +2538,7 @@ namespace GTAdhocToolchain.Compiler
             string fullPath = string.Join(AdhocConstants.OPERATOR_STATIC, pathParts);
             AdhocSymbol fullPathSymb = SymbolMap.RegisterSymbol(fullPath);
 
-            if (frame.Version >= 7)
+            if (frame.Version.HasVariableEvalSupport())
             {
                 InsVariableEvaluation eval = new InsVariableEvaluation();
                 foreach (string part in pathParts)
@@ -2648,7 +2648,7 @@ namespace GTAdhocToolchain.Compiler
                 frame.AddInstruction(vaCallIns, call.Location.Start.Line);
                 AddPostCompilationWarning(CompilationMessages.Warning_UsingVaCall_Code);
 
-                if (frame.Version < 11)
+                if (frame.Version.ShouldEvalOnCall())
                     frame.AddInstruction(new InsEval(), call.Location.Start.Line);
             }
             else if (IsNumberTypeIdentifier(call.Callee)) // UInt(1) => U_INT_CONST
@@ -2686,7 +2686,7 @@ namespace GTAdhocToolchain.Compiler
                 var callIns = new InsCall(call.Arguments.Count);
                 frame.AddInstruction(callIns, call.Location.Start.Line);
 
-                if (frame.Version < 11)
+                if (frame.Version.ShouldEvalOnCall())
                     frame.AddInstruction(new InsEval(), call.Location.Start.Line);
             }
 
@@ -2718,28 +2718,28 @@ namespace GTAdhocToolchain.Compiler
                 switch (calleeIdentifier.Name)
                 {
                     case "Byte":
-                        if (frame.Version < 13)
+                        if (!frame.Version.HasByteSupport())
                             ThrowCompilationError(calleeIdentifier, CompilationMessages.Error_V13ByteLiteralsUnsupported);
 
                         var byteConst = new InsByteConst(Convert.ToSByte(literal.NumericValue));
                         frame.AddInstruction(byteConst, literal.Location.Start.Line);
                         break;
                     case "UByte":
-                        if (frame.Version < 13)
+                        if (!frame.Version.HasUByteSupport())
                             ThrowCompilationError(calleeIdentifier, CompilationMessages.Error_V13UByteLiteralsUnsupported);
 
                         var ubyteConst = new InsUByteConst(Convert.ToByte(literal.NumericValue));
                         frame.AddInstruction(ubyteConst, literal.Location.Start.Line);
                         break;
                     case "Short":
-                        if (frame.Version < 13)
+                        if (!frame.Version.HasShortSupport())
                             ThrowCompilationError(calleeIdentifier, CompilationMessages.Error_V13ShortLiteralsUnsupported);
 
                         var shortConst = new InsShortConst(Convert.ToInt16(literal.NumericValue));
                         frame.AddInstruction(shortConst, literal.Location.Start.Line);
                         break;
                     case "UShort":
-                        if (frame.Version < 13)
+                        if (!frame.Version.HasUShortSupport())
                             ThrowCompilationError(calleeIdentifier, CompilationMessages.Error_V13UShortLiteralsUnsupported);
 
                         var ushortConst = new InsUShortConst(Convert.ToUInt16(literal.NumericValue));
@@ -2750,7 +2750,7 @@ namespace GTAdhocToolchain.Compiler
                         frame.AddInstruction(intConst, literal.Location.Start.Line);
                         break;
                     case "UInt":
-                        if (frame.Version < 12)
+                        if (!frame.Version.HasUIntSupport())
                             ThrowCompilationError(literal, CompilationMessages.Error_V12UIntLiteralUnsupported);
 
                         var uintConst = new InsUIntConst(Convert.ToUInt32(literal.NumericValue));
@@ -2761,7 +2761,7 @@ namespace GTAdhocToolchain.Compiler
                         frame.AddInstruction(longConst, literal.Location.Start.Line);
                         break;
                     case "ULong":
-                        if (frame.Version < 12)
+                        if (!frame.Version.HasULongSupport())
                             ThrowCompilationError(literal, CompilationMessages.Error_V12ULongLiteralUnsupported);
 
                         var ulongConst = new InsULongConst(Convert.ToUInt64(literal.NumericValue));
@@ -2772,7 +2772,7 @@ namespace GTAdhocToolchain.Compiler
                         frame.AddInstruction(singleConst, literal.Location.Start.Line);
                         break;
                     case "Double":
-                        if (frame.Version < 12)
+                        if (!frame.Version.HasDoubleSupport())
                             ThrowCompilationError(literal, CompilationMessages.Error_V12DoubleLiteralUnsupported);
 
                         var doubleConst = new InsDoubleConst(Convert.ToDouble(literal.NumericValue));
@@ -2815,9 +2815,9 @@ namespace GTAdhocToolchain.Compiler
             {
                 if (binExp.Operator == BinaryOperator.LogicalOr)
                 {
-                    InsLogicalBase orIns = frame.Version >= 11 ? new InsLogicalOr() : new InsLogicalOrOld();
+                    InsLogicalBase orIns = frame.Version.UsesNewLogicalInstructions() ? new InsLogicalOr() : new InsLogicalOrOld();
                     frame.AddInstruction(orIns, 0);
-                    if(frame.Version < 11)
+                    if (!frame.Version.UsesNewLogicalInstructions())
                         InsertPop(frame);
 
                     CompileExpression(frame, binExp.Right);
@@ -2825,9 +2825,9 @@ namespace GTAdhocToolchain.Compiler
                 }
                 else if (binExp.Operator == BinaryOperator.LogicalAnd)
                 {
-                    InsLogicalBase andIns = frame.Version >= 11 ? new InsLogicalAnd() : new InsLogicalAndOld();
+                    InsLogicalBase andIns = frame.Version.UsesNewLogicalInstructions() ? new InsLogicalAnd() : new InsLogicalAndOld();
                     frame.AddInstruction(andIns, 0);
-                    if (frame.Version < 11)
+                    if (!frame.Version.UsesNewLogicalInstructions())
                         InsertPop(frame);
 
                     CompileExpression(frame, binExp.Right);
@@ -2835,10 +2835,9 @@ namespace GTAdhocToolchain.Compiler
                 }
                 else if (binExp.Operator == BinaryOperator.NullishCoalescing)
                 {
-                    if (frame.Version < 12)
+                    if (frame.Version.IsMinimumVersionForOptionalSupport())
                         ThrowCompilationError(binExp, CompilationMessages.Error_NullCoalescingUnsupported);
-
-                    if (frame.Version < 13)
+                    else
                         AddPostCompilationWarning(CompilationMessages.Warning_UsingOptional_Code);
 
                     var jumpIfNotNil = new InsJumpIfNil();
@@ -2886,7 +2885,7 @@ namespace GTAdhocToolchain.Compiler
                 if (opStr is null)
                     ThrowCompilationError(binExp, $"Binary operator {binExp.Operator} not implemented");
 
-                AdhocSymbol opSymbol = SymbolMap.RegisterSymbol(opStr, convertToOperand: frame.Version >= 11);
+                AdhocSymbol opSymbol = SymbolMap.RegisterSymbol(opStr, convertToOperand: frame.Version.ShouldUseInternalOperatorNames());
                 InsBinaryOperator binOpIns = new InsBinaryOperator(opSymbol);
                 frame.AddInstruction(binOpIns, binExp.Location.Start.Line);
             }
@@ -2975,7 +2974,7 @@ namespace GTAdhocToolchain.Compiler
                     _ => throw new UnreachableException("Invalid unary operator"),
                 };
 
-                bool opToSymbol = frame.Version >= 12;
+                bool opToSymbol = frame.Version.ShouldUseInternalOperatorNames();
                 AdhocSymbol symb = SymbolMap.RegisterSymbol(op, opToSymbol);
                 InsUnaryAssignOperator unaryIns = new InsUnaryAssignOperator(symb);
                 frame.AddInstruction(unaryIns, unaryExp.Location.Start.Line);
@@ -2990,7 +2989,7 @@ namespace GTAdhocToolchain.Compiler
                 {
                     CompileExpression(frame, unaryExp.Argument);
 
-                    if (!isIndirectionBinaryAssignment && frame.Version >= 11)
+                    if (!isIndirectionBinaryAssignment && frame.Version.ShouldEvalInIndirection())
                         frame.AddInstruction(new InsEval(), 0);
                 }
                 
@@ -3039,7 +3038,7 @@ namespace GTAdhocToolchain.Compiler
                         return;
                 };
 
-                bool opToSymbol = frame.Version >= 12;
+                bool opToSymbol = frame.Version.ShouldUseInternalOperatorNames();
                 AdhocSymbol symb = SymbolMap.RegisterSymbol(op, opToSymbol);
                 InsUnaryOperator unaryIns = new InsUnaryOperator(symb);
                 frame.AddInstruction(unaryIns, unaryExp.Location.Start.Line);
@@ -3113,7 +3112,7 @@ namespace GTAdhocToolchain.Compiler
                     break;
 
                 case TokenType.BooleanLiteral:
-                    if (frame.Version >= 12)
+                    if (frame.Version.HasBoolSupport())
                     {
                         // On later versions, a specialized bool instruction was added
                         InsBoolConst boolConst = new InsBoolConst((literal.Value as bool?).Value);
@@ -3141,7 +3140,7 @@ namespace GTAdhocToolchain.Compiler
                             break;
 
                         case NumericTokenType.UnsignedInteger:
-                            if (frame.Version < 12)
+                            if (!frame.Version.HasUIntSupport())
                                 ThrowCompilationError(literal, CompilationMessages.Error_V12UIntLiteralUnsupported);
                             ins = new InsUIntConst((uint)literal.NumericValue);
                             break;
@@ -3151,13 +3150,13 @@ namespace GTAdhocToolchain.Compiler
                             break;
 
                         case NumericTokenType.UnsignedLong:
-                            if (frame.Version < 12)
+                            if (!frame.Version.HasULongSupport())
                                 ThrowCompilationError(literal, CompilationMessages.Error_V12ULongLiteralUnsupported);
                             ins = new InsULongConst((ulong)literal.NumericValue);
                             break;
 
                         case NumericTokenType.Double:
-                            if (frame.Version < 12)
+                            if (!frame.Version.HasDoubleSupport())
                                 ThrowCompilationError(literal, CompilationMessages.Error_V12DoubleLiteralUnsupported);
                             ins = new InsDoubleConst((double)literal.NumericValue);
                             break;
@@ -3300,7 +3299,7 @@ namespace GTAdhocToolchain.Compiler
 
             // Module leaves don't actually reset the max.
             // For earlier versions it doesn't matter
-            if (!isModuleLeave || frame.Version < 10) 
+            if (!isModuleLeave || frame.Version.ShouldAlwaysClearLocalsOnScopeLeave()) 
             {
                 // Clear up/rewind
                 foreach (var variable in lastScope.LocalScopeVariables)
@@ -3315,7 +3314,7 @@ namespace GTAdhocToolchain.Compiler
                 }
             }
 
-            if (insertLeaveInstruction && frame.Version >= 11) // Leave only available >= 11
+            if (insertLeaveInstruction && frame.Version.HasLeaveSupport())
             {
                 InsLeaveScope leave = new InsLeaveScope();
 
@@ -3387,7 +3386,7 @@ namespace GTAdhocToolchain.Compiler
         private AdhocSymbol InsertAttributeEval(AdhocCodeFrame frame, Identifier identifier)
         {
             AdhocSymbol symb = SymbolMap.RegisterSymbol(identifier.Name);
-            if (frame.Version >= 7)
+            if (frame.Version.HasAttributeEvalSupport())
             {
                 var attrEval = new InsAttributeEvaluation();
                 attrEval.AttributeSymbols.Add(symb); // Only one
@@ -3416,7 +3415,7 @@ namespace GTAdhocToolchain.Compiler
             int idx = frame.AddScopeVariable(symb, isAssignment: false);
 
             InstructionBase ins;
-            if (frame.Version >= 7)
+            if (frame.Version.HasVariableEvalSupport())
             {
                 ins = new InsVariableEvaluation(idx);
 
@@ -3441,7 +3440,7 @@ namespace GTAdhocToolchain.Compiler
             if (forceStatic || frame.IsStaticVariable(symb, CurrentModule))
             {
                 // Static, two symbols
-                if (frame.Version >= 7)
+                if (frame.Version.HasVariableEvalSupport())
                     (ins as InsVariableEvaluation).VariableSymbols.Add(symb);
                 else
                     (ins as InsVariablePush).VariableSymbols.Add(symb);
@@ -3483,7 +3482,7 @@ namespace GTAdhocToolchain.Compiler
         // Mostly used for temp variables produced by the compiler
         private AdhocSymbol InsertNewLocalVariable(AdhocCodeFrame frame, Expression exprValue, string variable, Location location = default)
         {
-            if (frame.Version >= 11)
+            if (frame.Version.ExpressionBeforeEvalOrPush())
             {
                 if (exprValue is not null)
                     CompileExpression(frame, exprValue);
@@ -3513,7 +3512,7 @@ namespace GTAdhocToolchain.Compiler
             LocalVariable taskVariable = frame.Stack.GetLocalVariableBySymbol(symbol);
             int taskVariableStoreIdx = frame.Stack.GetLocalVariableIndex(taskVariable);
 
-            if (frame.Version >= 7)
+            if (frame.Version.HasVariableEvalSupport())
             {
                 var insVarEval = new InsVariableEvaluation();
                 insVarEval.VariableSymbols.Add(symbol);
@@ -3536,7 +3535,7 @@ namespace GTAdhocToolchain.Compiler
         /// <param name="frame"></param>
         private void InsertAssignPop(AdhocCodeFrame frame)
         {
-            if (frame.Version >= 11)
+            if (frame.Version.HasAssignPopSupport())
             {
                 frame.AddInstruction(InsAssignPop.Default, 0);
             }
@@ -3549,7 +3548,7 @@ namespace GTAdhocToolchain.Compiler
 
         private static void InsertAssign(AdhocCodeFrame frame)
         {
-            if (frame.Version >= 10)
+            if (frame.Version.HasNewAssignSupport())
                 frame.AddInstruction(InsAssign.Default, 0);
             else // Assume under 10 that its the traditional assign + pop old
                 frame.AddInstruction(InsAssignOld.Default, 0);
@@ -3561,7 +3560,7 @@ namespace GTAdhocToolchain.Compiler
         /// <param name="frame"></param>
         private void InsertListAssign(AdhocCodeFrame frame, int numElements, bool restElement, int lineNumber)
         {
-            if (frame.Version >= 11)
+            if (frame.Version.HasNewListAssignSupport())
                 frame.AddInstruction(new InsListAssign() { VariableCount = numElements, }, lineNumber);
             else
                 frame.AddInstruction(new InsListAssignOld() { VariableCount = numElements }, lineNumber);
@@ -3573,7 +3572,7 @@ namespace GTAdhocToolchain.Compiler
         /// <param name="frame"></param>
         private void InsertPop(AdhocCodeFrame frame)
         {
-            if (frame.Version >= 10)
+            if (frame.Version.HasNewPopSupport())
                 frame.AddInstruction(InsPop.Default, 0);
             else // Assume under 10 that its the traditional assign + pop old
                 frame.AddInstruction(InsPopOld.Default, 0);
@@ -3585,7 +3584,7 @@ namespace GTAdhocToolchain.Compiler
         /// <param name="frame"></param>
         private void InsertSetState(AdhocCodeFrame frame, AdhocRunState state)
         {
-            if (frame.Version >= 10)
+            if (frame.Version.HasNewSetStateSupport())
                 frame.AddInstruction(new InsSetState(state), 0);
             else
                 frame.AddInstruction(new InsSetStateOld(state), 0);
@@ -3597,7 +3596,7 @@ namespace GTAdhocToolchain.Compiler
         /// <param name="frame"></param>
         private void InsertVoid(AdhocCodeFrame frame)
         {
-            if (frame.Version >= 11)
+            if (frame.Version.UseVoidInsteadOfNop())
                 frame.AddInstruction(new InsVoidConst(), 0);
             else
                 frame.AddInstruction(new InsNop(), 0);
@@ -3617,10 +3616,10 @@ namespace GTAdhocToolchain.Compiler
             if (string.IsNullOrEmpty(opStr))
                 ThrowCompilationError(parentNode, $"Unrecognized operator '{opStr}'");
 
-            bool opToSymbol = frame.Version >= 12;
+            bool opToSymbol = frame.Version.ShouldUseInternalOperatorNames();
             var symb = SymbolMap.RegisterSymbol(opStr, opToSymbol);
 
-            if (frame.Version >= 5)
+            if (frame.Version.HasBinaryAssignSupport())
             {
                 frame.AddInstruction(new InsBinaryAssignOperator(symb), lineNumber);
             }
@@ -3643,7 +3642,7 @@ namespace GTAdhocToolchain.Compiler
         {
             // Older versions's compilers don't check if a return at the top level with an argument was already specified
             // A return instruction is added anyway
-            if (frame.Version < 10)
+            if (frame.Version.ShouldAlwaysEmitSetStateInFunctions())
             {
                 InsertSetState(frame, AdhocRunState.RETURN);
                 return;
@@ -3652,7 +3651,7 @@ namespace GTAdhocToolchain.Compiler
             // Was a return explicitly specified?
             if (!frame.HasTopLevelReturnValue)
             {
-                if (frame.Version >= 11)
+                if (frame.Version.ShouldReturnVoidForEmptyFunctionReturn())
                 {
                     // All functions return a value internally in newer adhoc, even if they don't in the code.
                     // So, add one.
@@ -3678,7 +3677,7 @@ namespace GTAdhocToolchain.Compiler
             // TODO: Have some sort of system to compile as DEBUG, which would emit these anyway
             // It'd then be useful to make a debugger
 
-            if (frame.Version < 7)
+            if (frame.Version.IsNopAlwaysEmitted())
                 frame.AddInstruction(new InsNop(), line);
         }
 

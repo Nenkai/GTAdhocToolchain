@@ -321,7 +321,7 @@ public class Program
         }
     }
 
-    private static void BuildScript(string inputPath, string output, int version = 12, bool debugExceptions = false, bool preprocessOnly = false, string baseIncludeFolder = "")
+    private static void BuildScript(string inputPath, string output, uint version = 12, bool debugExceptions = false, bool preprocessOnly = false, string baseIncludeFolder = "")
     {
         var source = File.ReadAllText(inputPath);
         var time = new FileInfo(inputPath).LastWriteTime;
@@ -440,7 +440,7 @@ public class Program
                 {
                     Console.WriteLine($"Current adhoc version is set to {replVerbs.Version}.");
                 }
-                else if (int.TryParse(range, out int version))
+                else if (uint.TryParse(range, out uint version))
                 {
                     Console.WriteLine($"Now compiling for adhoc version {version}");
                     replVerbs.Version = version;
@@ -613,8 +613,8 @@ public class BuildVerbs
     [Option('o', "output", Required = false, HelpText = "Output compiled scripts when compiling standalone scripts or projects.")]
     public string OutputPath { get; set; }
 
-    [Option('v', "version", Required = false, Default = 12, HelpText = "Adhoc compile version (for files, not projects).")]
-    public int Version { get; set; }
+    [Option('v', "version", Required = false, Default = 12u, HelpText = "Adhoc compile version (for files, not projects).")]
+    public uint Version { get; set; }
 
     [Option("write-exceptions-to-file", Required = false, HelpText = "Artificially creates try/catch instructions to all code blocks compiled which will print adhoc exceptions to /APP_DATA_RAW/exceptions.txt (aka USRDIR) when thrown. " +
         "Very useful if the game does not normally print any error on adhoc exceptions and you do not have access to a debugger to breakpoint on a certain function to check errors.\n" +
@@ -631,8 +631,8 @@ public class BuildVerbs
 [Verb("disassembly-repl", HelpText = "Starts a disassembler repl for quickly disassembling input adhoc source code.")]
 public class DissasemblyReplVerbs
 {
-    [Option('v', "version", HelpText = "Adhoc version.")]
-    public int Version { get; set; }
+    [Option('v', "version", Default = 12u, HelpText = "Adhoc version. Defaults to 12.")]
+    public uint Version { get; set; } = 12u;
 }
 
 [Verb("pack", HelpText = "Pack files like gpb's, or mpackage's.")]

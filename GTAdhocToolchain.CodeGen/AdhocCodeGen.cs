@@ -33,9 +33,9 @@ namespace GTAdhocToolchain.CodeGen
             stream = new AdhocStream(ms, Frame.Version);
 
             // ADhoc Compiled Header?
-            stream.WriteString($"ADCH{Frame.Version:D3}", StringCoding.ZeroTerminated); // ADCH012
+            stream.WriteString($"ADCH{Frame.Version.VersionNumber:D3}", StringCoding.ZeroTerminated); // ADCH012
 
-            if (Frame.Version >= 9)
+            if (Frame.Version.HasSymbolTable())
                 SerializeSymbolTable();
 
             Frame.Write(stream);
