@@ -936,8 +936,7 @@ public class AdhocScriptCompiler
         AdhocSymbol caseSymb = InsertNewLocalVariable(frame, switchStatement.Discriminant, $"case#{SymbolMap.TempVariableCounter++}");
 
         Dictionary<SwitchCase, InsJumpIfTrue> caseBodyJumps = [];
-        InsJump defaultJump = null;
-        bool hasDefault = false;
+        bool hasSpecifiedDefault = false;
 
         // Write switch table jumps
         for (int i = 0; i < switchStatement.Cases.Count; i++)
@@ -962,22 +961,16 @@ public class AdhocScriptCompiler
             }
             else // Default
             {
-                if (hasDefault)
+                if (hasSpecifiedDefault)
                     ThrowCompilationError(swCase, CompilationMessages.Error_SwitchAlreadyHasDefault);
 
-                hasDefault = true;
-                defaultJump = new InsJump();
-                frame.AddInstruction(defaultJump, swCase.Location.Start.Line);
+                hasSpecifiedDefault = true;
             }
         }
 
-        // Was a default case statement specified?
-        if (!hasDefault)
-        {
-            // Switch statement does not have an explicit default case, add a default jump
-            defaultJump = new InsJump();
-            frame.AddInstruction(defaultJump, 0);
-        }
+        // Default is always at the end of all the tests regardless of where the default statement is.
+        InsJump defaultJump = new InsJump();
+        frame.AddInstruction(defaultJump, 0);
 
         // Write bodies
         for (int i = 0; i < switchStatement.Cases.Count; i++)
@@ -996,7 +989,7 @@ public class AdhocScriptCompiler
         }
 
         // Update non explicit default case to jump to end
-        if (!hasDefault)
+        if (!hasSpecifiedDefault)
             defaultJump.JumpInstructionIndex = frame.GetLastInstructionIndex();
 
         // Update break case jumps
