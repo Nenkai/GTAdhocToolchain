@@ -1387,6 +1387,43 @@ switch (type)
 [Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: LEAVE
 [Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
 
+// Case + default
+switch (value)
+{
+        case 0:
+        default:
+                test("hello world from case 0 and default");
+                break;
+
+        case 1:
+                test("hello world from case 1");
+                break;
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:80 DumpSubroutine: VARIABLE_EVAL: value,value
+[Core.Hooking] <Info> gt7_hooks.cpp:85 DumpSubroutine: VARIABLE_PUSH: case#0
+[Core.Hooking] <Info> gt7_hooks.cpp:212 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:80 DumpSubroutine: VARIABLE_EVAL: case#0
+[Core.Hooking] <Info> gt7_hooks.cpp:99 DumpSubroutine: INT_CONST: 0
+[Core.Hooking] <Info> gt7_hooks.cpp:212 DumpSubroutine: BINARY_OPERATOR
+[Core.Hooking] <Info> gt7_hooks.cpp:111 DumpSubroutine: JUMP_IF_TRUE: 12
+[Core.Hooking] <Info> gt7_hooks.cpp:80 DumpSubroutine: VARIABLE_EVAL: case#0
+[Core.Hooking] <Info> gt7_hooks.cpp:99 DumpSubroutine: INT_CONST: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:212 DumpSubroutine: BINARY_OPERATOR
+[Core.Hooking] <Info> gt7_hooks.cpp:111 DumpSubroutine: JUMP_IF_TRUE: 17
+[Core.Hooking] <Info> gt7_hooks.cpp:120 DumpSubroutine: JUMP: 12
+[Core.Hooking] <Info> gt7_hooks.cpp:80 DumpSubroutine: VARIABLE_EVAL: test,test
+[Core.Hooking] <Info> gt7_hooks.cpp:159 DumpSubroutine: STRING_CONST: "hello world from case 0 and default"
+[Core.Hooking] <Info> gt7_hooks.cpp:128 DumpSubroutine: CALL: 1 args
+[Core.Hooking] <Info> gt7_hooks.cpp:212 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:120 DumpSubroutine: JUMP: 22
+[Core.Hooking] <Info> gt7_hooks.cpp:80 DumpSubroutine: VARIABLE_EVAL: test,test
+[Core.Hooking] <Info> gt7_hooks.cpp:159 DumpSubroutine: STRING_CONST: "hello world from case 1"
+[Core.Hooking] <Info> gt7_hooks.cpp:128 DumpSubroutine: CALL: 1 args
+[Core.Hooking] <Info> gt7_hooks.cpp:212 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:120 DumpSubroutine: JUMP: 22
+[Core.Hooking] <Info> gt7_hooks.cpp:212 DumpSubroutine: LEAVE
+[Core.Hooking] <Info> gt7_hooks.cpp:133 DumpSubroutine: SET_STATE: EXIT
+
 ////////////////////////////////////////////////////////////////////////
 // Ternary tests
 ////////////////////////////////////////////////////////////////////////
