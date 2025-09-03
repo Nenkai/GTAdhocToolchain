@@ -1,10 +1,22 @@
-﻿namespace AdhocLanguage
+﻿/***************************************************************************
+
+Copyright (c) Microsoft Corporation. All rights reserved.
+This code is licensed under the Visual Studio SDK license terms.
+THIS CODE IS PROVIDED *AS IS* WITHOUT WARRANTY OF
+ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING ANY
+IMPLIED WARRANTIES OF FITNESS FOR A PARTICULAR
+PURPOSE, MERCHANTABILITY, OR NON-INFRINGEMENT.
+
+***************************************************************************/
+
+namespace AdhocLanguage
 {
     using System;
     using System.ComponentModel.Composition;
     using System.Diagnostics.CodeAnalysis;
     using System.Threading.Tasks;
     using System.Threading.Tasks.Dataflow;
+
     using Microsoft.VisualStudio.ProjectSystem;
     using Microsoft.VisualStudio.ProjectSystem.VS;
     using Microsoft.VisualStudio.Shell;
@@ -13,8 +25,8 @@
 
     [Export]
     [AppliesTo(MyUnconfiguredProject.UniqueCapability)]
-    [ProjectTypeRegistration(VsPackage.ProjectTypeGuid, "Adhoc Script", "#2", ProjectExtension, Language, resourcePackageGuid: VsPackage.PackageGuid, PossibleProjectExtensions = ProjectExtension, ProjectTemplatesDir = @"..\..\Templates\Projects\MyCustomProject")]
-    [ProvideProjectItem(VsPackage.ProjectTypeGuid, "My Items", @"..\..\Templates\ProjectItems\MyCustomProject", 500)]
+    [ProjectTypeRegistration(AdhocPackage.ProjectTypeGuid, "Adhoc", "Adhoc Project Files (*.adproj);*.adproj", ProjectExtension, Language, resourcePackageGuid: AdhocPackage.PackageGuidString, PossibleProjectExtensions = ProjectExtension, ProjectTemplatesDir = @"..\..\Templates\Projects\MyCustomProject")]
+    [ProvideProjectItem(AdhocPackage.ProjectTypeGuid, "My Items", @"..\..\Templates\ProjectItems\MyCustomProject", 500)]
     internal class MyUnconfiguredProject
     {
         /// <summary>
@@ -31,9 +43,9 @@
         /// <remarks>
         /// This value should be kept in sync with the capability as actually defined in your .targets.
         /// </remarks>
-        internal const string UniqueCapability = "AdhocScriptSample";
+        internal const string UniqueCapability = "AdhocLanguage";
 
-        internal const string Language = "AdhocLanguage";
+        internal const string Language = "Adhoc";
 
         [ImportingConstructor]
         public MyUnconfiguredProject(UnconfiguredProject unconfiguredProject)
@@ -41,27 +53,34 @@
             this.ProjectHierarchies = new OrderPrecedenceImportCollection<IVsHierarchy>(projectCapabilityCheckProvider: unconfiguredProject);
         }
 
-        [Import]
-        internal UnconfiguredProject UnconfiguredProject { get; private set; }
+        public MyUnconfiguredProject()
+        {
+            ;
+        }
 
         [Import]
-        internal IActiveConfiguredProjectSubscriptionService SubscriptionService { get; private set; }
+        internal UnconfiguredProject UnconfiguredProject { get; set; }
 
         [Import]
-        internal IProjectThreadingService ProjectThreadingService { get; private set; }
+        internal IActiveConfiguredProjectSubscriptionService SubscriptionService { get; set; }
 
         [Import]
-        internal ActiveConfiguredProject<ConfiguredProject> ActiveConfiguredProject { get; private set; }
+        internal IProjectThreadingService ThreadHandling { get; set; }
 
         [Import]
-        internal ActiveConfiguredProject<MyConfiguredProject> MyActiveConfiguredProject { get; private set; }
+        internal ActiveConfiguredProject<ConfiguredProject> ActiveConfiguredProject { get; set; }
+
+        [Import]
+        internal ActiveConfiguredProject<MyConfiguredProject> MyActiveConfiguredProject { get; set; }
 
         [ImportMany(ExportContractNames.VsTypes.IVsProject, typeof(IVsProject))]
-        internal OrderPrecedenceImportCollection<IVsHierarchy> ProjectHierarchies { get; private set; }
+        internal OrderPrecedenceImportCollection<IVsHierarchy> ProjectHierarchies { get; }
 
         internal IVsHierarchy ProjectHierarchy
         {
             get { return this.ProjectHierarchies.Single().Value; }
         }
+
+        private async 
     }
 }

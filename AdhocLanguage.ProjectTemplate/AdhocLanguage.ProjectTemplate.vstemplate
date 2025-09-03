@@ -1,0 +1,22 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<VSTemplate Version="3.0.0" Type="Project" xmlns="http://schemas.microsoft.com/developer/vstemplate/2005" xmlns:sdk="http://schemas.microsoft.com/developer/vstemplate-sdkextension/2010">
+  <TemplateData>
+    <Name>Adhoc Project Template</Name>
+    <Description>Project template for an Adhoc (Gran Turismo) project.</Description>
+    <Icon>AdhocLanguage.ProjectTemplate.ico</Icon>
+    <ProjectType>Adhoc</ProjectType> <!-- Actual project to use. This is defined by the main extension. -->
+    <LanguageTag>Adhoc</LanguageTag> <!-- Language name for display -->
+	<PlatformTag>Playstation</PlatformTag>
+	<ProjectTypeTag>Games</ProjectTypeTag>
+    <SortOrder>1000</SortOrder>
+    <TemplateID>f1da5b7b-4e45-4f1b-a20d-7f3c48469773</TemplateID>
+    <CreateNewFolder>true</CreateNewFolder>
+    <DefaultName>MyAdhocProject</DefaultName>
+    <ProvideDefaultName>true</ProvideDefaultName>
+  </TemplateData>
+  <TemplateContent>
+	  <Project File="project.adproj">
+		  <ProjectItem OpenInEditor="true">project.ad</ProjectItem>
+	  </Project>
+  </TemplateContent>
+</VSTemplate>

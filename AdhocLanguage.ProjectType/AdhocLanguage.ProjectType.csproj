@@ -1,35 +1,32 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <Import Project="packages\Microsoft.VisualStudio.Sdk.BuildTasks.14.0.14.0.23-pre\build\Microsoft.VisualStudio.Sdk.BuildTasks.14.0.props" Condition="'$(VisualStudioVersion)' == '14.0' And Exists('packages\Microsoft.VisualStudio.Sdk.BuildTasks.14.0.14.0.23-pre\build\Microsoft.VisualStudio.Sdk.BuildTasks.14.0.props')" />
-  <Import Project="packages\Microsoft.VSSDK.BuildTools.15.0.26201\build\Microsoft.VSSDK.BuildTools.props" Condition="'$(VisualStudioVersion)' == '15.0' And Exists('packages\Microsoft.VSSDK.BuildTools.15.0.26201\build\Microsoft.VSSDK.BuildTools.props')" />
   <PropertyGroup>
-    <MinimumVisualStudioVersion>15.0</MinimumVisualStudioVersion>
-    <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">15.0</VisualStudioVersion>
+    <MinimumVisualStudioVersion>17.0</MinimumVisualStudioVersion>
     <VSToolsPath Condition="'$(VSToolsPath)' == ''">$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)</VSToolsPath>
-    <NuGetPackageImportStamp>
-    </NuGetPackageImportStamp>
     <TargetFrameworkProfile />
   </PropertyGroup>
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProductVersion>8.0.30703</ProductVersion>
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectTypeGuids>{82b43b9b-a64c-4715-b499-d71e9ca2bd60};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
-    <ProjectGuid>{D14ED547-03FF-4195-A5A0-2107C033C2EF}</ProjectGuid>
+    <ProjectGuid>{E5223F52-8C81-47FB-858A-0C7364178482}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>AdhocLanguage</RootNamespace>
-    <AssemblyName>AdhocLanguage</AssemblyName>
+    <RootNamespace>AdhocLanguage.ProjectType</RootNamespace>
+    <AssemblyName>AdhocLanguage.ProjectType</AssemblyName>
     <TargetFrameworkVersion>v4.8.1</TargetFrameworkVersion>
-    <FileAlignment>512</FileAlignment>
-    <SignAssembly>true</SignAssembly>
-    <AssemblyOriginatorKeyFile>
-    </AssemblyOriginatorKeyFile>
+    <GeneratePkgDefFile>true</GeneratePkgDefFile>
+    <UseCodebase>true</UseCodebase>
+    <IncludeAssemblyInVSIXContainer>true</IncludeAssemblyInVSIXContainer>
+    <IncludeDebugSymbolsInVSIXContainer>false</IncludeDebugSymbolsInVSIXContainer>
+    <IncludeDebugSymbolsInLocalVSIXDeployment>false</IncludeDebugSymbolsInLocalVSIXDeployment>
+    <CopyBuildOutputToOutputDirectory>true</CopyBuildOutputToOutputDirectory>
+    <CopyOutputSymbolsToOutputDirectory>true</CopyOutputSymbolsToOutputDirectory>
     <StartAction>Program</StartAction>
-    <StartProgram>$(DevEnvDir)devenv.exe</StartProgram>
-    <StartArguments>/rootSuffix Exp</StartArguments>
+    <StartProgram Condition="'$(DevEnvDir)' != ''">$(DevEnvDir)devenv.exe</StartProgram>
+    <StartArguments>/rootsuffix Exp</StartArguments>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -49,8 +46,64 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Classification\AdhocClassifier.cs" />
+    <Compile Include="Classification\AdhocSyntaxErrorTagger.cs" />
+    <Compile Include="Classification\AdhocTokenTypes.cs" />
+    <Compile Include="Classification\ClassificationFormat.cs" />
+    <Compile Include="Classification\ClassificationType.cs" />
+    <Compile Include="Classification\SymbolTree.cs" />
+    <Compile Include="Intellisense\Completions\AdhocCompletionSet.cs" />
+    <Compile Include="Intellisense\Completions\CompletionController.cs" />
+    <Compile Include="Intellisense\Completions\CompletionSource.cs" />
+    <Compile Include="Intellisense\IntellisenseProvider.cs" />
+    <Compile Include="Intellisense\QuickInfo\AdhocQuickInfoSource.cs" />
+    <Compile Include="Intellisense\QuickInfo\QuickInfoController.cs" />
+    <Compile Include="Intellisense\QuickInfo\QuickInfoControllerProvider.cs" />
+    <Compile Include="MyConfiguredProject.cs" />
+    <Compile Include="MyUnconfiguredProject.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="AdhocPackage.cs" />
+    <Compile Include="Tags\AdhocTokenTag.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="BuildSystem\DeployedBuildSystem\CustomProject.Default.props" />
+    <None Include="BuildSystem\DeployedBuildSystem\CustomProject.props" />
+    <None Include="BuildSystem\DeployedBuildSystem\CustomProject.targets" />
+    <None Include="BuildSystem\DeployedBuildSystem\CustomProjectCs.targets" />
+    <None Include="source.extension.vsixmanifest">
+      <SubType>Designer</SubType>
+    </None>
+    <Content Include="Syntaxes\adhoc.tmLanguage.json">
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="PresentationCore" />
+    <Reference Include="System" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.VisualStudio.ProjectSystem.Analyzers">
+      <Version>17.9.380</Version>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.VisualStudio.ProjectSystem.SDK">
+      <Version>17.9.380</Version>
+    </PackageReference>
+    <PackageReference Include="Microsoft.VisualStudio.ProjectSystem.VS">
+      <Version>17.9.380</Version>
+    </PackageReference>
+    <PackageReference Include="Microsoft.VisualStudio.SDK" Version="17.14.40265" ExcludeAssets="runtime" NoWarn="NU1604">
+      <IncludeAssets>compile; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.VSSDK.BuildTools" Version="17.14.2101" NoWarn="NU1604" />
+    <PackageReference Include="System.ComponentModel.Composition">
+      <Version>9.0.8</Version>
+    </PackageReference>
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\AdhocLanguage.ProjectTemplate\AdhocLanguage.ProjectTemplate.csproj">
-      <Project>{651EBED8-058E-4104-A3B5-2E06330822F2}</Project>
+      <Project>{AA0FE9EF-6144-40B3-AB5C-E68BAF98AD57}</Project>
       <Name>AdhocLanguage.ProjectTemplate</Name>
       <VSIXSubPath>ProjectTemplates</VSIXSubPath>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
@@ -66,158 +119,88 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.VisualStudio.ProjectSystem">
-      <Version>15.8.243</Version>
-    </PackageReference>
-    <PackageReference Include="Microsoft.VisualStudio.SDK">
-      <Version>17.4.33103.184</Version>
-    </PackageReference>
-    <PackageReference Include="Microsoft.VSSDK.BuildTools">
-      <Version>17.4.2120</Version>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
-    <PackageReference Include="System.Memory">
-      <Version>4.5.5</Version>
-    </PackageReference>
-  </ItemGroup>
-  <!-- 
-  Resources for our new project system
-  -->
-  <ItemGroup>
-    <EmbeddedResource Include="Resources.resx">
-      <SubType>Designer</SubType>
-    </EmbeddedResource>
-    <EmbeddedResource Include="VSPackage.resx">
-      <MergeWithCTO>true</MergeWithCTO>
-      <SubType>Designer</SubType>
-    </EmbeddedResource>
+    <Content Include="AdhocLanguage.pkgdef">
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Classification\AdhocTokenTypes.cs" />
-    <Compile Include="Classification\AdhocClassifier.cs" />
-    <Compile Include="Classification\AdhocSyntaxErrorTagger.cs" />
-    <Compile Include="Classification\ClassificationFormat.cs" />
-    <Compile Include="Classification\ClassificationType.cs" />
-    <Compile Include="Intellisense\Completions\AdhocCompletionSet.cs" />
-    <Compile Include="Intellisense\Completions\CompletionController.cs" />
-    <Compile Include="Intellisense\Completions\CompletionSource.cs" />
-    <Compile Include="Intellisense\IntellisenseProvider.cs" />
-    <Compile Include="Intellisense\QuickInfo\AdhocQuickInfoSource.cs" />
-    <Compile Include="Intellisense\QuickInfo\QuickInfoController.cs" />
-    <Compile Include="Intellisense\QuickInfo\QuickInfoControllerProvider.cs" />
-    <Compile Include="MyConfiguredProject.cs" />
-    <Compile Include="MyUnconfiguredProject.cs" />
-    <Compile Include="ProjectProperties.cs" />
-    <Compile Include="ScriptDebuggerLaunchProvider.cs" />
-    <Compile Include="Classification\SymbolTree.cs" />
-    <Compile Include="Tags\AdhocTokenTag.cs" />
-    <Compile Include="VsPackage.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="app.config" />
-    <None Include="source.extension.vsixmanifest">
-      <SubType>Designer</SubType>
-    </None>
-    <None Include="Syntaxes\adhoc.tmLanguage.json" />
-  </ItemGroup>
-  <!-- 
-  These are the parts of the custom project system which will be deployed as part of the 
-  final implementation, and provide the basic processing for handling rules in CPS.
-  -->
-  <ItemGroup>
-    <None Include="BuildSystem\DeployedBuildSystem\AdhocScript.props" />
-    <None Include="BuildSystem\DeployedBuildSystem\AdhocScript.targets" />
-  </ItemGroup>
-  <!--
-  The XAML files provide buth compile-time implementations for CPS rules as well as
-  runtime information for property pages.  They will also be deployed as part of the
-  final package.
-  -->
-  <ItemGroup>
-    <None Include="BuildSystem\Rules\ProjectItemsSchema.xaml">
-      <SubType>Designer</SubType>
-    </None>
-    <None Include="BuildSystem\Rules\script.browseobject.xaml">
-      <SubType>Designer</SubType>
-    </None>
-    <XamlPropertyRule Include="BuildSystem\Rules\general.xaml">
-      <SubType>Designer</SubType>
-    </XamlPropertyRule>
-    <XamlPropertyRule Include="BuildSystem\Rules\general_file.xaml">
-      <RuleInjection>None</RuleInjection>
-      <SubType>Designer</SubType>
-    </XamlPropertyRule>
-    <XamlPropertyRule Include="BuildSystem\Rules\folder.xaml">
-      <RuleInjection>None</RuleInjection>
-      <SubType>Designer</SubType>
-    </XamlPropertyRule>
-    <XamlPropertyRule Include="BuildSystem\Rules\none.xaml">
-      <RuleInjection>None</RuleInjection>
-      <SubType>Designer</SubType>
-    </XamlPropertyRule>
-    <XamlPropertyRule Include="BuildSystem\Rules\scc.xaml">
-      <SubType>Designer</SubType>
-    </XamlPropertyRule>
-    <XamlPropertyRule Include="BuildSystem\Rules\debugger_general.xaml">
-      <SubType>Designer</SubType>
-    </XamlPropertyRule>
-    <XamlPropertyRule Include="BuildSystem\Rules\script.xaml">
-      <SubType>Designer</SubType>
-    </XamlPropertyRule>
-    <XamlPropertyRule Include="BuildSystem\Rules\general.browseobject.xaml">
-      <SubType>Designer</SubType>
-    </XamlPropertyRule>
-    <XamlPropertyRule Include="BuildSystem\Rules\ScriptDebugger.xaml">
-      <SubType>Designer</SubType>
-    </XamlPropertyRule>
+    <Page Include="BuildSystem\Rules\assemblyreference.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="BuildSystem\Rules\comreference.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="BuildSystem\Rules\csharp.browseobject.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="BuildSystem\Rules\csharp.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="BuildSystem\Rules\CustomPropertyPage.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="BuildSystem\Rules\debugger_general.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="BuildSystem\Rules\EmbeddedResource.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="BuildSystem\Rules\folder.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="BuildSystem\Rules\general.browseobject.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="BuildSystem\Rules\general.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="BuildSystem\Rules\general_file.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="BuildSystem\Rules\none.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="BuildSystem\Rules\ProjectItemsSchema.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="BuildSystem\Rules\projectreference.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="BuildSystem\Rules\ResolvedAssemblyReference.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="BuildSystem\Rules\ResolvedCOMReference.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="BuildSystem\Rules\ResolvedProjectReference.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="BuildSystem\Rules\resolvedsdkreference.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="BuildSystem\Rules\scc.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="BuildSystem\Rules\sdkreference.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="$(VSToolsPath)\VSSDK\Microsoft.VsSDK.targets" Condition="'$(VSToolsPath)' != ''" />
-  <!-- This will include the msbuild files and rules files in the VSIX file, installed under 
-       MSBuildExtensionsPath ([Visual Studio Install Path]\MSBuild). This gives the files a well-known
-       location, so projects can import these files and work for different users on the same machine, or work
-       on different machines when VS is installed on a different path, as long as the VSIX was installed.
-       NOTE: The VSIX manifest needs the "This VSIX is installed for all users (requires elevation on install)"
-       checkbox to be checked. -->
-  <ItemGroup>
-    <VSIXSourceItem Include="BuildSystem\DeployedBuildSystem\**">
-      <InProject>false</InProject>
-      <InstallRoot>MSBuild</InstallRoot>
-      <VSIXSubPath>CustomProjectSystems\WindowsScript</VSIXSubPath>
-    </VSIXSourceItem>
-    <VSIXSourceItem Include="BuildSystem\Rules\**">
-      <InProject>false</InProject>
-      <InstallRoot>MSBuild</InstallRoot>
-      <VSIXSubPath>CustomProjectSystems\WindowsScript\Rules</VSIXSubPath>
-    </VSIXSourceItem>
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="Grammars.pkgdef" />
-  </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Icons\" />
-    <Folder Include="Snippets\" />
-  </ItemGroup>
-  <!-- Although the above causes the VSIX to contain the MSBuild and rules files, the automatic deploy of the
-       VSIX to the experimental instance of Visual Studio on build does not copy the files to the MSBuild
-       location. In order to simplify development, we'll copy the files to a different well-known location. To
-       avoid needed to run Visual Studio as administrator, or overwriting the files installed by the VSIX,
-       we'll copy to a different location, in the current user's profile. However, this requires any project
-       used to test the project system to import the files from a different location than to use the project
-       system installed from the VSIX. -->
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it.
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+  <!-- Extensibility crap -->
   <Target Name="AfterBuild">
     <ItemGroup>
       <BuildSystemToCopy Include="BuildSystem\DeployedBuildSystem\**\*" />
       <RulesToCopy Include="BuildSystem\Rules\**\*" />
     </ItemGroup>
-    <Copy SourceFiles="@(BuildSystemToCopy)" DestinationFiles="@(BuildSystemToCopy->'$(LocalAppData)\CustomProjectSystems\WindowsScript\%(RecursiveDir)%(FileName)%(Extension)')" SkipUnchangedFiles="true" />
-    <Copy SourceFiles="@(RulesToCopy)" DestinationFiles="@(RulesToCopy->'$(LocalAppData)\CustomProjectSystems\WindowsScript\Rules\%(RecursiveDir)%(FileName)%(Extension)')" SkipUnchangedFiles="true" />
-  </Target>
-  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
-    <PropertyGroup>
-      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
-    </PropertyGroup>
+    <Copy SourceFiles="@(BuildSystemToCopy)" DestinationFiles="@(BuildSystemToCopy->'$(LocalAppData)\CustomProjectSystems\AdhocLanguage\%(RecursiveDir)%(FileName)%(Extension)')" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(RulesToCopy)" DestinationFiles="@(RulesToCopy->'$(LocalAppData)\CustomProjectSystems\AdhocLanguage\Rules\%(RecursiveDir)%(FileName)%(Extension)')" SkipUnchangedFiles="true" />
   </Target>
 </Project>

@@ -1,0 +1,12 @@
+; Registering the TextMate grammar
+[$RootKey$\TextMate\Repositories]
+"AdhocLanguage"="$PackageFolder$\Syntaxes"
+
+; Match file extensions with icons. See full icon list at https://glyphlist.azurewebsites.net/knownmonikers/
+[$RootKey$\ShellFileAssociations\.ad]
+"DefaultIconMoniker"="c1d9a25d-64aa-411d-bf70-aed57282d942:0"
+
+; New GUID for ProjectType.
+[$RootKey$\Projects\{A6D8BEB7-15C8-4B8B-85BD-C260C9C0C73B}]
+"Lang"="Adhoc"
+"Package"="{76a5f055-9704-434e-9936-0cb1493170b7}"

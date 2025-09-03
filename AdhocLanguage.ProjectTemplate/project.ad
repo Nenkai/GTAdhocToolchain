@@ -1,0 +1,7 @@
+module PROJECT
+{
+	method onLoad(context)
+	{
+		
+	}
+}
