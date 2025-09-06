@@ -80,7 +80,5 @@ namespace AdhocLanguage
         {
             get { return this.ProjectHierarchies.Single().Value; }
         }
-
-        private async 
     }
 }

@@ -2638,7 +2638,8 @@ public class AdhocScriptCompiler
             if (frame.Version.ShouldEvalOnCall())
                 frame.AddInstruction(new InsEval(), call.Location.Start.Line);
         }
-        else if (IsNumberTypeIdentifier(call.Callee)) // UInt(1) => U_INT_CONST
+        else if (IsNumberTypeIdentifier(call.Callee) && call.Arguments.Count == 1 && call.Arguments[0].Type == Nodes.Literal && 
+            ((Literal)call.Arguments[0]).TokenType == TokenType.NumericLiteral) // UInt(1) => U_INT_CONST
         {
             CompileNumberConstructor(frame, call);
         }
