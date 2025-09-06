@@ -1139,7 +1139,10 @@ for (var i = 0; i < 10; i++)
 [Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: LEAVE
 [Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
 
+////////////////////////////////////////////////////////////////////////
 // Labeled statements
+////////////////////////////////////////////////////////////////////////
+// This only works with loop statements: for, foreach, 
 test_label: for (var i = 0; i < 5; i++)
 {
     break test_label;
@@ -1170,6 +1173,23 @@ test_label: for (var i = 0; i < 5; i++)
   [Core.Hooking] <Info> gt7_hooks.cpp:212 DumpSubroutine: VOID_CONST
   [Core.Hooking] <Info> gt7_hooks.cpp:133 DumpSubroutine: SET_STATE: RETURN
 [Core.Hooking] <Info> gt7_hooks.cpp:133 DumpSubroutine: SET_STATE: EXIT
+
+test_label: {
+
+}
+ERROR
+
+test_label: if (true) {
+
+}
+ERROR
+
+test_label: switch (val) 
+{
+	case 1:
+		break test_label;
+}
+ERROR
 
 ////////////////////////////////////////////////////////////////////////
 // While Loop Tests
