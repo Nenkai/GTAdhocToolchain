@@ -1140,6 +1140,58 @@ for (var i = 0; i < 10; i++)
 [Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
 
 ////////////////////////////////////////////////////////////////////////
+// Labeled statements
+////////////////////////////////////////////////////////////////////////
+// This only works with loop statements: for, foreach, while, do..while
+test_label: for (var i = 0; i < 5; i++)
+{
+    break test_label;
+    pr("hello world");
+    continue test_label;
+}
+
+[Core.Hooking] <Info> gt7_hooks.cpp:200 DumpSubroutine: FUNCTION_DEFINE - test
+  [Core.Hooking] <Info> gt7_hooks.cpp:99 DumpSubroutine: INT_CONST: 0
+  [Core.Hooking] <Info> gt7_hooks.cpp:85 DumpSubroutine: VARIABLE_PUSH: i
+  [Core.Hooking] <Info> gt7_hooks.cpp:212 DumpSubroutine: ASSIGN_POP
+  [Core.Hooking] <Info> gt7_hooks.cpp:80 DumpSubroutine: VARIABLE_EVAL: i
+  [Core.Hooking] <Info> gt7_hooks.cpp:99 DumpSubroutine: INT_CONST: 5
+  [Core.Hooking] <Info> gt7_hooks.cpp:212 DumpSubroutine: BINARY_OPERATOR
+  [Core.Hooking] <Info> gt7_hooks.cpp:116 DumpSubroutine: JUMP_IF_FALSE: 18
+  [Core.Hooking] <Info> gt7_hooks.cpp:120 DumpSubroutine: JUMP: 18
+  [Core.Hooking] <Info> gt7_hooks.cpp:80 DumpSubroutine: VARIABLE_EVAL: __toplevel__,System,pr,__toplevel__::System::pr
+  [Core.Hooking] <Info> gt7_hooks.cpp:159 DumpSubroutine: STRING_CONST: "hello world"
+  [Core.Hooking] <Info> gt7_hooks.cpp:128 DumpSubroutine: CALL: 1 args
+  [Core.Hooking] <Info> gt7_hooks.cpp:212 DumpSubroutine: POP
+  [Core.Hooking] <Info> gt7_hooks.cpp:120 DumpSubroutine: JUMP: 14
+  [Core.Hooking] <Info> gt7_hooks.cpp:212 DumpSubroutine: LEAVE
+  [Core.Hooking] <Info> gt7_hooks.cpp:85 DumpSubroutine: VARIABLE_PUSH: i
+  [Core.Hooking] <Info> gt7_hooks.cpp:212 DumpSubroutine: UNARY_ASSIGN_OPERATOR
+  [Core.Hooking] <Info> gt7_hooks.cpp:212 DumpSubroutine: POP
+  [Core.Hooking] <Info> gt7_hooks.cpp:120 DumpSubroutine: JUMP: 3
+  [Core.Hooking] <Info> gt7_hooks.cpp:212 DumpSubroutine: LEAVE
+  [Core.Hooking] <Info> gt7_hooks.cpp:212 DumpSubroutine: VOID_CONST
+  [Core.Hooking] <Info> gt7_hooks.cpp:133 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:133 DumpSubroutine: SET_STATE: EXIT
+
+test_label: {
+
+}
+ERROR
+
+test_label: if (true) {
+
+}
+ERROR
+
+test_label: switch (val) 
+{
+	case 1:
+		break test_label;
+}
+ERROR
+
+////////////////////////////////////////////////////////////////////////
 // While Loop Tests
 ////////////////////////////////////////////////////////////////////////
 while (true)
@@ -1850,11 +1902,11 @@ NodeType (used by switch table in mCompiler::CompileExpression, 0x30E36D0 GT7 1.
 	6 = binary_assign_operator_expr (2 expr)
 	7 = ? frame?
 	8 = bool_const
-	9 = loop?
+	9 = break statement
 	10 = call
 	12 = try_catch
 	13 = class_define
-	15 = loop? continue?
+	15 = continue statement
 	16 = delegate_define
 	17 = double_const
 	18 = if_statement
@@ -1864,7 +1916,7 @@ NodeType (used by switch table in mCompiler::CompileExpression, 0x30E36D0 GT7 1.
 	23 = finalizer_statement (2?)
 	24 = float_const
 	25 = foreach_statement
-	26 = loop (which?)
+	26 = for loop statement
 	27 = function_define
 	28 = function_const
 	29 = loop (which?)

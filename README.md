@@ -5,7 +5,7 @@ Adhoc is a scripting language that is used for roughly 99% of the entire games's
 
 The toolchain contains the following:
 * **Adhoc Script Preprocessor / Parser / Compiler / CodeGen** (`.ad` -> `.adc`) 
-  * Supports adhoc bytecode version 7 (GT4), 10 (GT4O/TT), 12 (GTPSP/GT5/GT6/GT Sport) with experimental support for Version 5 (GT4)
+  * Supports adhoc bytecode version 5 (GT4), 7 (GT4O), 10 (GTHD), 12 (GTPSP/GT5/GT6/GT Sport)
 * **Adhoc Project Builder**
   * Compiles menu sources from a `.yaml` project file to `.adc`, `.mproject`, `.mpackage`
 * VS Code Extension for syntax highlighting & many snippets (useful!)
