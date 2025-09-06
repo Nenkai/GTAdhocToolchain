@@ -54,6 +54,10 @@ public class CompilationMessages
 
     public const string Error_UnsupportedUnaryOprationOnMemberExpression = "Unsupported unary operation on member expression";
 
+    public const string Error_LabeledStatementNotALoop = "Labeled statement must be a loop";
+    public const string Error_LoopLabelAlreadyUsed = "Duplicate labeled loop name in this frame";
+    public const string Error_LoopWithLabelNotFound = "Labeled loop statement '{0}' not found";
+
     public const string Error_ForeachUnsupported = "Foreach statements are not supported in Adhoc Versions below 11.";
     public const string Error_MapUnsupported = "Map constants are not supported in Adhoc Versions lower than 11.";
     public const string Error_SelfUnsupported = "self is not supported in Adhoc Versions lower than 7.";

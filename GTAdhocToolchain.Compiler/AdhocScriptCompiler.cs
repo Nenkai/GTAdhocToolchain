@@ -269,8 +269,40 @@ public class AdhocScriptCompiler
             case Nodes.EmptyStatement:
                 CompileEmptyStatement(frame, node);
                 break;
+            case Nodes.LabeledStatement:
+                CompileLabeledStatement(frame, node as LabeledStatement);
+                break;
             default:
                 ThrowCompilationError(node, $"Unsupported statement: {node.Type}");
+                break;
+        }
+    }
+
+    private void CompileLabeledStatement(AdhocCodeFrame frame, LabeledStatement labeledStatement)
+    {
+        if (labeledStatement.Body.Type != Nodes.ForStatement &&
+            labeledStatement.Body.Type != Nodes.ForeachStatement &&
+            labeledStatement.Body.Type != Nodes.DoWhileStatement &&
+            labeledStatement.Body.Type != Nodes.WhileStatement)
+        {
+            ThrowCompilationError(labeledStatement.Body, CompilationMessages.Error_LabeledStatementNotALoop);
+            return;
+        }
+
+        Identifier label = labeledStatement.Label;
+        switch (labeledStatement.Body.Type)
+        {
+            case Nodes.ForStatement:
+                CompileFor(frame, labeledStatement.Body as ForStatement, label);
+                break;
+            case Nodes.ForeachStatement:
+                CompileForeach(frame, labeledStatement.Body as ForeachStatement, label);
+                break;
+            case Nodes.WhileStatement:
+                CompileWhile(frame, labeledStatement.Body as WhileStatement, label);
+                break;
+            case Nodes.DoWhileStatement:
+                CompileDoWhile(frame, labeledStatement.Body as DoWhileStatement, label);
                 break;
         }
     }
@@ -479,22 +511,35 @@ public class AdhocScriptCompiler
 
     public void CompileBreak(AdhocCodeFrame frame, BreakStatement breakStatement)
     {
-        var scope = frame.GetLastBreakControlledScope();
-        if (scope is LoopContext loopCtx)
+        if (breakStatement.Label is not null)
         {
+            var loopCtx = frame.GetLoopByLabel(breakStatement.Label.Name);
+            if (loopCtx is null)
+                ThrowCompilationError(breakStatement.Label, string.Format(CompilationMessages.Error_LoopWithLabelNotFound, breakStatement.Label.Name));
+
             InsJump breakJmp = new InsJump();
             loopCtx.BreakJumps.Add(breakJmp);
-            frame.Instructions.Add(breakJmp);
-        }
-        else if (scope is SwitchContext swContext)
-        {
-            InsJump breakJmp = new InsJump();
-            swContext.BreakJumps.Add(breakJmp);
-            frame.Instructions.Add(breakJmp);
+            frame.AddInstruction(breakJmp, breakStatement.Location.Start.Line);
         }
         else
         {
-            ThrowCompilationError(breakStatement, CompilationMessages.Error_BreakWithoutContextualScope);
+            var scope = frame.GetLastBreakControlledScope();
+            if (scope is LoopContext loopCtx)
+            {
+                InsJump breakJmp = new InsJump();
+                loopCtx.BreakJumps.Add(breakJmp);
+                frame.AddInstruction(breakJmp, breakStatement.Location.Start.Line);
+            }
+            else if (scope is SwitchContext swContext)
+            {
+                InsJump breakJmp = new InsJump();
+                swContext.BreakJumps.Add(breakJmp);
+                frame.AddInstruction(breakJmp, breakStatement.Location.Start.Line);
+            }
+            else
+            {
+                ThrowCompilationError(breakStatement, CompilationMessages.Error_BreakWithoutContextualScope);
+            }
         }
     }
 
@@ -596,12 +641,25 @@ public class AdhocScriptCompiler
         if (frame.CurrentLoops.Count == 0)
             ThrowCompilationError(continueStatement, CompilationMessages.Error_ContinueWithoutContextualScope);
 
-        LoopContext loop = frame.GetLastLoop();
+        if (continueStatement.Label is not null)
+        {
+            var loopCtx = frame.GetLoopByLabel(continueStatement.Label.Name);
+            if (loopCtx is null)
+                ThrowCompilationError(continueStatement.Label, string.Format(CompilationMessages.Error_LoopWithLabelNotFound, continueStatement.Label.Name));
 
-        InsJump continueJmp = new InsJump();
-        frame.AddInstruction(continueJmp, continueStatement.Location.Start.Line);
+            InsJump continueJump = new InsJump();
+            loopCtx.ContinueJumps.Add(continueJump);
+            frame.AddInstruction(continueJump, continueStatement.Location.Start.Line);
+        }
+        else
+        {
+            LoopContext loop = frame.GetLastLoop();
 
-        loop.ContinueJumps.Add(continueJmp);
+            InsJump continueJmp = new InsJump();
+            frame.AddInstruction(continueJmp, continueStatement.Location.Start.Line);
+
+            loop.ContinueJumps.Add(continueJmp);
+        }
     }
 
     public void CompileIfStatement(AdhocCodeFrame frame, IfStatement ifStatement)
@@ -668,9 +726,9 @@ public class AdhocScriptCompiler
         }
     }
 
-    public void CompileFor(AdhocCodeFrame frame, ForStatement forStatement)
+    public void CompileFor(AdhocCodeFrame frame, ForStatement forStatement, Identifier label = null)
     {
-        LoopContext loopCtx = EnterLoop(frame, forStatement);
+        LoopContext loopCtx = EnterLoop(frame, forStatement, label);
 
         // Initialization
         if (forStatement.Init is not null)
@@ -783,9 +841,9 @@ public class AdhocScriptCompiler
         }
     }
 
-    public void CompileWhile(AdhocCodeFrame frame, WhileStatement whileStatement)
+    public void CompileWhile(AdhocCodeFrame frame, WhileStatement whileStatement, Identifier label = null)
     {
-        LoopContext loopCtx = EnterLoop(frame, whileStatement);
+        LoopContext loopCtx = EnterLoop(frame, whileStatement, label);
 
         int loopStartInsIndex = frame.GetLastInstructionIndex();
 
@@ -827,9 +885,9 @@ public class AdhocScriptCompiler
         LeaveLoop(frame);
     }
 
-    public void CompileDoWhile(AdhocCodeFrame frame, DoWhileStatement doWhileStatement)
+    public void CompileDoWhile(AdhocCodeFrame frame, DoWhileStatement doWhileStatement, Identifier label = null)
     {
-        LoopContext loopCtx = EnterLoop(frame, doWhileStatement);
+        LoopContext loopCtx = EnterLoop(frame, doWhileStatement, label);
 
         int loopStartInsIndex = frame.GetLastInstructionIndex();
 
@@ -860,12 +918,12 @@ public class AdhocScriptCompiler
         LeaveLoop(frame);
     }
 
-    public void CompileForeach(AdhocCodeFrame frame, ForeachStatement foreachStatement)
+    public void CompileForeach(AdhocCodeFrame frame, ForeachStatement foreachStatement, Identifier label = null)
     {
         if (!frame.Version.HasForeachSupport())
             ThrowCompilationError(foreachStatement, CompilationMessages.Error_ForeachUnsupported);
 
-        LoopContext loopCtx = EnterLoop(frame, foreachStatement);
+        LoopContext loopCtx = EnterLoop(frame, foreachStatement, label);
 
         CompileExpression(frame, foreachStatement.Right);
 
@@ -3213,9 +3271,12 @@ public class AdhocScriptCompiler
 
 
     #region Scope/Loop Handling
-    private static LoopContext EnterLoop(AdhocCodeFrame frame, Statement loopStatement)
+    private LoopContext EnterLoop(AdhocCodeFrame frame, Statement loopStatement, Identifier label = null)
     {
-        LoopContext loopCtx = new LoopContext(loopStatement);
+        LoopContext loopCtx = new LoopContext(loopStatement, label?.Name);
+        if (label is not null && frame.CurrentLoops.Any(e => e.IsLabeled && e.Label == label.Name))
+            ThrowCompilationError(label, CompilationMessages.Error_LoopLabelAlreadyUsed);
+
         frame.CurrentLoops.Push(loopCtx);
         frame.CurrentScopes.Push(loopCtx);
         return loopCtx;

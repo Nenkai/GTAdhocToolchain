@@ -517,6 +517,20 @@ public class AdhocCodeFrame
         return true;
     }
 
+    public LoopContext GetLoopByLabel(string label)
+    {
+        foreach (var scope in CurrentScopes)
+        {
+            if (scope is LoopContext loopCtx)
+            {
+                if (loopCtx.IsLabeled && loopCtx.Label == label)
+                    return loopCtx;
+            }
+        }
+
+        return null;
+    }
+
     public ScopeContext GetLastBreakControlledScope()
     {
         foreach (var scope in CurrentScopes)

@@ -12,6 +12,9 @@ namespace GTAdhocToolchain.Core;
 
 public class LoopContext : ScopeContext
 {
+    public string Label { get; set; }
+    public bool IsLabeled => !string.IsNullOrEmpty(Label);
+
     /// <summary>
     /// Direct jumps for continues
     /// </summary>
@@ -22,9 +25,9 @@ public class LoopContext : ScopeContext
     /// </summary>
     public List<InsJump> BreakJumps { get; set; } = [];
 
-    public LoopContext(Node srcNode)
+    public LoopContext(Node srcNode, string label = default)
         : base(srcNode)
     {
-        
+        Label = label;
     }
 }
