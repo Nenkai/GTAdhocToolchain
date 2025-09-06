@@ -1142,7 +1142,7 @@ for (var i = 0; i < 10; i++)
 ////////////////////////////////////////////////////////////////////////
 // Labeled statements
 ////////////////////////////////////////////////////////////////////////
-// This only works with loop statements: for, foreach, 
+// This only works with loop statements: for, foreach, while, do..while
 test_label: for (var i = 0; i < 5; i++)
 {
     break test_label;
