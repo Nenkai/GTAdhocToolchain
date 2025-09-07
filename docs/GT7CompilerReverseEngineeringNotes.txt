@@ -221,13 +221,13 @@ function test({a, b} = c)
 ERROR
 
 |one, two|;
-ERROR
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] syntax error, unexpected ';', expecting '=' (near token ';')
 
 |var a = 6, b| = 5;
-ERROR
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] syntax error, unexpected '=', expecting '|' (near token '=')
 
 |attribute a, b| = 5;
-ERROR
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] syntax error, unexpected kATTRIBUTE (near token 'attribute')
 
 ////////////////////////////////////////////////////////////////////////
 // LIST_ASSIGN (foreach)
@@ -268,6 +268,16 @@ module (test)
 [Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
 [Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
 
+// lol?
+module (1)
+{
+
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:108 DumpSubroutine: INT_CONST: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:221 DumpSubroutine: MODULE_CONSTRUCTOR
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
+
 ////////////////////////////////////////////////////////////////////////
 // Finally statement
 ////////////////////////////////////////////////////////////////////////
@@ -283,7 +293,34 @@ finally
 [Core.Hooking] <Info> gt7_hooks.cpp:140 DumpSubroutine: ASSIGN_POP
 [Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
 
+finally a;
+[Core.Hooking] <Info> gt7_hooks.cpp:108 DumpSubroutine: INT_CONST: 0
+[Core.Hooking] <Info> gt7_hooks.cpp:94 DumpSubroutine: VARIABLE_PUSH: a
+[Core.Hooking] <Info> gt7_hooks.cpp:104 DumpSubroutine: ATTRIBUTE_PUSH: finally
+[Core.Hooking] <Info> gt7_hooks.cpp:221 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
+
+finally a(5)
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] syntax error, unexpected '(', expecting ';' (near token '(')
+
+finally a
+{
+        return "hi";
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] syntax error, unexpected '{', expecting ';' (near token '{')
+
+finally a.b
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] syntax error, unexpected '.', expecting ';' (near token '.')
+
+finally self
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [NameError] var 'self' is already defined as var at :2.
+
+finally (self)
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] syntax error, unexpected '(' (near token '(')
+
+////////////////////////////////////////////////////////////////////////
 // Import
+////////////////////////////////////////////////////////////////////////
 import myModule as obj;
 [Core.Hooking] <Info> gt7_hooks.cpp:132 DumpSubroutine: IMPORT: path:nil, target:myModule, alias:obj
 [Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
@@ -297,10 +334,10 @@ import myModule::*;
 [Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
 
 import myModule::* as obj;
-ERROR
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] syntax error, unexpected tIDENT, expecting ';' (near token 'as')
 
 import *;
-ERROR
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] syntax error, unexpected '*' (near token '*')
 
 ////////////////////////////////////////////////////////////////////////
 // Yielding
@@ -551,7 +588,7 @@ class test : testt
 [Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
 
 &x_ref = 1;
-ERROR
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] syntax error, unexpected '=', expecting ';' (near token '=')
 
 value = *x_ref;
 [Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: x_ref
@@ -662,10 +699,10 @@ function myFunction(args...)
 // PRINT (not supported or been removed?)
 ////////////////////////////////////////////////////////////////////////
 print "a";
-ERROR
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] syntax error, unexpected tSTRING, expecting ';' (near token 'a')
 
 pr "a";
-ERROR
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] syntax error, unexpected tSTRING, expecting ';' (near token 'a')
 
 pr("test");
 [Core.Hooking] <Info> gt7_hooks.cpp:78 DumpSubroutine: VARIABLE_EVAL: __toplevel__::System::pr
@@ -681,14 +718,21 @@ print("a"); // This just thinks it's a regular function call
 [Core.Hooking] <Info> gt7_hooks.cpp:180 DumpSubroutine: POP
 [Core.Hooking] <Info> gt7_hooks.cpp:126 DumpSubroutine: SET_STATE: EXIT
 
-// Raw Literals (not supported? but the get token function seems to support it...)
+////////////////////////////////////////////////////////////////////////
+// Raw strings
+////////////////////////////////////////////////////////////////////////
+return R"(<a href="file">C:\Program Files\</a>)";
+[Core.Hooking] <Info> gt7_hooks.cpp:168 DumpSubroutine: STRING_CONST: "<a href="file">C:\Program Files\</a>"
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
+
 return R"aaa
 bbb
 ccc";
-ERROR
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] invalid new-line in raw string delimiter
 
 return R"aaa";
-ERROR
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] invalid new-line in raw string delimiter
 
 ////////////////////////////////////////////////////////////////////////
 // Hex strings
@@ -774,7 +818,7 @@ return 'a'
 [Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
 
 return 'a' 'b'
-ERROR
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] syntax error, unexpected tSYMBOL, expecting ';' (near token 'b')
 
 ////////////////////////////////////////////////////////////////////////
 // Literals
@@ -785,7 +829,7 @@ return 0.0;
 [Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
 
 return 0.0f
-ERROR
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] syntax error, unexpected tIDENT, expecting ';' (near token 'f')
 
 return 0x123
 [Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 291
@@ -813,13 +857,13 @@ return 0x89ABCDEF89ABCDEFul
 [Core.Hooking] <Info> gt7_hooks.cpp:83 CompileImpl: SET_STATE
 
 return 0x89ABCDEF89ABCDEFull
-ERROR
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] syntax error, unexpected tIDENT, expecting ';' (near token 'l')
 
 return 0x89ABCDEF89ABCDEFd
 ERROR
 
 return 12345d
-ERROR
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] syntax error, unexpected tIDENT, expecting ';' (near token 'd')
 
 return 12345.0d
 [Core.Hooking] <Info> gt7_hooks.cpp:83 CompileImpl: DOUBLE_CONST
@@ -956,7 +1000,7 @@ catch
 {
 
 }
-ERROR
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] syntax error, unexpected '{', expecting '(' (near token '{')
 
 ////////////////////////////////////////////////////////////////////////
 // Function tests
@@ -1011,31 +1055,16 @@ Test(function() {});
 [Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
 
 function() return true;
-ERROR
-
-function() = true;
-ERROR
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] syntax error, unexpected kRETURN, expecting '{' (near token 'return')
 
 function();
-ERROR
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] syntax error, unexpected ';', expecting '{' (near token ';'
 
 function hello();
-ERROR
-
-function a() => b;
-ERROR
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] syntax error, unexpected ';', expecting '{' (near token ';')
 
 function a => b;
-ERROR
-
-mdl.find_static(pair => pair[1] == value);
-ERROR
-
-Test(() => {});
-ERROR
-
-Test(function() => {});
-ERROR
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] syntax error, unexpected '=', expecting '(' (near token '=')
 
 Template::ScrolledWindow::clip::space::LoginBonusGetNum::slider.format_function = (value, scale, range, format, zero_text) => {
     var num = value;
@@ -1177,19 +1206,12 @@ test_label: for (var i = 0; i < 5; i++)
 test_label: {
 
 }
-ERROR
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] syntax error, unexpected '{', expecting kDO or kWHILE or kFOR or kFOREACH (near token '{')
 
 test_label: if (true) {
 
 }
-ERROR
-
-test_label: switch (val) 
-{
-	case 1:
-		break test_label;
-}
-ERROR
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] syntax error, unexpected kIF, expecting kDO or kWHILE or kFOR or kFOREACH (near token 'if')
 
 ////////////////////////////////////////////////////////////////////////
 // While Loop Tests
@@ -1259,7 +1281,7 @@ while
 {
 
 }
-ERROR
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] syntax error, unexpected '{', expecting '(' (near token '{')
 
 ////////////////////////////////////////////////////////////////////////
 // Do While Tests
@@ -1310,7 +1332,7 @@ do 5; while (true);
 [Core.Hooking] <Info> gt7_hooks.cpp:131 DumpSubroutine: SET_STATE: EXIT
 
 do while (true);
-ERROR
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] syntax error, unexpected ';', expecting kWHILE (near token ';')
 
 do
 {
@@ -1789,6 +1811,159 @@ foreach (var car in cars)
 [Core.Hooking] <Info> gt7_hooks.cpp:210 DumpSubroutine: LEAVE
 [Core.Hooking] <Info> gt7_hooks.cpp:131 DumpSubroutine: SET_STATE: EXIT
 
+////////////////////////////////////////////////////////////////////////
+// @include (expects adhoc source file)
+////////////////////////////////////////////////////////////////////////
+@include "test.ad"
+[Core.Hooking] <Info> gt7_hooks.cpp:69 GT7Logger: FileSystemMPH::openStream: opening. stream=0xe400d15f30 path=test.ad remote_path=/app0/contents/
+[Core.Hooking] <Info> gt7_hooks.cpp:69 GT7Logger: FileSystemMPH::openStream[0xe4008dc400]: open failed. cannot stat. stream=0xe400d15f30 code=11
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [IOError] cannot open "test.ad".
+gt7/boot/boot_sequence_common.ad:243;gt7/boot/boot_entry.ad:89;gt7/SequenceController.ad:126;(from C:\w\label\pkg-1-tokyo\src\master\adhoc\src\m_gen_code.cpp:1450)
+
+@include "font/ps4/fontset_jp.gpb"
+[Core.Hooking] <Info> gt7_hooks.cpp:69 GT7Logger: FileSystemMPH::openStream: opening. stream=0xe400d0df30 path=font/ps4/fontset_jp.gpb remote_path=/app0/contents/
+[Core.Hooking] <Info> gt7_hooks.cpp:69 GT7Logger: FileSystemMPH::openStream[0xe4008dc400]: open done. stream=0xe400d0df30 attr=PZ2-LUMP-ZSTD raw_size=20617460 exp_size=27544064 ehash=0x2c761502 path=font/ps4/fontset_jp.gpb
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] syntax error, unexpected tIDENT, expecting ';' (near token 'bpg')
+gt7/boot/boot_sequence_common.ad:243;gt7/boot/boot_entry.ad:89;gt7/SequenceController.ad:126;(from C:\w\label\pkg-1-tokyo\src\master\adhoc\src\h_parser.cpp:605)
+
+@include "/APP_DATA/test.ad"
+[Core.Hooking] <Info> gt7_hooks.cpp:69 GT7Logger: FileSystemDirect::openStream: opening. stream=0xe400d15f30 path=/test.ad remote_name=/download0/APP_DATA//test.ad
+[Core.Hooking] <Info> gt7_hooks.cpp:69 GT7Logger: DevAccPs4Kernel::[0xe4008de2c8]: An error has occured while calling os-open. result=0x80020002 path=/download0/APP_DATA/test.ad
+[Core.Hooking] <Info> gt7_hooks.cpp:69 GT7Logger: FileSystemDirect::openStream: open failed. cannot stat. stream=0xe400d15f30 code=11 path=/test.ad remote_name=/test.ad
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [IOError] cannot open "/APP_DATA/test.ad".
+gt7/boot/boot_sequence_common.ad:243;gt7/boot/boot_entry.ad:89;gt7/SequenceController.ad:126;(from C:\w\label\pkg-1-tokyo\src\master\adhoc\src\m_gen_code.cpp:1450)
+
+@include "/APP_CACHE/test.ad"
+[Core.Hooking] <Info> gt7_hooks.cpp:69 GT7Logger: FileSystemDirect::openStream: opening. stream=0xe400d15f30 path=/test.ad remote_name=/temp0//test.ad
+[Core.Hooking] <Info> gt7_hooks.cpp:69 GT7Logger: DevAccPs4Kernel::[0xe4008ddc48]: An error has occured while calling os-open. result=0x80020002 path=/temp0/test.ad
+[Core.Hooking] <Info> gt7_hooks.cpp:69 GT7Logger: FileSystemDirect::openStream: open failed. cannot stat. stream=0xe400d15f30 code=11 path=/test.ad remote_name=/test.ad
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [IOError] cannot open "/APP_CACHE/test.ad".
+gt7/boot/boot_sequence_common.ad:243;gt7/boot/boot_entry.ad:89;gt7/SequenceController.ad:126;(from C:\w\label\pkg-1-tokyo\src\master\adhoc\src\m_gen_code.cpp:1450)
+
+@include "/SYSTEM_ROOT/test.ad"
+[Core.Hooking] <Info> gt7_hooks.cpp:69 GT7Logger: FileSystemDirect::openStream: opening. stream=0xe400d15f30 path=/test.ad remote_name=///test.ad
+[Core.Hooking] <Info> gt7_hooks.cpp:69 GT7Logger: DevAccPs4Kernel::[0xe4008dbb88]: An error has occured while calling os-open. result=0x80020002 path=/test.ad
+[Core.Hooking] <Info> gt7_hooks.cpp:69 GT7Logger: FileSystemDirect::openStream: open failed. cannot stat. stream=0xe400d15f30 code=11 path=/test.ad remote_name=/test.ad
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [IOError] cannot open "/SYSTEM_ROOT/test.ad".
+gt7/boot/boot_sequence_common.ad:243;gt7/boot/boot_entry.ad:89;gt7/SequenceController.ad:126;(from C:\w\label\pkg-1-tokyo\src\master\adhoc\src\m_gen_code.cpp:1450)
+
+////////////////////////////////////////////////////////////////////////
+// @include (expects adhoc source file)
+////////////////////////////////////////////////////////////////////////
+@exec "5 + 6"
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] syntax error, unexpected tSTRING, expecting '{' (near token '5 + 6')
+gt7/boot/boot_sequence_common.ad:243;gt7/boot/boot_entry.ad:89;gt7/SequenceController.ad:126;(from C:\w\label\pkg-1-tokyo\src\master\adhoc\src\h_parser.cpp:605)
+
+////////////////////////////////////////////////////////////////////////
+// @exec <block> (curly brackets)
+////////////////////////////////////////////////////////////////////////
+@exec { pdistd::WriteFile("test.xyz", "lol"); }
+[Core.Hooking] <Info> gt7_hooks.cpp:69 GT7Logger: FileSystemMPH::openStream: opening. stream=0xec00e14b20 path=test.xyz remote_path=/app0/contents/
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
+
+@exec { return true; }
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
+
+////////////////////////////////////////////////////////////////////////
+@push_strict <int or bool>
+////////////////////////////////////////////////////////////////////////
+@push_strict 1
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
+
+////////////////////////////////////////////////////////////////////////
+@undef <variable>
+////////////////////////////////////////////////////////////////////////
+@undef i
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
+
+////////////////////////////////////////////////////////////////////////
+@import <path> / @import <path> as <alias>
+////////////////////////////////////////////////////////////////////////
+@import main;
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
+
+@import main as test;
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
+
+////////////////////////////////////////////////////////////////////////
+@current_module <module path>
+////////////////////////////////////////////////////////////////////////
+@current_module main;
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
+
+@current_module main::test;
+static hello = 1;
+return main::test::hello;
+[Core.Hooking] <Info> gt7_hooks.cpp:188 DumpSubroutine: STATIC_DEFINE: hello
+[Core.Hooking] <Info> gt7_hooks.cpp:108 DumpSubroutine: INT_CONST: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:94 DumpSubroutine: VARIABLE_PUSH: hello,hello
+[Core.Hooking] <Info> gt7_hooks.cpp:221 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:89 DumpSubroutine: VARIABLE_EVAL: main,test,hello,main::test::hello
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
+
+////////////////////////////////////////////////////////////////////////
+@dump <variable>
+////////////////////////////////////////////////////////////////////////
+var i = 5;
+@dump i
+[Core.Hooking] <Info> gt7_hooks.cpp:108 DumpSubroutine: INT_CONST: 5
+[Core.Hooking] <Info> gt7_hooks.cpp:94 DumpSubroutine: VARIABLE_PUSH: i
+[Core.Hooking] <Info> gt7_hooks.cpp:221 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
+
+class a
+{
+
+}
+
+@dump a
+[Core.Hooking] <Info> gt7_hooks.cpp:203 DumpSubroutine: CLASS_DEFINE: a : System,Object,System::Object
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
+
+module a
+{
+
+}
+
+@dump a
+[Core.Hooking] <Info> gt7_hooks.cpp:163 DumpSubroutine: MODULE_DEFINE: a
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
+
+function a()
+{
+
+}
+
+@dump a
+
+[Core.Hooking] <Info> gt7_hooks.cpp:209 DumpSubroutine: FUNCTION_DEFINE - a
+  [Core.Hooking] <Info> gt7_hooks.cpp:221 DumpSubroutine: VOID_CONST
+  [Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
+
+attribute a;
+static b;
+delegate c;
+var d;
+
+@dump a;
+@dump b;
+@dump c;
+@dump d;
+
+[Core.Hooking] <Info> gt7_hooks.cpp:221 DumpSubroutine: NIL_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ATTRIBUTE_DEFINE: a
+[Core.Hooking] <Info> gt7_hooks.cpp:188 DumpSubroutine: STATIC_DEFINE: b
+[Core.Hooking] <Info> gt7_hooks.cpp:183 DumpSubroutine: DELEGATE_DEFINE: c
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
+
+// Does not work on built-in modules
+@dump main;
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
+
 ///////////////////////////////////////////////////////
 ____COMPILER REVERSE ENGINEERING NOTES_________________
 
@@ -1897,10 +2072,10 @@ NodeType (used by switch table in mCompiler::CompileExpression, 0x30E36D0 GT7 1.
 	1 = 2x expression & ASSIGN
 	2 = attribute_assign_expr
 	3 = attribute_define
-	4 = ? set_state - trivial body expression?
+	4 = ? set_state with status exception
 	5 = binary_operator_expr (2 expr)
 	6 = binary_assign_operator_expr (2 expr)
-	7 = ? frame?
+	7 = block statement?
 	8 = bool_const
 	9 = break statement
 	10 = call
@@ -1909,17 +2084,17 @@ NodeType (used by switch table in mCompiler::CompileExpression, 0x30E36D0 GT7 1.
 	15 = continue statement
 	16 = delegate_define
 	17 = double_const
-	18 = if_statement
+	18 = do_while_statement
 	19 = element_push?
 	20/21 = eval expression
-	22 = finalizer_statement
-	23 = finalizer_statement (2?)
+	22 = finally statement
+	23 = finally (try/catch)
 	24 = float_const
 	25 = foreach_statement
 	26 = for loop statement
 	27 = function_define
 	28 = function_const
-	29 = loop (which?)
+	29 = if statement
 	30 = import_statement
 	31 = int_const
 	32/69 = expression_list?
@@ -1963,19 +2138,20 @@ NodeType (used by switch table in mCompiler::CompileExpression, 0x30E36D0 GT7 1.
 	73 = ?
 	74 = yield
 	75 = ?
-	76 = ?
-	78 = exec code?
-	79 = ? import?
+	76 = @current_module <path>
+    77 = @dump <variable>?
+	78 = @exec { <code> }
+	79 = @import <path>;
 	80 = ? import?
-	81 = ? file open?
-	82 = ?
+	81 = @include "<file path>" (from root)
+	82 = @link "<file name to link code as>" { <code> }
 	83 = ?
-	84 = ?
-	85 = ?
-	86 = ?
-	87 = ?
-	88 = ?
-	89 = ?
+	84 = @no_strict
+	85 = @pop_strict
+	86 = @push_strict <bool or int>
+	87 = @undef <variable>
+	88 = @use_strict
+	89 = @attribute/@static/@delegate/@function/@method <name>, declares them
 	
 --- 
 
