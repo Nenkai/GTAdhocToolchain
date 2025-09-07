@@ -1002,6 +1002,14 @@ catch
 }
 [Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] syntax error, unexpected '{', expecting '(' (near token '{')
 
+throw 1;
+[Core.Hooking] <Info> gt7_hooks.cpp:108 DumpSubroutine: INT_CONST: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:221 DumpSubroutine: THROW
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
+
+throw;
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] syntax error, unexpected ';' (near token ';')
+
 ////////////////////////////////////////////////////////////////////////
 // Function tests
 ////////////////////////////////////////////////////////////////////////
@@ -1818,41 +1826,35 @@ foreach (var car in cars)
 [Core.Hooking] <Info> gt7_hooks.cpp:69 GT7Logger: FileSystemMPH::openStream: opening. stream=0xe400d15f30 path=test.ad remote_path=/app0/contents/
 [Core.Hooking] <Info> gt7_hooks.cpp:69 GT7Logger: FileSystemMPH::openStream[0xe4008dc400]: open failed. cannot stat. stream=0xe400d15f30 code=11
 [Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [IOError] cannot open "test.ad".
-gt7/boot/boot_sequence_common.ad:243;gt7/boot/boot_entry.ad:89;gt7/SequenceController.ad:126;(from C:\w\label\pkg-1-tokyo\src\master\adhoc\src\m_gen_code.cpp:1450)
 
 @include "font/ps4/fontset_jp.gpb"
 [Core.Hooking] <Info> gt7_hooks.cpp:69 GT7Logger: FileSystemMPH::openStream: opening. stream=0xe400d0df30 path=font/ps4/fontset_jp.gpb remote_path=/app0/contents/
 [Core.Hooking] <Info> gt7_hooks.cpp:69 GT7Logger: FileSystemMPH::openStream[0xe4008dc400]: open done. stream=0xe400d0df30 attr=PZ2-LUMP-ZSTD raw_size=20617460 exp_size=27544064 ehash=0x2c761502 path=font/ps4/fontset_jp.gpb
 [Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] syntax error, unexpected tIDENT, expecting ';' (near token 'bpg')
-gt7/boot/boot_sequence_common.ad:243;gt7/boot/boot_entry.ad:89;gt7/SequenceController.ad:126;(from C:\w\label\pkg-1-tokyo\src\master\adhoc\src\h_parser.cpp:605)
 
 @include "/APP_DATA/test.ad"
 [Core.Hooking] <Info> gt7_hooks.cpp:69 GT7Logger: FileSystemDirect::openStream: opening. stream=0xe400d15f30 path=/test.ad remote_name=/download0/APP_DATA//test.ad
 [Core.Hooking] <Info> gt7_hooks.cpp:69 GT7Logger: DevAccPs4Kernel::[0xe4008de2c8]: An error has occured while calling os-open. result=0x80020002 path=/download0/APP_DATA/test.ad
 [Core.Hooking] <Info> gt7_hooks.cpp:69 GT7Logger: FileSystemDirect::openStream: open failed. cannot stat. stream=0xe400d15f30 code=11 path=/test.ad remote_name=/test.ad
 [Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [IOError] cannot open "/APP_DATA/test.ad".
-gt7/boot/boot_sequence_common.ad:243;gt7/boot/boot_entry.ad:89;gt7/SequenceController.ad:126;(from C:\w\label\pkg-1-tokyo\src\master\adhoc\src\m_gen_code.cpp:1450)
 
 @include "/APP_CACHE/test.ad"
 [Core.Hooking] <Info> gt7_hooks.cpp:69 GT7Logger: FileSystemDirect::openStream: opening. stream=0xe400d15f30 path=/test.ad remote_name=/temp0//test.ad
 [Core.Hooking] <Info> gt7_hooks.cpp:69 GT7Logger: DevAccPs4Kernel::[0xe4008ddc48]: An error has occured while calling os-open. result=0x80020002 path=/temp0/test.ad
 [Core.Hooking] <Info> gt7_hooks.cpp:69 GT7Logger: FileSystemDirect::openStream: open failed. cannot stat. stream=0xe400d15f30 code=11 path=/test.ad remote_name=/test.ad
 [Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [IOError] cannot open "/APP_CACHE/test.ad".
-gt7/boot/boot_sequence_common.ad:243;gt7/boot/boot_entry.ad:89;gt7/SequenceController.ad:126;(from C:\w\label\pkg-1-tokyo\src\master\adhoc\src\m_gen_code.cpp:1450)
 
 @include "/SYSTEM_ROOT/test.ad"
 [Core.Hooking] <Info> gt7_hooks.cpp:69 GT7Logger: FileSystemDirect::openStream: opening. stream=0xe400d15f30 path=/test.ad remote_name=///test.ad
 [Core.Hooking] <Info> gt7_hooks.cpp:69 GT7Logger: DevAccPs4Kernel::[0xe4008dbb88]: An error has occured while calling os-open. result=0x80020002 path=/test.ad
 [Core.Hooking] <Info> gt7_hooks.cpp:69 GT7Logger: FileSystemDirect::openStream: open failed. cannot stat. stream=0xe400d15f30 code=11 path=/test.ad remote_name=/test.ad
 [Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [IOError] cannot open "/SYSTEM_ROOT/test.ad".
-gt7/boot/boot_sequence_common.ad:243;gt7/boot/boot_entry.ad:89;gt7/SequenceController.ad:126;(from C:\w\label\pkg-1-tokyo\src\master\adhoc\src\m_gen_code.cpp:1450)
 
 ////////////////////////////////////////////////////////////////////////
 // @include (expects adhoc source file)
 ////////////////////////////////////////////////////////////////////////
 @exec "5 + 6"
 [Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] syntax error, unexpected tSTRING, expecting '{' (near token '5 + 6')
-gt7/boot/boot_sequence_common.ad:243;gt7/boot/boot_entry.ad:89;gt7/SequenceController.ad:126;(from C:\w\label\pkg-1-tokyo\src\master\adhoc\src\h_parser.cpp:605)
 
 ////////////////////////////////////////////////////////////////////////
 // @exec <block> (curly brackets)
@@ -2117,7 +2119,7 @@ NodeType (used by switch table in mCompiler::CompileExpression, 0x30E36D0 GT7 1.
 	51 = assign pop 2 expression then pop?
 	52 = print - NOTE: the parser does not return a node with this number, compiler supports it, not the parser
 	53 = require
-	54 = ? expresison then set state
+	54 = ? expression then set state
 	55 = static_define
 	56 = static_define 2
 	57 = string_const
@@ -2151,7 +2153,7 @@ NodeType (used by switch table in mCompiler::CompileExpression, 0x30E36D0 GT7 1.
 	86 = @push_strict <bool or int>
 	87 = @undef <variable>
 	88 = @use_strict
-	89 = @attribute/@static/@delegate/@function/@method <name>, declares them
+	89 = @attribute/@static/@delegate/@function/@method/@module/@class <name>, declares them 
 	
 --- 
 
@@ -2161,16 +2163,6 @@ table 0x48D9410 (__int16 g_ParserAllowedTokenTypeLUT[2190] is an optimized looku
 table 0x48DB650 (__int16 g_ParserStartValueToUnk[544]) maps current context to parser node type
 table 0x48D8A90 (unsigned __int8 g_NodeKindTable[288]) ?
 table 0x48DA530 (__int16 _0x48DA530[2190]) ?
-
-for dump/exec/current_module, etc:
-"if i have to guess, exec/dump/current_module/include etc are not really implemented in this parser in that the allowed token list per context only holds the wider range of keywords but no specific handling for each keyword, can't see any specialization in code either, so it's essentally just parsed as a plain identifier
-the compiler does have some switch cases for what would likely be exec node types
-coincidentally that would be the statement types 78 and above, which is all marked as unknown from my side (list above)
-yeah i think this matches what i'm seeing in code
-tokens range 476 to 480 I THINK but not sure - maps to parser types 100->106 (0x48DB650) which handle these keywords, but they're marked as invalid/no tokens
-then ast node types 81-86 would specifically then handle parser type 100-106
-
-so probably the parser has preprocessing stripped, or it's not available in debug mode, even though the compiler itself supports these very specific node types, see compiler type 78 and 81"
 
 table g_ParserAllowedTokenTypeLUT:
 0 = invalid
