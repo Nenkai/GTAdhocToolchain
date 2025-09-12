@@ -2296,6 +2296,11 @@ public class AdhocScriptCompiler
                 {
                     CompileUnaryExpression(frame, assignExpression.Right as UnaryExpression, popResult: false, asReference: true); // a = &b;
                 }
+                else if (assignExpression.Right.Type == Nodes.AssignmentExpression)
+                {
+                    // We are reusing the result (b in this case) - we do not pop it.
+                    CompileAssignmentExpression(frame, assignExpression.Right as AssignmentExpression, popResult: false);
+                }
                 else
                 {
                     CompileExpression(frame, assignExpression.Right);
