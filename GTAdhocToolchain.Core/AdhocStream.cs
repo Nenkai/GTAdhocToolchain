@@ -32,9 +32,11 @@ public class AdhocStream : BinaryStream
         /* In GT4, the encoding for the compiler is set to EUC-JP
          * "ぐわあああ\n" in boot/CheckRoot.ad
          * 
-         * So set the encoding to it if it's earlier than EUC-JP */
-        if (Version.VersionNumber < 10)
-            Encoding = Encoding.GetEncoding("EUC-JP");
+         * So set the encoding to it if it's earlier than EUC-JP 
+         * 12/09/2025: Removed, as GT4's photo_shoot/SteeringDialog.ad has a " °" in UTF-8
+         */
+        //if (Version.VersionNumber < 10)
+        //    Encoding = Encoding.GetEncoding("EUC-JP");
     }
 
     public void Reset()
