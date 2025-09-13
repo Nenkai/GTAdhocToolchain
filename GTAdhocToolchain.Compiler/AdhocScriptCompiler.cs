@@ -1093,7 +1093,7 @@ public class AdhocScriptCompiler
         if (isMethod)
         {
             if (!CurrentModule.DefineMethod(subroutine.Name))
-                ThrowCompilationError(id, $"Method name '{subroutine.Name}' already defined in this scope.");
+                PrintCompilationWarning(id, $"Method name '{subroutine.Name}' already defined in this scope.");
         }
 
         EnterScope(subroutine.CodeFrame, parentNode);
@@ -1109,7 +1109,7 @@ public class AdhocScriptCompiler
         }
 
         if (frame.CurrentScope.StaticScopeVariables.ContainsKey(subroutine.Name.Name))
-            ThrowCompilationError(parentNode, $"Static subroutine name '{subroutine.Name.Name}' is already defined in this scope.");
+            PrintCompilationWarning(parentNode, $"Static subroutine name '{subroutine.Name.Name}' is already defined in this scope.");
 
         if (frame.Version.ShouldDefineFunctionAsStaticVariables())
             frame.AddAttributeOrStaticMemberVariable(subroutine.Name);
@@ -1117,7 +1117,10 @@ public class AdhocScriptCompiler
         {
             // In older versions the subroutines don't count towards the local storage
             // Just keep track of it instead
-            frame.CurrentScope.StaticScopeVariables.Add(subroutine.Name.Name, subroutine.Name);
+            if (frame.CurrentScope.StaticScopeVariables.ContainsKey(subroutine.Name.Name))
+                frame.CurrentScope.StaticScopeVariables[subroutine.Name.Name] = subroutine.Name;
+            else
+                frame.CurrentScope.StaticScopeVariables.Add(subroutine.Name.Name, subroutine.Name);
         }
 
         frame.AddInstruction(subroutine, parentNode.Location.Start.Line);
