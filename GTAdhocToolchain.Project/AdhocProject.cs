@@ -501,7 +501,10 @@ public class AdhocProject
 
         foreach (AdhocProjectFile srcFile in FilesToCompile)
         {
-            if (!srcFile.IsMain || this.Version < 10) // HACK: do not define ROOT for main project files (except files as old as GT4 which are always inserted anyway)
+            // HACK: do not define ROOT for main project files (except files as old as GT4 which are always inserted anyway)
+            // NOTE: Are they really? Check quick-championship, there is a stray ROOT from quick-championship.ad including icon.ad
+
+            if (!srcFile.IsMain || this.Version < 10)
             {
                 mergedFile.WriteLine($"#define ROOT {Path.ChangeExtension(srcFile.Name, null)}");
                 mergedFile.WriteLine($"#define IMPL ROOT.getImpl()"); // GT Sport
