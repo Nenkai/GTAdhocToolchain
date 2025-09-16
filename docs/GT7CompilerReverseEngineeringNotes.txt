@@ -353,20 +353,6 @@ yield 1;
 [Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
 
 ////////////////////////////////////////////////////////////////////////
-// Undef
-////////////////////////////////////////////////////////////////////////
-undef myThing;
-[Core.Hooking] <Info> gt7_hooks.cpp:137 DumpSubroutine: UNDEF: myThing
-[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
-
-undef myThing::myThing2;
-[Core.Hooking] <Info> gt7_hooks.cpp:137 DumpSubroutine: UNDEF: myThing::myThing2
-[Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
-
-undef myThing.a;
-ERROR
-
-////////////////////////////////////////////////////////////////////////
 // Async/Await
 ////////////////////////////////////////////////////////////////////////
 async function myAsyncFunction(){}
@@ -428,6 +414,21 @@ require "MyScript.adc"
 [Core.Hooking] <Info> gt7_hooks.cpp:155 DumpSubroutine: STRING_CONST: "MyScript.adc"
 [Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: REQUIRE
 [Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+// Check variables supported
+var test = "test";
+require test;
+[Core.Hooking] <Info> gt7_hooks.cpp:168 DumpSubroutine: STRING_CONST: "test"
+[Core.Hooking] <Info> gt7_hooks.cpp:94 DumpSubroutine: VARIABLE_PUSH: test
+[Core.Hooking] <Info> gt7_hooks.cpp:221 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:89 DumpSubroutine: VARIABLE_EVAL: test
+[Core.Hooking] <Info> gt7_hooks.cpp:221 DumpSubroutine: REQUIRE
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
+
+require test;
+[Core.Hooking] <Info> gt7_hooks.cpp:89 DumpSubroutine: VARIABLE_EVAL: test,test
+[Core.Hooking] <Info> gt7_hooks.cpp:221 DumpSubroutine: REQUIRE
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
 
 ////////////////////////////////////////////////////////////////////////
 // VA_CALL
@@ -558,6 +559,30 @@ module test::test2
 [Core.Hooking] <Info> gt7_hooks.cpp:150 DumpSubroutine: MODULE_DEFINE: test::test2
 [Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
 [Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+////////////////////////////////////////////////////////////////////////
+// Undef tests
+////////////////////////////////////////////////////////////////////////
+undef i;
+[Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: UNDEF: i,i
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
+
+// Can undef local? seems not
+var i = 0;
+undef i;
+[Core.Hooking] <Info> gt7_hooks.cpp:108 DumpSubroutine: INT_CONST: 0
+[Core.Hooking] <Info> gt7_hooks.cpp:94 DumpSubroutine: VARIABLE_PUSH: i
+[Core.Hooking] <Info> gt7_hooks.cpp:221 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: UNDEF: i,i
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
+
+undef i::j;
+[Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: UNDEF: i,j,i::j
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
+
+// Check if it supports expressions
+undef test["hello"];
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] syntax error, unexpected '[', expecting tSCOPE or ';' (near token '[')
 
 ////////////////////////////////////////////////////////////////////////
 // Class tests
@@ -810,6 +835,9 @@ return "aaa"
 [Core.Hooking] <Info> gt7_hooks.cpp:155 DumpSubroutine: STRING_PUSH: 5 elems
 [Core.Hooking] <Info> gt7_hooks.cpp:126 DumpSubroutine: SET_STATE: RETURN
 [Core.Hooking] <Info> gt7_hooks.cpp:126 DumpSubroutine: SET_STATE: EXIT
+
+var test = "%{";
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] missing terminating double quote in string literal (near token ';;')
 
 // Symbol Const
 return 'a'
@@ -1964,6 +1992,206 @@ var d;
 
 // Does not work on built-in modules
 @dump main;
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
+
+////////////////////////////////////////////////////////////////////////
+// Test variable redeclaration
+////////////////////////////////////////////////////////////////////////
+var a = 1;
+var a = 2;
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [NameError] var 'a' is already defined as var at :1
+
+@no_strict;
+var a = 1;
+var a = 2;
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [NameError] var 'a' is already defined as var at :3.
+
+////////////////////////////////////////////////////////////////////////
+// Test static redeclaration
+////////////////////////////////////////////////////////////////////////
+static a = 1;
+static a = 2;
+[Core.Hooking] <Info> gt7_hooks.cpp:188 DumpSubroutine: STATIC_DEFINE: a
+[Core.Hooking] <Info> gt7_hooks.cpp:108 DumpSubroutine: INT_CONST: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:94 DumpSubroutine: VARIABLE_PUSH: a,a
+[Core.Hooking] <Info> gt7_hooks.cpp:221 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:188 DumpSubroutine: STATIC_DEFINE: a
+[Core.Hooking] <Info> gt7_hooks.cpp:108 DumpSubroutine: INT_CONST: 2
+[Core.Hooking] <Info> gt7_hooks.cpp:94 DumpSubroutine: VARIABLE_PUSH: a,a
+[Core.Hooking] <Info> gt7_hooks.cpp:221 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
+
+@use_strict;
+static a = 1;
+static a = 2;
+[Core.Hooking] <Info> gt7_hooks.cpp:188 DumpSubroutine: STATIC_DEFINE: a
+[Core.Hooking] <Info> gt7_hooks.cpp:108 DumpSubroutine: INT_CONST: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:94 DumpSubroutine: VARIABLE_PUSH: a,a
+[Core.Hooking] <Info> gt7_hooks.cpp:221 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:188 DumpSubroutine: STATIC_DEFINE: a
+[Core.Hooking] <Info> gt7_hooks.cpp:108 DumpSubroutine: INT_CONST: 2
+[Core.Hooking] <Info> gt7_hooks.cpp:94 DumpSubroutine: VARIABLE_PUSH: a,a
+[Core.Hooking] <Info> gt7_hooks.cpp:221 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
+
+////////////////////////////////////////////////////////////////////////
+// Test function redeclaration
+////////////////////////////////////////////////////////////////////////
+function a()
+{
+
+}
+
+function a()
+{
+
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:209 DumpSubroutine: FUNCTION_DEFINE - a
+  [Core.Hooking] <Info> gt7_hooks.cpp:221 DumpSubroutine: VOID_CONST
+  [Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:209 DumpSubroutine: FUNCTION_DEFINE - a
+  [Core.Hooking] <Info> gt7_hooks.cpp:221 DumpSubroutine: VOID_CONST
+  [Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
+
+@use_strict;
+function a()
+{
+
+}
+
+function a()
+{
+
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:209 DumpSubroutine: FUNCTION_DEFINE - a
+  [Core.Hooking] <Info> gt7_hooks.cpp:221 DumpSubroutine: VOID_CONST
+  [Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:209 DumpSubroutine: FUNCTION_DEFINE - a
+  [Core.Hooking] <Info> gt7_hooks.cpp:221 DumpSubroutine: VOID_CONST
+  [Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
+
+////////////////////////////////////////////////////////////////////////
+// Test method redeclaration
+////////////////////////////////////////////////////////////////////////
+@use_strict;
+method a()
+{
+
+}
+
+method a()
+{
+
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:221 DumpSubroutine: METHOD_DEFINE
+[Core.Hooking] <Info> gt7_hooks.cpp:221 DumpSubroutine: METHOD_DEFINE
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
+
+////////////////////////////////////////////////////////////////////////
+// Test variable is defined
+////////////////////////////////////////////////////////////////////////
+
+a = 1;
+[Core.Hooking] <Info> gt7_hooks.cpp:108 DumpSubroutine: INT_CONST: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:94 DumpSubroutine: VARIABLE_PUSH: a
+[Core.Hooking] <Info> gt7_hooks.cpp:221 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
+
+@use_strict;
+a = 1;
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [StrictCheckError] undefined variable 'a'.
+gt7/boot/boot_sequence_common.ad:243;gt7/boot/boot_entry.ad:89;gt7/SequenceController.ad:126;(from C:\w\label\pkg-1-tokyo\src\master\adhoc\src\m_compiler.cpp:395)
+
+////////////////////////////////////////////////////////////////////////
+// Test attribute redefinition
+////////////////////////////////////////////////////////////////////////
+@use_strict;
+attribute i;
+attribute i;
+[Core.Hooking] <Info> gt7_hooks.cpp:221 DumpSubroutine: NIL_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ATTRIBUTE_DEFINE: i
+[Core.Hooking] <Info> gt7_hooks.cpp:221 DumpSubroutine: NIL_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ATTRIBUTE_DEFINE: i
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
+
+////////////////////////////////////////////////////////////////////////
+// Test redefinition mixing
+////////////////////////////////////////////////////////////////////////
+
+attribute i;
+static i;
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [NameError] static 'i' is already defined as attribute at :1.
+
+@use_strict;
+attribute i;
+static i;
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [StrictCheckError] static '__toplevel__::main::i' is already defined as attribute at :2.
+gt7/boot/boot_sequence_common.ad:243;gt7/boot/boot_entry.ad:89;gt7/SequenceController.ad:126;(from C:\w\label\pkg-1-tokyo\src\master\adhoc\src\m_compiler.cpp:194)
+
+attribute i;
+function i()
+{
+
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [NameError] function 'i' is already defined as attribute at :1.
+gt7/boot/boot_sequence_common.ad:243;gt7/boot/boot_entry.ad:89;gt7/SequenceController.ad:126;(from C:\w\label\pkg-1-tokyo\src\master\adhoc\src\m_compiler.cpp:263)
+
+attribute i;
+var i = 0;
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [NameError] var 'i' is already defined as attribute at :1.
+
+@use_strict;
+static i;
+method i()
+{
+
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [StrictCheckError] method '__toplevel__::main::i' is already defined as static at :2.
+
+////////////////////////////////////////////////////////////////////////
+// Test strict undef
+////////////////////////////////////////////////////////////////////////
+undef test;
+[Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: UNDEF: test,test
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
+
+@use_strict;
+undef test;
+[Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: UNDEF: test,test
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
+
+@use_strict;
+undef test::test2;
+[Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: UNDEF: test,test2,test::test2
+
+////////////////////////////////////////////////////////////////////////
+// Test strict import
+////////////////////////////////////////////////////////////////////////
+import whatever;
+[Core.Hooking] <Info> gt7_hooks.cpp:153 DumpSubroutine: IMPORT: path:nil,nil, target:whatever, alias:nil
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
+
+@use_strict;
+import whatever;
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [ScrictCheckError] undefined module variable 'nil'.
+
+@use_strict;
+import main::pdistd;
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [StrictCheckError] undefined variable main::pdistd
+
+@use_strict;
+import main::*;
+[Core.Hooking] <Info> gt7_hooks.cpp:153 DumpSubroutine: IMPORT: path:main,main, target:__mul__, alias:nil
+[Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
+
+@use_strict;
+import main::test::*;
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [ScrictCheckError] undefined module variable 'main::test'.
+
+import main::test::*;
+[Core.Hooking] <Info> gt7_hooks.cpp:153 DumpSubroutine: IMPORT: path:main,test,main::test, target:__mul__, alias:nil
 [Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
 
 ///////////////////////////////////////////////////////
