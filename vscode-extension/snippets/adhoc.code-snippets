@@ -1000,6 +1000,28 @@
 	"CELL_PAD_CTRL_R2 (0xFFDD)": { "prefix": "CELL_PAD_CTRL_R2", "body": [ "CELL_PAD_CTRL_R2" ], "description": "PS3 R2 Button"},
 	"CELL_PAD_CTRL_R3 (0xFFDE)": { "prefix": "CELL_PAD_CTRL_R3", "body": [ "CELL_PAD_CTRL_R3" ], "description": "PS3 R3 Button"},
 
+	// PSP codes
+	"PSP_PAD_CTRL_L3_LEFT (0xFF51)": { "prefix": "PSP_PAD_CTRL_L3_LEFT", "body": [ "PSP_PAD_CTRL_L3_LEFT" ], "description": "PSP Left Stick LEFT"},
+	"PSP_PAD_CTRL_L3_UP (0xFF52)": { "prefix": "PSP_PAD_CTRL_L3_UP", "body": [ "PSP_PAD_CTRL_L3_UP" ], "description": "PSP Left Stick UP"},
+	"PSP_PAD_CTRL_L3_RIGHT (0xFF53)": { "prefix": "PSP_PAD_CTRL_L3_RIGHT", "body": [ "PSP_PAD_CTRL_L3_RIGHT" ], "description": "PSP Left Stick RIGHT"},
+	"PSP_PAD_CTRL_L3_DOWN (0xFF54)": { "prefix": "PSP_PAD_CTRL_L3_DOWN", "body": [ "PSP_PAD_CTRL_L3_DOWN" ], "description": "PSP Left Stick DOWN"},
+	
+	"PSP_PAD_CTRL_R3_LEFT (0xFFB4)": { "prefix": "PSP_PAD_CTRL_R3_LEFT", "body": [ "PSP_PAD_CTRL_R3_LEFT" ], "description": "PSP Right Stick LEFT"},
+	"PSP_PAD_CTRL_R3_UP (0xFFB8)": { "prefix": "PSP_PAD_CTRL_R3_UP", "body": [ "PSP_PAD_CTRL_R3_UP" ], "description": "PSP Right Stick UP"},
+	"PSP_PAD_CTRL_R3_RIGHT (0xFF51)": { "prefix": "PSP_PAD_CTRL_R3_RIGHT", "body": [ "PSP_PAD_CTRL_R3_RIGHT" ], "description": "PSP Right Stick RIGHT"},
+	"PSP_PAD_CTRL_R3_DOWN (0xFFB2)": { "prefix": "PSP_PAD_CTRL_R3_DOWN", "body": [ "PSP_PAD_CTRL_R3_DOWN" ], "description": "PSP Right Stick DOWN"},
+	
+	"PSP_PAD_CTRL_CROSS (0xFF0D)": { "prefix": "PSP_PAD_CTRL_CROSS", "body": [ "PSP_PAD_CTRL_CROSS" ], "description": "PSP X Button"},
+	"PSP_PAD_CTRL_SQUARE (0xFFBF)": { "prefix": "PSP_PAD_CTRL_SQUARE", "body": [ "PSP_PAD_CTRL_SQUARE" ], "description": "PSP □ Button"},
+	"PSP_PAD_CTRL_TRIANGLE (0xFFBE)": { "prefix": "PSP_PAD_CTRL_TRIANGLE", "body": [ "PSP_PAD_CTRL_TRIANGLE" ], "description": "PSP △ Triangle Button"},
+	"PSP_PAD_CTRL_CIRCLE (0xFF1B)": { "prefix": "PSP_PAD_CTRL_CIRCLE", "body": [ "PSP_PAD_CTRL_CIRCLE" ], "description": "PSP O Button"},
+	
+	"PSP_PAD_CTRL_SELECT (0xFF63)": { "prefix": "PSP_PAD_CTRL_SELECT", "body": [ "PSP_PAD_CTRL_SELECT" ], "description": "PSP Select Button"},
+	"PSP_PAD_CTRL_START (0xFF8D)": { "prefix": "PSP_PAD_CTRL_START", "body": [ "PSP_PAD_CTRL_START" ], "description": "PSP Start Buton"},
+	
+	"PSP_PAD_CTRL_L1 (0xFFD7)": { "prefix": "PSP_PAD_CTRL_L1", "body": [ "PSP_PAD_CTRL_L1" ], "description": "PSP L1 Button"},
+	"PSP_PAD_CTRL_R1 (0xFFDC)": { "prefix": "PSP_PAD_CTRL_R1", "body": [ "PSP_PAD_CTRL_R1" ], "description": "PSP R1 Button"},
+	
 	// PS2 key codes
 	"PS2_PAD_CTRL_L3_LEFT (0xFF51)": { "prefix": "PS2_PAD_CTRL_L3_LEFT", "body": [ "PS2_PAD_CTRL_L3_LEFT" ], "description": "PS2 Left Stick LEFT"},
 	"PS2_PAD_CTRL_L3_UP (0xFF52)": { "prefix": "PS2_PAD_CTRL_L3_UP", "body": [ "PS2_PAD_CTRL_L3_UP" ], "description": "PS2 Left Stick UP"},

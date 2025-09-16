@@ -666,6 +666,27 @@ public class BuiltinMacros
         $"CELL_PAD_CTRL_R2      XK_F32",
         $"CELL_PAD_CTRL_R3      XK_F33",
 
+        // PSP
+        $"PSP_PAD_CTRL_L3_LEFT     XK_Left",
+        $"PSP_PAD_CTRL_L3_UP       XK_Up",
+        $"PSP_PAD_CTRL_L3_RIGHT    XK_Right",
+        $"PSP_PAD_CTRL_L3_DOWN     XK_Down",
+
+        $"PSP_PAD_CTRL_R3_LEFT     XK_KP_4",
+        $"PSP_PAD_CTRL_R3_UP       XK_KP_8",
+        $"PSP_PAD_CTRL_R3_RIGHT    XK_KP_6",
+        $"PSP_PAD_CTRL_R3_DOWN     XK_KP_2",
+
+        $"PSP_PAD_CTRL_CROSS       XK_Return",
+        $"PSP_PAD_CTRL_SQUARE      XK_F2",
+        $"PSP_PAD_CTRL_TRIANGLE    XK_F1",
+        $"PSP_PAD_CTRL_CIRCLE      XK_Escape",
+
+        $"PSP_PAD_CTRL_SELECT      XK_Insert",
+        $"PSP_PAD_CTRL_START       XK_KP_Enter",
+
+        $"PSP_PAD_CTRL_L1      XK_F26",
+        $"PSP_PAD_CTRL_R1      XK_F31",
 
         // PS2
         $"PS2_PAD_CTRL_L3_LEFT      XK_Left",
