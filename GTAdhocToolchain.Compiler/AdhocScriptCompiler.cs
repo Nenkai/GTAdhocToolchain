@@ -1126,8 +1126,8 @@ public class AdhocScriptCompiler
         frame.AddInstruction(subroutine, parentNode.Location.Start.Line);
 
 
-        if (body is BlockStatement blockStatement)
-            CompileBlockStatement(subroutine.CodeFrame, blockStatement, openScope: false, insertLeaveInstruction: false, emitNops: false);
+        if (body.Type == Nodes.BlockStatement)
+            CompileBlockStatement(subroutine.CodeFrame, body as BlockStatement, openScope: false, insertLeaveInstruction: false, emitNops: false);
         else
             ThrowCompilationError(body, "Expected subroutine body to be frame statement.");
 
@@ -1295,10 +1295,6 @@ public class AdhocScriptCompiler
         }
 
         InsertSetState(frame, AdhocRunState.RETURN);
-
-        // Top level of frame?
-        if (frame.IsCurrentScopeTopScope)
-            frame.HasTopLevelReturnValue = true;
     }
 
     /// <summary>
@@ -1822,6 +1818,7 @@ public class AdhocScriptCompiler
                             
     }
 
+    // TODO/FIXME: Remove this, adhoc does not support arrow functions
     /// <summary>
     /// Compiles: .doThing(e => <statement>)
     /// </summary>
@@ -3705,8 +3702,8 @@ public class AdhocScriptCompiler
             return;
         }
 
-        // Was a return explicitly specified?
-        if (!frame.HasTopLevelReturnValue)
+        // Check whether the last statement
+        if (bodyNode is BlockStatement blockStatement && (blockStatement.ChildNodes.Count == 0 || blockStatement.ChildNodes[^1].Type != Nodes.ReturnStatement))
         {
             if (frame.Version.ShouldReturnVoidForEmptyFunctionReturn())
             {
