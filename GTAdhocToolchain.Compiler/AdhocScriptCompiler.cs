@@ -3702,7 +3702,7 @@ public class AdhocScriptCompiler
             return;
         }
 
-        // Check whether the last statement
+        // Check whether the frame was terminated with an explicit return, if not, insert one
         if (bodyNode is BlockStatement blockStatement && (blockStatement.ChildNodes.Count == 0 || blockStatement.ChildNodes[^1].Type != Nodes.ReturnStatement))
         {
             if (frame.Version.ShouldReturnVoidForEmptyFunctionReturn())
