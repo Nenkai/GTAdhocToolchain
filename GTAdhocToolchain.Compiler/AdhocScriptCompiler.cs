@@ -953,6 +953,10 @@ public class AdhocScriptCompiler
         {
             CompileVariableDeclaration(frame, foreachStatement.Left as VariableDeclaration, pushWhenNoInit: true); // We're unboxing, gotta push anyway
         }
+        else if (foreachStatement.Left.Type == Nodes.Identifier)
+        {
+            CompileIdentifier(frame, foreachStatement.Left as Identifier);
+        }
         else if (foreachStatement.Left.Type == Nodes.ListAssignmentExpression)
         {
             ListAssignementExpression list = foreachStatement.Left as ListAssignementExpression;
