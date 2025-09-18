@@ -1286,9 +1286,26 @@ public class AdhocScriptCompiler
     {
         if (retStatement.Argument is not null) // Return has argument?
         {
-            CompileExpression(frame, retStatement.Argument);
-            if (retStatement.Argument is AssignmentExpression assignmentExpr)
-                CompileExpression(frame, assignmentExpr.Left); // If we are returning an assignment i.e return <variable or path> += "hi", we need to eval str again
+            if (retStatement.Argument.Type == Nodes.AssignmentExpression)
+            {
+                var assignmentExpression = (AssignmentExpression)retStatement.Argument;
+                if (assignmentExpression.Operator == AssignmentOperator.Assign)
+                {
+                    // return a = b;
+                    CompileAssignmentExpression(frame, retStatement.Argument as AssignmentExpression, popResult: false);
+                }
+                else
+                {
+                    // return a += b;
+                    CompileExpression(frame, assignmentExpression);
+                    CompileExpression(frame, assignmentExpression.Left); // If we are returning an assignment i.e return <variable or path> += "hi", we need to eval str again
+                }
+            }
+            else
+            {
+                // return <non assignment expr>
+                CompileExpression(frame, retStatement.Argument);
+            }
 
             // Initial return indicates a return value in older versions
             if (frame.Version.ShouldPopOnReturnStatementWithValue())
@@ -1296,7 +1313,6 @@ public class AdhocScriptCompiler
         }
         else
         {
-            
             if (frame.Version.ShouldReturnVoidForEmptyFunctionReturn())
                 InsertVoid(frame); // Void const is returned
         }
