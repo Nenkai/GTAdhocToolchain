@@ -951,20 +951,23 @@ public class AdhocScriptCompiler
 
         if (foreachStatement.Left.Type == Nodes.VariableDeclaration)
         {
+            // foreach (var value in <right>)
             CompileVariableDeclaration(frame, foreachStatement.Left as VariableDeclaration, pushWhenNoInit: true); // We're unboxing, gotta push anyway
-        }
-        else if (foreachStatement.Left.Type == Nodes.Identifier)
-        {
-            CompileIdentifier(frame, foreachStatement.Left as Identifier);
         }
         else if (foreachStatement.Left.Type == Nodes.ListAssignmentExpression)
         {
+            // foreach (|var ..| in <right>)
             ListAssignementExpression list = foreachStatement.Left as ListAssignementExpression;
             CompileListAsssignmentExpression(frame, list);
         }
+        else if (foreachStatement.Left is Expression)
+        {
+            // foreach (<expression> in <right>)
+            CompileVariableAssignment(frame, foreachStatement.Left as Expression);
+        }
         else
         {
-            ThrowCompilationError(foreachStatement, CompilationMessages.Error_ForeachDeclarationNotVariableOrList);
+            ThrowCompilationError(foreachStatement.Left, CompilationMessages.Error_ForeachDeclarationNotDeclarationOrExpression);
         }
 
         // Compile body.
