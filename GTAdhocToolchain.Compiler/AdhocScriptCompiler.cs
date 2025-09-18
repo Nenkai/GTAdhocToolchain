@@ -2958,7 +2958,7 @@ public class AdhocScriptCompiler
         CompileAnonymousSubroutine(frame, asSubroutine, finalizer.Body, new NodeList<Expression>());
 
         // add temp value & set finally
-        InsertVariablePush(frame, new Identifier($"fin#{SymbolMap.TempVariableCounter++}") { Location = finalizer.Body.Location }, true);
+        InsertVariablePush(frame, new Identifier($"fin#{SymbolMap.FinalizerTempVariableCounter++}") { Location = finalizer.Body.Location }, true);
 
         InsAttributePush push = new InsAttributePush();
         push.AttributeSymbols.Add(SymbolMap.RegisterSymbol("finally"));
@@ -2986,7 +2986,7 @@ public class AdhocScriptCompiler
         frame.AddInstruction(new InsEval(), 0);
 
         // add temp value & set finally
-        InsertVariablePush(frame, new Identifier($"fin#{SymbolMap.TempVariableCounter++}") { Location = finalizer.Body.Location }, true);
+        InsertVariablePush(frame, new Identifier($"fin#{SymbolMap.FinalizerTempVariableCounter++}") { Location = finalizer.Body.Location }, true);
 
         InsAttributePush push = new InsAttributePush();
         push.AttributeSymbols.Add(SymbolMap.RegisterSymbol("finally"));

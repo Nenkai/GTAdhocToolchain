@@ -11,10 +11,14 @@ public class AdhocSymbolMap
     public Dictionary<string, AdhocSymbol> Symbols { get; set; } = [];
 
     /// <summary>
-    /// case#/in#/catch# etc counter
+    /// case#/in#/catch# etc variable counter
     /// </summary>
     public int TempVariableCounter { get; set; } = 0;
 
+    /// <summary>
+    /// fin# variable counter (counted aside)
+    /// </summary>
+    public int FinalizerTempVariableCounter { get; set; } = 0;
 
     /// <summary>
     /// Adds a new symbol to the map if it doesn't already exist.
