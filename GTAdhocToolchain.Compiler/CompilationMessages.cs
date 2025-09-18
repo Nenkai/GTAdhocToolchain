@@ -36,7 +36,7 @@ public class CompilationMessages
     public const string Error_CatchClauseParameterNotIdentifier = "Catch clause parameter must be an identifier.";
 
     public const string Error_ForLoopInitializationType = "Unsupported for loop inititialization type";
-    public const string Error_ForeachDeclarationNotVariableOrList = "Expected foreach to have a variable declaration, or list assignment expression.";
+    public const string Error_ForeachDeclarationNotDeclarationOrExpression = "Expected foreach to have a variable declaration, left-hand side expression.";
 
     public const string Error_SwitchAlreadyHasDefault = "Switch statement already has a default case.";
 
