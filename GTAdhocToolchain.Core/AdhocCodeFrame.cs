@@ -84,11 +84,6 @@ public class AdhocCodeFrame
     public bool IsCurrentScopeTopScope => CurrentScopes.Count == 1;
 
     /// <summary>
-    /// Whether the current block has a return statement, to manually add the return instructions if false.
-    /// </summary>
-    public bool HasTopLevelReturnValue { get; set; }
-
-    /// <summary>
     /// Gets the current/last loop.
     /// </summary>
     /// <returns></returns>
