@@ -8,6 +8,7 @@ namespace GTAdhocToolchain.Core.Variables
 {
     public class Variable
     {
+        public int StackIndex { get; set; } = -1;
         public AdhocSymbol Symbol { get; set; }
 
         public override string ToString()

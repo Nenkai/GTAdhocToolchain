@@ -70,7 +70,7 @@ public class AdhocStack : IAdhocStack
         return StackSize;
     }
 
-    public bool TryAddStaticVariable(AdhocSymbol symbol, out Variable variable)
+    public bool TryAddStaticVariable(AdhocSymbol symbol, out StaticVariable variable)
     {
         variable = StaticVariableStorage.Find(e => e?.Symbol == symbol);
         if (variable is null)
@@ -85,7 +85,7 @@ public class AdhocStack : IAdhocStack
         return false;
     }
 
-    public bool TryAddLocalVariable(AdhocSymbol symbol, out Variable variable)
+    public bool TryAddLocalVariable(AdhocSymbol symbol, out LocalVariable variable)
     {
         variable = GetLocalVariableBySymbol(symbol);
         if (variable is null)
@@ -108,10 +108,13 @@ public class AdhocStack : IAdhocStack
             LocalVariableStorage.Add(variable); // Expand
             if (LocalVariableStorage.Count > LocalVariableStorageSize)
                 LocalVariableStorageSize = LocalVariableStorage.Count;
+
+            variable.StackIndex = LocalVariableStorage.Count - 1;
         }
         else
         {
             LocalVariableStorage[freeIdx] = variable;
+            variable.StackIndex = freeIdx;
         }
     }
 
@@ -120,6 +123,8 @@ public class AdhocStack : IAdhocStack
         StaticVariableStorage.Add(variable); // Expand
         if (StaticVariableStorage.Count > StaticVariableStorageSize)
             StaticVariableStorageSize = StaticVariableStorage.Count;
+
+        variable.StackIndex = StaticVariableStorage.Count - 1;
     }
 
     public bool HasStaticVariable(AdhocSymbol symbol)

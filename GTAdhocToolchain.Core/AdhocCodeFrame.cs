@@ -36,7 +36,7 @@ public class AdhocCodeFrame
     /// <summary>
     /// Captured variables for function consts
     /// </summary>
-    public List<AdhocSymbol> CapturedCallbackVariables { get; set; } = [];
+    public List<LocalVariable> CapturedCallbackVariables { get; set; } = [];
 
     /// <summary>
     /// Current stack for the block.
@@ -316,16 +316,14 @@ public class AdhocCodeFrame
         return Instructions.Count;
     }
 
-    public void FreeLocalVariable(AdhocSymbol symbol)
+    public void FreeLocalVariable(LocalVariable localVariable)
     {
-        var localVarToRemove = Stack.GetLocalVariableBySymbol(symbol);
-        Stack.FreeLocalVariable(localVarToRemove);
+        Stack.FreeLocalVariable(localVariable);
     }
 
-    public void FreeStaticVariable(AdhocSymbol symbol)
+    public void FreeStaticVariable(StaticVariable staticVariable)
     {
-        var staticVarToRemove = Stack.GetStaticVariableBySymbol(symbol);
-        Stack.FreeStaticVariable(staticVarToRemove);
+        Stack.FreeStaticVariable(staticVariable);
     }
 
     /// <summary>
@@ -337,11 +335,15 @@ public class AdhocCodeFrame
     /// <param name="isLocalDeclaration"></param>
     /// <returns></returns>
     /// <exception cref="Exception"></exception>
-    public int AddScopeVariable(AdhocSymbol symbol,
+    public Variable AddScopeVariable(AdhocSymbol symbol,
         bool isAssignment = false, 
         bool isStatic = false, 
         bool isLocalDeclaration = false)
     {
+        // TODO: This whole thing should be redone, honestly.
+        // Namely, consolidate scopes. Stop relying on the stack itself so much, and let scopes declare their variables and search these instead
+        // We shouldn't be trying to search the stack so much (i.e Stack.TryAdd.. etc)
+
         Variable newVariable;
         var lastScope = CurrentScope;
 
@@ -349,38 +351,54 @@ public class AdhocCodeFrame
         {
             if (isStatic)
             {
-                bool added = Stack.TryAddStaticVariable(symbol, out newVariable);
+                bool added = Stack.TryAddStaticVariable(symbol, out StaticVariable staticVariable);
                 if (added)
-                    lastScope.StaticScopeVariables.Add(symbol.Name, symbol);
+                    lastScope.StaticScopeVariables.Add(symbol.Name, staticVariable);
+                newVariable = staticVariable;
             }
             else if (!isLocalDeclaration) // Assigning to a symbol without a declaration, i.e 'hello = "world"'
             {
                 if (IsVariableCapturedFromParentScope(symbol))
-                {
                     return AddCapturedVariableFromParentScope(symbol);
-                }
 
                 // Are we trying to assign to a local variable?
                 if (Stack.HasLocalVariable(symbol))
                 {
                     // Assigning to a local that already exists
-                    bool added = Stack.TryAddLocalVariable(symbol, out newVariable);
+                    bool added = Stack.TryAddLocalVariable(symbol, out LocalVariable local_);
                     if (added)
-                        lastScope.LocalScopeVariables.Add(symbol.Name, symbol);
+                        lastScope.LocalScopeVariables.Add(symbol.Name, local_);
+                    newVariable = local_;
                 }
                 else
                 {
                     // Nope. Assuming this is a static
-                    bool added = Stack.TryAddStaticVariable(symbol, out newVariable);
-                    if (added)
-                        lastScope.StaticScopeVariables.Add(symbol.Name, symbol);
+
+                    // Is it declared in the current scopes? (statics with same names are allowed to be
+                    // new declarations in different modules, thus go into a different slot)
+                    foreach (var scope in CurrentScopes)
+                    {
+                        if (scope.StaticScopeVariables.TryGetValue(symbol.Name, out StaticVariable staticVar))
+                        {
+                            if (staticVar.StackIndex == -1) // Likely wasn't pushed to stack yet. Old adhoc versions don't declare functions as static slots until used
+                                Stack.AddStaticVariable(staticVar);
+
+                            return staticVar;
+                        }
+                    }
+
+                    var newStatic = new StaticVariable() { Symbol = symbol };
+                    Stack.AddStaticVariable(newStatic);
+                    lastScope.StaticScopeVariables.Add(symbol.Name, newStatic);
+                    newVariable = newStatic;
                 }
             }
             else // Actually declaring a new local 
             {
-                bool added = Stack.TryAddLocalVariable(symbol, out newVariable);
+                bool added = Stack.TryAddLocalVariable(symbol, out LocalVariable localVariable);
                 if (added)
-                    lastScope.LocalScopeVariables.Add(symbol.Name, symbol);
+                    lastScope.LocalScopeVariables.Add(symbol.Name, localVariable);
+                newVariable = localVariable;
             }
         }
         else
@@ -395,32 +413,44 @@ public class AdhocCodeFrame
 
             if (isStatic || !Stack.HasLocalVariable(symbol))
             {
-                bool added = Stack.TryAddStaticVariable(symbol, out newVariable);
-                if (added)
-                    lastScope.StaticScopeVariables.TryAdd(symbol.Name, symbol);
+                // Is it declared in the current scopes?
+                foreach (var scope in CurrentScopes)
+                {
+                    if (scope.StaticScopeVariables.TryGetValue(symbol.Name, out StaticVariable staticVar))
+                    {
+                        if (staticVar.StackIndex == -1) // Likely wasn't pushed to stack yet. Old adhoc versions don't declare functions as static slots until used
+                            Stack.AddStaticVariable(staticVar);
+
+                        return staticVar;
+                    }
+                }
+
+                var newStatic = new StaticVariable() { Symbol = symbol };
+                Stack.AddStaticVariable(newStatic);
+                lastScope.StaticScopeVariables.TryAdd(symbol.Name, newStatic);
+                newVariable = newStatic;
             }
             else
             {
                 // Variable already exists, just get the index
-                Stack.TryAddLocalVariable(symbol, out newVariable);
+                Stack.TryAddLocalVariable(symbol, out LocalVariable localVariable);
+                newVariable = localVariable;
             }
         }
 
         // Grab our variable index, whether it's been added or not
         if (newVariable is LocalVariable local)
         {
-            var idx = Stack.GetLocalVariableIndex(local);
-            if (idx == -1)
+            if (local.StackIndex == -1)
                 throw new Exception($"Could not find local variable index for {local}");
 
-            return idx;
+            return local;
         }
         else if (newVariable is StaticVariable staticVar)
         {
-            var idx = Stack.GetStaticVariableIndex(staticVar);
-            if (idx == -1)
+            if (staticVar.StackIndex == -1)
                 throw new Exception($"Could not find static variable index for {staticVar}");
-            return idx;
+            return staticVar;
         }
         else
             throw new Exception("Variable is not a local or static variable..?");
@@ -443,7 +473,7 @@ public class AdhocCodeFrame
             return false;
 
         // Check conflicts with other locals or params
-        return (!Stack.HasLocalVariable(symbol) && !FunctionParameters.Contains(symbol) || CapturedCallbackVariables.Contains(symbol));
+        return (!Stack.HasLocalVariable(symbol) && !FunctionParameters.Contains(symbol) || CapturedCallbackVariables.Any(e => e.Symbol.Name == symbol.Name));
     }
 
 
@@ -453,18 +483,20 @@ public class AdhocCodeFrame
     /// <param name="symbol"></param>
     /// <param name="newVariable"></param>
     /// <returns>Returns stack index of captured variable</returns>
-    private int AddCapturedVariableFromParentScope(AdhocSymbol symbol)
+    private LocalVariable AddCapturedVariableFromParentScope(AdhocSymbol symbol)
     {
-        if (!CapturedCallbackVariables.Contains(symbol))
+        LocalVariable local = CapturedCallbackVariables.FirstOrDefault(e => e.Symbol == symbol);
+        if (local is null)
         {
-            CapturedCallbackVariables.Add(symbol);
-
             // Add captured variable to current frame
-            Stack.TryAddLocalVariable(symbol, out _);
+            Stack.TryAddLocalVariable(symbol, out local);
+
+            CapturedCallbackVariables.Add(local);
         }
 
         // Captured variables have backward indices
-        return -(CapturedCallbackVariables.IndexOf(symbol) + 1); // 0 -> -1, 1 -> -2 etc
+        local.StackIndex = -(CapturedCallbackVariables.IndexOf(local) + 1); // 0 -> -1, 1 -> -2 etc
+        return local;
     }
 
     public bool IsStaticModuleFieldOrAttribute(AdhocSymbol symbol, AdhocModule relativeTo)
@@ -489,7 +521,7 @@ public class AdhocCodeFrame
 
         // TODO: Refactor me maybe?
         Stack.AddStaticVariable(newVar);
-        CurrentScope.StaticScopeVariables.TryAdd(symbol.Name, symbol);
+        CurrentScope.StaticScopeVariables.TryAdd(symbol.Name, newVar);
     }
 
     /// <summary>
@@ -568,9 +600,9 @@ public class AdhocCodeFrame
             stream.WriteInt32(CapturedCallbackVariables.Count);
             for (int i = 0; i < CapturedCallbackVariables.Count; i++)
             {
-                AdhocSymbol capturedVariable = CapturedCallbackVariables[i];
-                stream.WriteSymbol(capturedVariable);
-                stream.WriteInt32(-(i + 1));
+                LocalVariable capturedVariable = CapturedCallbackVariables[i];
+                stream.WriteSymbol(capturedVariable.Symbol);
+                stream.WriteInt32(capturedVariable.StackIndex);
             }
 
             stream.WriteInt32(0); // Some stack variable index
@@ -648,8 +680,12 @@ public class AdhocCodeFrame
                 for (int i = 0; i < funcArgs; i++)
                 {
                     var symbol = stream.ReadSymbol();
-                    CapturedCallbackVariables.Add(new AdhocSymbol(stream.ReadInt32(), symbol.Name));
-
+                    int stackIdx = stream.ReadInt32();
+                    CapturedCallbackVariables.Add(new LocalVariable()
+                    {
+                        Symbol = symbol,
+                        StackIndex = stackIdx,
+                    });
                 }
             }
 
@@ -722,7 +758,7 @@ public class AdhocCodeFrame
             sb.Append('[');
             for (int i = 0; i < CapturedCallbackVariables.Count; i++)
             {
-                sb.Append(CapturedCallbackVariables[i].Name);//.Append($"[{CapturedCallbackVariables[i].Id}]");
+                sb.Append(CapturedCallbackVariables[i].Symbol.Name);//.Append($"[{CapturedCallbackVariables[i].Id}]");
                 if (i != CapturedCallbackVariables.Count - 1)
                     sb.Append(", ");
             }

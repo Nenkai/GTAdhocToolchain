@@ -64,9 +64,9 @@ namespace GTAdhocToolchain.Core.Stack
             return StackSize;
         }
 
-        public bool TryAddStaticVariable(AdhocSymbol symbol, out Variable variable)
+        public bool TryAddStaticVariable(AdhocSymbol symbol, out StaticVariable variable)
         {
-            variable = VariableStorage.Find(e => e?.Symbol == symbol && e is StaticVariable);
+            variable = VariableStorage.Find(e => e?.Symbol == symbol && e is StaticVariable) as StaticVariable;
             if (variable is null)
             {
                 var newVar = new StaticVariable() { Symbol = symbol };
@@ -79,7 +79,7 @@ namespace GTAdhocToolchain.Core.Stack
             return false;
         }
 
-        public bool TryAddLocalVariable(AdhocSymbol symbol, out Variable variable)
+        public bool TryAddLocalVariable(AdhocSymbol symbol, out LocalVariable variable)
         {
             variable = GetLocalVariableBySymbol(symbol);
             if (variable is null)
@@ -99,6 +99,8 @@ namespace GTAdhocToolchain.Core.Stack
             VariableStorage.Add(variable); // Expand
             if (VariableStorage.Count > VariableStorageSize)
                 VariableStorageSize = VariableStorage.Count;
+
+            variable.StackIndex = VariableStorage.Count - 1;
         }
 
         public void AddStaticVariable(StaticVariable variable)
@@ -106,6 +108,8 @@ namespace GTAdhocToolchain.Core.Stack
             VariableStorage.Add(variable); // Expand
             if (VariableStorage.Count > VariableStorageSize)
                 VariableStorageSize = VariableStorage.Count;
+
+            variable.StackIndex = VariableStorage.Count - 1;
         }
 
         public bool HasStaticVariable(AdhocSymbol symbol)

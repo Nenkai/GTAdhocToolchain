@@ -20,9 +20,9 @@ namespace GTAdhocToolchain.Core.Stack
 
         int GetStackSize();
 
-        bool TryAddStaticVariable(AdhocSymbol symbol, out Variable variable);
+        bool TryAddStaticVariable(AdhocSymbol symbol, out StaticVariable variable);
 
-        bool TryAddLocalVariable(AdhocSymbol symbol, out Variable variable);
+        bool TryAddLocalVariable(AdhocSymbol symbol, out LocalVariable variable);
 
         void AddLocalVariable(LocalVariable variable);
 
@@ -35,10 +35,6 @@ namespace GTAdhocToolchain.Core.Stack
         LocalVariable GetLocalVariableBySymbol(AdhocSymbol symbol);
 
         StaticVariable GetStaticVariableBySymbol(AdhocSymbol symbol);
-
-        int GetLocalVariableIndex(LocalVariable local);
-
-        int GetStaticVariableIndex(StaticVariable local);
 
         int GetLastLocalVariableIndex();
 

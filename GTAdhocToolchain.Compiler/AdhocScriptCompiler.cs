@@ -98,7 +98,7 @@ public class AdhocScriptCompiler
 
         // Always an empty one in old versions (same in subroutines)
         if (MainFrame.Version.HasReservedLocalInFrame())
-            MainFrame.Stack.AddLocalVariable(null);
+            MainFrame.Stack.AddLocalVariable(new LocalVariable() { Symbol = null });
 
         EnterScope(MainFrame, script);
         CompileScriptBody(MainFrame, script);
@@ -1096,6 +1096,7 @@ public class AdhocScriptCompiler
             subroutine.Name = SymbolMap.RegisterSymbol(id.Name);
         subroutine.CodeFrame.SourceFilePath = frame.SourceFilePath;
         subroutine.CodeFrame.ParentFrame = frame;
+        subroutine.CodeFrame.ContextAllowsVariableCaptureFromParentFrame = true;
 
         if (isMethod)
         {
@@ -1112,26 +1113,26 @@ public class AdhocScriptCompiler
         if (isMethod || frame.Version.ShouldAllocateVariableForSelf())
         {
             // It's also after parameters
-            subroutine.CodeFrame.Stack.AddLocalVariable(null);
+            subroutine.CodeFrame.Stack.AddLocalVariable(new LocalVariable() { Symbol = null });
         }
 
         if (frame.CurrentScope.StaticScopeVariables.ContainsKey(subroutine.Name.Name))
             PrintCompilationWarning(parentNode, $"Static subroutine name '{subroutine.Name.Name}' is already defined in this scope.");
 
+
         if (frame.Version.ShouldDefineFunctionAsStaticVariables())
+        {
             frame.AddAttributeOrStaticMemberVariable(subroutine.Name);
+        }
         else
         {
-            // In older versions the subroutines don't count towards the local storage
+            // In older versions the subroutines don't count towards the local storage (until referenced)
             // Just keep track of it instead
-            if (frame.CurrentScope.StaticScopeVariables.ContainsKey(subroutine.Name.Name))
-                frame.CurrentScope.StaticScopeVariables[subroutine.Name.Name] = subroutine.Name;
-            else
-                frame.CurrentScope.StaticScopeVariables.Add(subroutine.Name.Name, subroutine.Name);
+            if (!frame.CurrentScope.StaticScopeVariables.TryGetValue(subroutine.Name.Name, out StaticVariable staticVar))
+                frame.CurrentScope.StaticScopeVariables.Add(subroutine.Name.Name, new StaticVariable() { Symbol = subroutine.Name });
         }
 
         frame.AddInstruction(subroutine, parentNode.Location.Start.Line);
-
 
         if (body.Type == Nodes.BlockStatement)
             CompileBlockStatement(subroutine.CodeFrame, body as BlockStatement, openScope: false, insertLeaveInstruction: false, emitNops: false);
@@ -1139,7 +1140,7 @@ public class AdhocScriptCompiler
             ThrowCompilationError(body, "Expected subroutine body to be frame statement.");
 
         InsertFrameExitIfNeeded(subroutine.CodeFrame, body);
-        LeaveScope(subroutine.CodeFrame);
+        LeaveScope(subroutine.CodeFrame, insertLeaveInstruction: false);
 
         Logger.Debug($"Subroutine '{id.Name}' compiled ({subroutine.CodeFrame.Instructions.Count} ins, " +
             $"Stack Size: {subroutine.CodeFrame.Stack.GetStackSize()}, Variable Storage Size: {subroutine.CodeFrame.Stack.GetLocalVariableStorageSize()})");
@@ -1583,8 +1584,8 @@ public class AdhocScriptCompiler
                 }
                 else
                 {
-                    // TODO
-                    frame.Stack.AddStaticVariable(null);
+                    // TODO (how to handle this?)
+                    frame.Stack.AddStaticVariable(new StaticVariable() { Symbol = null, });
                 }
             }
         }
@@ -1884,7 +1885,7 @@ public class AdhocScriptCompiler
 
         // "Insert" by evaluating each captured variable
         foreach (var capturedVariable in subroutine.CodeFrame.CapturedCallbackVariables)
-            InsertVariableEval(frame, new Identifier(capturedVariable.Name));
+            InsertVariableEval(frame, new Identifier(capturedVariable.Symbol.Name));
 
         frame.AddInstruction(subroutine, parentNode.Location.Start.Line);
     }
@@ -2623,8 +2624,8 @@ public class AdhocScriptCompiler
 
             eval.VariableSymbols.Add(fullPathSymb);
 
-            int idx = frame.AddScopeVariable(fullPathSymb, isAssignment: false, isStatic: true);
-            eval.VariableStorageIndex = idx;
+            Variable variable = frame.AddScopeVariable(fullPathSymb, isAssignment: false, isStatic: true);
+            eval.VariableStorageIndex = variable.StackIndex;
             frame.AddInstruction(eval, staticExp.Location.Start.Line);
         }
         else
@@ -2639,8 +2640,8 @@ public class AdhocScriptCompiler
 
             push.VariableSymbols.Add(fullPathSymb);
 
-            int idx = frame.AddScopeVariable(fullPathSymb, isAssignment: false, isStatic: true);
-            push.VariableStorageIndex = idx;
+            Variable variable = frame.AddScopeVariable(fullPathSymb, isAssignment: false, isStatic: true);
+            push.VariableStorageIndex = variable.StackIndex;
             frame.AddInstruction(push, staticExp.Location.Start.Line);
             frame.AddInstruction(new InsEval(), staticExp.Location.Start.Line);
         }
@@ -2668,8 +2669,8 @@ public class AdhocScriptCompiler
         AdhocSymbol fullPathSymb = SymbolMap.RegisterSymbol(fullPath);
         push.VariableSymbols.Add(fullPathSymb);
 
-        int idx = frame.AddScopeVariable(fullPathSymb, isAssignment: false, isStatic: true);
-        push.VariableStorageIndex = idx;
+        Variable variable = frame.AddScopeVariable(fullPathSymb, isAssignment: false, isStatic: true);
+        push.VariableStorageIndex = variable.StackIndex;
 
         frame.AddInstruction(push, staticExp.Location.Start.Line);
     }
@@ -3262,7 +3263,7 @@ public class AdhocScriptCompiler
     private AdhocSymbol InsertVariablePush(AdhocCodeFrame frame, Identifier identifier, bool isVariableDeclaration)
     {
         AdhocSymbol varSymb = SymbolMap.RegisterSymbol(identifier.Name);
-        int idx = frame.AddScopeVariable(varSymb, isAssignment: true, isLocalDeclaration: isVariableDeclaration);
+        Variable variable = frame.AddScopeVariable(varSymb, isAssignment: true, isLocalDeclaration: isVariableDeclaration);
 
         var varPush = new InsVariablePush();
         varPush.VariableSymbols.Add(varSymb);
@@ -3271,7 +3272,7 @@ public class AdhocScriptCompiler
         if (frame.IsStaticVariable(varSymb, CurrentModule))
             varPush.VariableSymbols.Add(varSymb);
             
-        varPush.VariableStorageIndex = idx;
+        varPush.VariableStorageIndex = variable.StackIndex;
         frame.AddInstruction(varPush, identifier.Location.Start.Line);
 
         return varSymb;
@@ -3489,12 +3490,12 @@ public class AdhocScriptCompiler
     private void InsertVariableEval(AdhocCodeFrame frame, Identifier identifier, bool forceStatic = false)
     {
         AdhocSymbol symb = SymbolMap.RegisterSymbol(identifier.Name);
-        int idx = frame.AddScopeVariable(symb, isAssignment: false);
+        Variable variable = frame.AddScopeVariable(symb, isAssignment: false);
 
         InstructionBase ins;
         if (frame.Version.HasVariableEvalSupport())
         {
-            ins = new InsVariableEvaluation(idx);
+            ins = new InsVariableEvaluation(variable.StackIndex);
 
             var varEval = ins as InsVariableEvaluation;
             varEval.VariableSymbols.Add(symb); // Only one
@@ -3505,14 +3506,14 @@ public class AdhocScriptCompiler
             ins = new InsVariablePush();
 
             var varPush = ins as InsVariablePush;
-            varPush.VariableStorageIndex = idx;
+            varPush.VariableStorageIndex = variable.StackIndex;
             varPush.VariableSymbols.Add(symb); // Only one
             frame.AddInstruction(varPush, identifier.Location.Start.Line);
             frame.AddInstruction(new InsEval(), identifier.Location.Start.Line);
         }
 
 
-        // Static references or pushes always have double their own symbol
+        // Static references or pushes always have double their own symbol (basically creating a module 'path' with each component, and the full path at the end.)
         // If its a static reference, do not add it as a declared variable within this scope
         if (forceStatic || frame.IsStaticVariable(symb, CurrentModule))
         {
@@ -3544,7 +3545,7 @@ public class AdhocScriptCompiler
             {
                 var moduleScope = ModuleOrClassScopes.Peek();
                 if (frame.ParentFrame is null && !moduleScope.StaticScopeVariables.ContainsKey(symb.Name))
-                    moduleScope.StaticScopeVariables.Add(symb.Name, symb);
+                    moduleScope.StaticScopeVariables.Add(symb.Name, new StaticVariable() { Symbol = symb }); // Won't have a stack index, which is fine.
             }
         }
     }
@@ -3587,20 +3588,19 @@ public class AdhocScriptCompiler
     private static void InsertVariableEvalFromSymbol(AdhocCodeFrame frame, AdhocSymbol symbol, Location location = default)
     {
         LocalVariable taskVariable = frame.Stack.GetLocalVariableBySymbol(symbol);
-        int taskVariableStoreIdx = frame.Stack.GetLocalVariableIndex(taskVariable);
 
         if (frame.Version.HasVariableEvalSupport())
         {
             var insVarEval = new InsVariableEvaluation();
             insVarEval.VariableSymbols.Add(symbol);
-            insVarEval.VariableStorageIndex = taskVariableStoreIdx;
+            insVarEval.VariableStorageIndex = taskVariable.StackIndex;
             frame.AddInstruction(insVarEval, location.Start.Line);
         }
         else
         {
             var insVarPush = new InsVariablePush();
             insVarPush.VariableSymbols.Add(symbol);
-            insVarPush.VariableStorageIndex = taskVariableStoreIdx;
+            insVarPush.VariableStorageIndex = taskVariable.StackIndex;
             frame.AddInstruction(insVarPush, location.Start.Line);
             frame.AddInstruction(new InsEval(), location.Start.Line);
         }
