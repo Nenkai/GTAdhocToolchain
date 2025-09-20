@@ -340,9 +340,9 @@ public class AdhocCodeFrame
         bool isStatic = false, 
         bool isLocalDeclaration = false)
     {
-        // TODO: This whole thing should be redone, honestly.
+        // TODO: This whole thing should be redone, honestly. It's janky.
         // Namely, consolidate scopes. Stop relying on the stack itself so much, and let scopes declare their variables and search these instead
-        // We shouldn't be trying to search the stack so much (i.e Stack.TryAdd.. etc)
+        // We shouldn't be trying to search the stack so much (i.e Stack.TryAdd.. etc), even per frame
 
         Variable newVariable;
         var lastScope = CurrentScope;
@@ -356,7 +356,14 @@ public class AdhocCodeFrame
                     lastScope.StaticScopeVariables.Add(symbol.Name, staticVariable);
                 newVariable = staticVariable;
             }
-            else if (!isLocalDeclaration) // Assigning to a symbol without a declaration, i.e 'hello = "world"'
+            else if (isLocalDeclaration)// Actually declaring a new local 
+            {
+                bool added = Stack.TryAddLocalVariable(symbol, out LocalVariable localVariable);
+                if (added)
+                    lastScope.LocalScopeVariables.Add(symbol.Name, localVariable);
+                newVariable = localVariable;
+            }
+            else // Assigning to a symbol without a declaration, i.e 'hello = "world"'
             {
                 if (IsVariableCapturedFromParentScope(symbol))
                     return AddCapturedVariableFromParentScope(symbol);
@@ -372,10 +379,21 @@ public class AdhocCodeFrame
                 }
                 else
                 {
-                    // Nope. Assuming this is a static
+                    // Nope. Assuming this is a static reference
 
                     // Is it declared in the current scopes? (statics with same names are allowed to be
                     // new declarations in different modules, thus go into a different slot)
+                    // i.e:
+                    /* module a
+                     * {
+                     *     static value; <- should be 1
+                     * }
+                     * 
+                     * module b
+                     * {
+                     *     static value; <- should be 2
+                     * }
+                     */
                     foreach (var scope in CurrentScopes)
                     {
                         if (scope.StaticScopeVariables.TryGetValue(symbol.Name, out StaticVariable staticVar))
@@ -387,18 +405,27 @@ public class AdhocCodeFrame
                         }
                     }
 
-                    var newStatic = new StaticVariable() { Symbol = symbol };
-                    Stack.AddStaticVariable(newStatic);
-                    lastScope.StaticScopeVariables.Add(symbol.Name, newStatic);
-                    newVariable = newStatic;
+                    StaticVariable static_;
+                    if (ParentFrame is null) // No parent frame? we may be referencing a static not declared in this frame's scopes - probably not the best way to handle this..
+                    {
+                        static_ = new StaticVariable() { Symbol = symbol };
+                        Stack.AddStaticVariable(static_);
+                    }
+                    else
+                    {
+                        // Otherwise we are in a function or method.
+                        // We need to track whether a static was already evaluated
+                        // i.e:
+                        /* if (a) <- should be 1
+                         *     ;
+                         * if (a) <- should still be 1!
+                         *     ;
+                         */
+                        Stack.TryAddStaticVariable(symbol, out static_);
+                    }
+                    lastScope.StaticScopeVariables.TryAdd(symbol.Name, static_);
+                    newVariable = static_;
                 }
-            }
-            else // Actually declaring a new local 
-            {
-                bool added = Stack.TryAddLocalVariable(symbol, out LocalVariable localVariable);
-                if (added)
-                    lastScope.LocalScopeVariables.Add(symbol.Name, localVariable);
-                newVariable = localVariable;
             }
         }
         else
@@ -407,9 +434,7 @@ public class AdhocCodeFrame
 
             // Captured variable from parent function?
             if (IsVariableCapturedFromParentScope(symbol))
-            {
                 return AddCapturedVariableFromParentScope(symbol);
-            }
 
             if (isStatic || !Stack.HasLocalVariable(symbol))
             {
@@ -425,10 +450,17 @@ public class AdhocCodeFrame
                     }
                 }
 
-                var newStatic = new StaticVariable() { Symbol = symbol };
-                Stack.AddStaticVariable(newStatic);
-                lastScope.StaticScopeVariables.TryAdd(symbol.Name, newStatic);
-                newVariable = newStatic;
+                StaticVariable static_;
+                if (ParentFrame is null) // No parent frame? we may be referencing a static not declared in this frame's scopes - probably not the best way to handle this..
+                {
+                    static_ = new StaticVariable() { Symbol = symbol };
+                    Stack.AddStaticVariable(static_);
+                }
+                else
+                    Stack.TryAddStaticVariable(symbol, out static_);
+
+                lastScope.StaticScopeVariables.TryAdd(symbol.Name, static_);
+                newVariable = static_;
             }
             else
             {
