@@ -1038,6 +1038,54 @@ throw 1;
 throw;
 [Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] syntax error, unexpected ';' (near token ';')
 
+// Catch with break
+try
+{
+
+}
+catch (e)
+{
+	break;
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:242 DumpSubroutine: TRY_CATCH
+[Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: SET_STATE: EXIT
+[Core.Hooking] <Info> gt7_hooks.cpp:145 DumpSubroutine: JUMP: 11
+[Core.Hooking] <Info> gt7_hooks.cpp:124 DumpSubroutine: INT_CONST: 0
+[Core.Hooking] <Info> gt7_hooks.cpp:110 DumpSubroutine: VARIABLE_PUSH: e, Local: 2
+[Core.Hooking] <Info> gt7_hooks.cpp:242 DumpSubroutine: ASSIGN
+[Core.Hooking] <Info> gt7_hooks.cpp:110 DumpSubroutine: VARIABLE_PUSH: catch#0, Local: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:242 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:145 DumpSubroutine: JUMP: 10
+[Core.Hooking] <Info> gt7_hooks.cpp:145 DumpSubroutine: JUMP: 10
+[Core.Hooking] <Info> gt7_hooks.cpp:239 DumpSubroutine: LEAVE: Depth:0, RewindLocalsStorageTo:1
+[Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: SET_STATE: EXIT
+
+// Catch with cases
+try
+{
+
+}
+catch (e)
+{
+        case x:
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:242 DumpSubroutine: TRY_CATCH
+[Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: SET_STATE: EXIT
+[Core.Hooking] <Info> gt7_hooks.cpp:145 DumpSubroutine: JUMP: 15
+[Core.Hooking] <Info> gt7_hooks.cpp:124 DumpSubroutine: INT_CONST: 0
+[Core.Hooking] <Info> gt7_hooks.cpp:110 DumpSubroutine: VARIABLE_PUSH: e, Local: 2
+[Core.Hooking] <Info> gt7_hooks.cpp:242 DumpSubroutine: ASSIGN
+[Core.Hooking] <Info> gt7_hooks.cpp:110 DumpSubroutine: VARIABLE_PUSH: catch#0, Local: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:242 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:105 DumpSubroutine: VARIABLE_EVAL: catch#0, Local: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:115 DumpSubroutine: ATTRIBUTE_EVAL: isInstanceOf
+[Core.Hooking] <Info> gt7_hooks.cpp:105 DumpSubroutine: VARIABLE_EVAL: x,x, Local: 0
+[Core.Hooking] <Info> gt7_hooks.cpp:153 DumpSubroutine: CALL: 1 args
+[Core.Hooking] <Info> gt7_hooks.cpp:136 DumpSubroutine: JUMP_IF_TRUE: 14
+[Core.Hooking] <Info> gt7_hooks.cpp:145 DumpSubroutine: JUMP: 14
+[Core.Hooking] <Info> gt7_hooks.cpp:239 DumpSubroutine: LEAVE: Depth:0, RewindLocalsStorageTo:1
+[Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: SET_STATE: EXIT
+
 ////////////////////////////////////////////////////////////////////////
 // Function tests
 ////////////////////////////////////////////////////////////////////////
