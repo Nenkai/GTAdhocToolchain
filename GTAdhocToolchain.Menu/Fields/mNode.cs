@@ -83,7 +83,8 @@ public class mNode : mTypeBase
                 Child.Add(field);
             }
 
-            Debug.Assert(io.Stream.ReadInt16() == 0x18d, "Scope terminator did not match");
+            var terminator = io.Stream.ReadInt16();
+            Debug.Assert(terminator == 0x18d, "Scope terminator did not match");
         }
         else if (io.Version == 1)
         {
