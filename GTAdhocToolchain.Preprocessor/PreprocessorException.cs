@@ -1,4 +1,7 @@
-﻿using Esprima;
+﻿// Copyright (c) 2026 Nenkai
+// SPDX-License-Identifier: MIT
+
+using Esprima;
 
 using System;
 using System.Collections.Generic;

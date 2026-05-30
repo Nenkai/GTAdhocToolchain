@@ -1,4 +1,7 @@
-﻿using GTAdhocToolchain.Core.Variables;
+﻿// Copyright (c) 2026 Nenkai
+// SPDX-License-Identifier: MIT
+
+using GTAdhocToolchain.Core.Variables;
 
 using System;
 using System.Collections.Generic;
