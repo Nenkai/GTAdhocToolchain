@@ -84,9 +84,9 @@ public class AdhocProject
 
     private string ProjectFilePath { get; set; }
 
-    public static AdhocProject Read(string path)
+    public static AdhocProject? Read(string path)
     {
-        var deserializer = new DeserializerBuilder()
+        var deserializer = new StaticDeserializerBuilder(new YamlStaticContext())
                     .WithNamingConvention(UnderscoredNamingConvention.Instance)
                     .IgnoreUnmatchedProperties()
                     .Build();
@@ -132,8 +132,9 @@ public class AdhocProject
     /// Builds the project.
     /// </summary>
     /// <returns></returns>
-    public bool Build(bool debug = false, string customOutputDir = "")
+    public bool Build(bool debug = false, string? customOutputDir = "")
     {
+
         if (!Directory.Exists(ProjectDir))
         {
             Logger.Error($"Project directory does not exist ({ProjectDir})");
@@ -232,7 +233,7 @@ public class AdhocProject
         finally
         {
             // Cleanup temp files
-            if (!string.IsNullOrEmpty(tmpFilePath) && File.Exists(tmpFilePath))
+            if (!string.IsNullOrWhiteSpace(tmpFilePath) && File.Exists(tmpFilePath))
                 File.Delete(tmpFilePath);
 
             if (Directory.Exists(pkgPath))
@@ -406,7 +407,7 @@ public class AdhocProject
         var mprojectRoot = new mNode();
         mprojectRoot.TypeName = "Project";
 
-        mNode project_component = null;
+        mNode? project_component = null;
 
         var projectRoots = new mArray();
         projectRoots.Name = "children";
@@ -459,7 +460,7 @@ public class AdhocProject
             }
         }
 
-        if (project_component != null)
+        if (project_component is not null)
             mprojectRoot.Child.Add(project_component);
 
         // Prepare for roots
@@ -543,16 +544,16 @@ public class AdhocProject
     /// <returns></returns>
     public (bool Result, string ErrorMessage) VerifyProjectFile()
     {
-        if (string.IsNullOrEmpty(ProjectName))
+        if (string.IsNullOrWhiteSpace(ProjectName))
             return (false, "Project name is missing or empty.");
 
-        if (string.IsNullOrEmpty(ProjectFolder))
+        if (string.IsNullOrWhiteSpace(ProjectFolder))
             return (false, "Project folder is missing or empty.");
 
-        if (string.IsNullOrEmpty(BaseIncludeFolder))
+        if (string.IsNullOrWhiteSpace(BaseIncludeFolder))
             return (false, "Base Include Folder is missing or empty.");
 
-        if (string.IsNullOrEmpty(OutputName))
+        if (string.IsNullOrWhiteSpace(OutputName))
             return (false, "Output Name is missing or empty.");
 
         if (FilesToCompile.Length == 0)
@@ -566,4 +567,11 @@ public class AdhocProject
 
         return (true, string.Empty);
     }
+}
+
+[YamlStaticContext]
+[YamlSerializable(typeof(AdhocProject))]
+[YamlSerializable(typeof(AdhocProjectFile))]
+public partial class YamlStaticContext : YamlDotNet.Serialization.StaticContext
+{
 }

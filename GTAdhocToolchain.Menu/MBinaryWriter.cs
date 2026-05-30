@@ -36,7 +36,7 @@ public class MBinaryWriter : IDisposable
 
         Stream = new BinaryStream(fs, ByteConverter.Big);
         Stream.WriteString("MPRJ", StringCoding.Raw);
-        Stream.WriteVarInt(Version);
+        Stream.WriteVarInt((int)Version);
 
         node.Write(this);
     }
