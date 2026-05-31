@@ -8,13 +8,14 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       with:
         submodules: 'recursive'
 
-    - uses: actions/setup-dotnet@v3
+    - uses: actions/setup-dotnet@v5
       with:
-        dotnet-version: '6.0.x'
+        dotnet-version: 'latest'
+        dotnet-channel: STS
 
     - name: Publish GTAdhocToolchain.CLI for Windows (framework dependent)
       run: dotnet publish --configuration Release
