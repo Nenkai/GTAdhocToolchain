@@ -8,9 +8,9 @@
 	<Nullable>enable</Nullable>
     <AssemblyName>adhoc</AssemblyName>
     <SignAssembly>False</SignAssembly>
-    <AssemblyVersion>1.3.6</AssemblyVersion>
-    <FileVersion>1.3.6</FileVersion>
-    <Version>1.3.6</Version>
+    <AssemblyVersion>1.3.7</AssemblyVersion>
+    <FileVersion>1.3.7</FileVersion>
+    <Version>1.3.7</Version>
 	<PublishAot>true</PublishAot>
   </PropertyGroup>
 
