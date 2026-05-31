@@ -104,7 +104,7 @@ public class mNode : mTypeBase
                 }
             }
 
-            mTypeBase field;
+            mTypeBase? field;
             do
             {
                 field = io.ReadNext();
@@ -114,10 +114,9 @@ public class mNode : mTypeBase
                     field = io.ReadNext();
 
                     // Grab roots
-                    if (TypeName == "RootWindow" && field is mString @string)
+                    if (TypeName == "RootWindow" && field is mString @string && @string.String is not null)
                     {
                         var rootName = @string.String.Substring(@string.String.IndexOf("::") + 1).TrimStart(':');
-
                         if (!rootName.StartsWith("alias_") && !mStrings.Contains(rootName))
                             mStrings.Add(rootName);
                     }
@@ -157,7 +156,8 @@ public class mNode : mTypeBase
                         }
                     }
 
-                    field.Name = str.String;
+                    if (field is not null && str.String is not null)
+                        field.Name = str.String;
                 }
 
                 if (field != null)
@@ -169,8 +169,8 @@ public class mNode : mTypeBase
 
     public override void Read(MTextIO io)
     {
-        string token = null;
-        string token2 = null;
+        string? token;
+        string? token2;
 
         if (IsRoot)
         {
@@ -180,20 +180,20 @@ public class mNode : mTypeBase
             if (token2 == MTextIO.SCOPE_START.ToString())
             {
                 // We only have the type
-                TypeName = token;
+                TypeName = token!;
             }
             else
             {
                 Name = token;
                 TypeName = token2;
-                string token3 = io.GetToken();
+                string? token3 = io.GetToken();
                 if (token3 != MTextIO.SCOPE_START.ToString())
                     throw new Exception($"Expected '{MTextIO.SCOPE_START}' character for node definition.");
 
             }
         }
 
-        mTypeBase field = null;
+        mTypeBase? field;
         while (true)
         {
             // Loop through all fields, now
@@ -209,7 +209,7 @@ public class mNode : mTypeBase
                 field = new mNode();
                 ((mNode)field).TypeName = token;
             }
-            else if (token2.StartsWith(MTextIO.ARRAY_START)) // Array def
+            else if (token2?.StartsWith(MTextIO.ARRAY_START) == true) // Array def
             {
                 int arrLen = int.Parse(token2.AsSpan(1, token2.Length - 2));
                 if (arrLen > byte.MaxValue)
@@ -225,9 +225,9 @@ public class mNode : mTypeBase
             }
             else
             {
-                string fieldName = token;
-                string fieldType = token2;
-                string token3 = io.GetToken();
+                string? fieldName = token;
+                string? fieldType = token2;
+                string? token3 = io.GetToken();
                 if (token3 != MTextIO.SCOPE_START.ToString())
                     throw new Exception($"Expected '{MTextIO.SCOPE_START}' character for node field definition.");
 
@@ -272,9 +272,9 @@ public class mNode : mTypeBase
                     field = FromTypeName(fieldType);
                 }
 
-                if (field is mNode)
+                if (field is mNode node)
                 {
-                    ((mNode)field).TypeName = token2;
+                    node.TypeName = token2;
                 }
 
                 field.Name = token;

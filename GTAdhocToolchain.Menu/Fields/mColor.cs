@@ -31,10 +31,10 @@ public class mColor : mTypeBase
         }
         else
         {
-            R = (io.ReadNext() as mUByte).Value;
-            G = (io.ReadNext() as mUByte).Value;
-            B = (io.ReadNext() as mUByte).Value;
-            A = (io.ReadNext() as mUByte).Value;
+            R = io.ReadNext<mUByte>().Value;
+            G = io.ReadNext<mUByte>().Value;
+            B = io.ReadNext<mUByte>().Value;
+            A = io.ReadNext<mUByte>().Value;
         }
     }
 
@@ -64,7 +64,7 @@ public class mColor : mTypeBase
         else
             throw new UISyntaxError($"Unexpected token for mColor A. Got {a}.");
 
-        string end = io.GetToken();
+        string? end = io.GetToken();
         if (end != MTextIO.SCOPE_END.ToString())
             throw new UISyntaxError($"Expected mColor scope end ({MTextIO.SCOPE_END}), got {end}");
     }

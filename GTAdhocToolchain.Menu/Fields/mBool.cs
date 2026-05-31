@@ -35,7 +35,7 @@ public class mBool : mTypeBase
         else
             throw new UISyntaxError($"Expected bool token (1/0) for mBool. Got {numbToken}.");
 
-        string end = io.GetToken();
+        string? end = io.GetToken();
         if (end != MTextIO.SCOPE_END.ToString())
             throw new UISyntaxError($"Expected mBool scope end ({MTextIO.SCOPE_END}), got {end}");
     }

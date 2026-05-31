@@ -33,8 +33,8 @@ public class mLong : mTypeBase
         else
             throw new UISyntaxError($"Unexpected long token for mLong. Got {numbToken}.");
 
-        string end = io.GetToken();
-        if (io.GetToken() != MTextIO.SCOPE_END.ToString())
+        string? end = io.GetToken();
+        if (end != MTextIO.SCOPE_END.ToString())
             throw new UISyntaxError($"Expected mLong scope end ({MTextIO.SCOPE_END}), got {end}");
     }
 

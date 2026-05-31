@@ -30,8 +30,8 @@ public class mVector : mTypeBase
         }
         else
         {
-            X = (io.ReadNext() as mFloat).Value;
-            Y = (io.ReadNext() as mFloat).Value;
+            X = io.ReadNext<mFloat>().Value;
+            Y = io.ReadNext<mFloat>().Value;
         }
     }
 
@@ -50,7 +50,7 @@ public class mVector : mTypeBase
             throw new UISyntaxError($"Unexpected token for mVector Y. Got {x}.");
 
 
-        string end = io.GetToken();
+        string? end = io.GetToken();
         if (end != MTextIO.SCOPE_END.ToString())
             throw new UISyntaxError($"Expected mVector scope end ({MTextIO.SCOPE_END}), got {end}");
     }

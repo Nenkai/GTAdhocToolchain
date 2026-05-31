@@ -18,7 +18,7 @@ namespace GTAdhocToolchain.Menu.Fields;
 public class mExternalRef : mTypeBase
 #pragma warning restore IDE1006 // Naming Styles
 {
-    public string ExternalRefName { get; set; }
+    public string? ExternalRefName { get; set; }
 
     public override void Read(MBinaryIO io)
     {
@@ -29,7 +29,7 @@ public class mExternalRef : mTypeBase
     {
         ExternalRefName = io.GetString();
 
-        string end = io.GetToken();
+        string? end = io.GetToken();
         if (end != MTextIO.SCOPE_END.ToString())
             throw new UISyntaxError($"Expected external ref scope end ({MTextIO.SCOPE_END}), got {end}");
     }
@@ -45,7 +45,11 @@ public class mExternalRef : mTypeBase
         writer.WriteString(Name);
         writer.WriteSpace();
         writer.WriteString("ExternalRef");
-        writer.WriteString("{\""); writer.WriteString(ExternalRefName); writer.WriteString("\"}");
+
+        writer.WriteString("{\""); 
+        if (!string.IsNullOrEmpty(ExternalRefName))
+            writer.WriteString(ExternalRefName);
+        writer.WriteString("\"}");
         writer.SetNeedNewLine();
     }
 }

@@ -33,7 +33,7 @@ public class mSByte : mTypeBase
         else
             throw new UISyntaxError($"Unexpected sbyte token for mSByte. Got {numbToken}.");
 
-        string end = io.GetToken();
+        string? end = io.GetToken();
         if (end != MTextIO.SCOPE_END.ToString())
             throw new UISyntaxError($"Expected mSByte scope end ({MTextIO.SCOPE_END}), got {end}");
     }

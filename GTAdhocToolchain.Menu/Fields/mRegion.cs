@@ -31,15 +31,10 @@ namespace GTAdhocToolchain.Menu.Fields
             }
             else
             {
-                mFloat x1 = io.ReadNext() as mFloat;
-                mFloat y1 = io.ReadNext() as mFloat;
-                mFloat x2 = io.ReadNext() as mFloat;
-                mFloat y2 = io.ReadNext() as mFloat;
-
-                X1 = x1.Value;
-                Y1 = y1.Value;
-                X2 = x2.Value;
-                Y2 = y2.Value;
+                X1 = io.ReadNext<mFloat>().Value;
+                Y1 = io.ReadNext<mFloat>().Value;
+                X2 = io.ReadNext<mFloat>().Value;
+                Y2 = io.ReadNext<mFloat>().Value;
             }
         }
 
@@ -69,7 +64,7 @@ namespace GTAdhocToolchain.Menu.Fields
             else
                 throw new UISyntaxError($"Unexpected token for mRegion Y2. Got {y2}.");
 
-            string end = io.GetToken();
+            string? end = io.GetToken();
             if (end != MTextIO.SCOPE_END.ToString())
                 throw new UISyntaxError($"Expected mRectangle scope end ({MTextIO.SCOPE_END}), got {end}");
         }

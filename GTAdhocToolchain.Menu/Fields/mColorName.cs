@@ -15,21 +15,21 @@ namespace GTAdhocToolchain.Menu.Fields;
 public class mColorName : mTypeBase
 #pragma warning restore IDE1006 // Naming Styles
 {
-    public string ColorName { get; set; }
+    public string? ColorName { get; set; }
 
     public override void Read(MBinaryIO io)
     {
         if (io.Version == 0)
             ColorName = io.Stream.Read7BitString();
         else
-            ColorName = (io.ReadNext() as mString).String;
+            ColorName = io.ReadNext<mString>().String;
     }
 
     public override void Read(MTextIO io)
     {
         ColorName = io.GetString();
 
-        string end = io.GetToken();
+        string? end = io.GetToken();
         if (end != MTextIO.SCOPE_END.ToString())
             throw new UISyntaxError($"Expected color name scope end ({MTextIO.SCOPE_END}), got {end}");
     }
@@ -52,7 +52,10 @@ public class mColorName : mTypeBase
         }
 
         writer.WriteString("color_name");
-        writer.WriteString("{\""); writer.WriteString(ColorName); writer.WriteString("\"}");
+        writer.WriteString("{\""); 
+        if (!string.IsNullOrEmpty(ColorName))
+            writer.WriteString(ColorName); 
+        writer.WriteString("\"}");
         writer.SetNeedNewLine();
     }
 }

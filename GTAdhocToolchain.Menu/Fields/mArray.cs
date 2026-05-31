@@ -70,7 +70,7 @@ public class mArray : mTypeBase
             }
             else
             {
-                mTypeBase field;
+                mTypeBase? field;
                 var type = (FieldType)io.Stream.ReadByte();
                 field = type switch
                 {
@@ -94,7 +94,7 @@ public class mArray : mTypeBase
 
                 if (type != FieldType.ScopeEnd)
                 {
-                    field.Read(io);
+                    field!.Read(io);
                     if (field is mString str)
                     {
                         if (str.String == "RGBA")
@@ -136,8 +136,8 @@ public class mArray : mTypeBase
         Elements = new List<mTypeBase>(Length);
         for (int i = 0; i < Length; i++)
         {
-            string token = io.GetToken();
-            string token2 = io.GetToken();
+            string? token = io.GetToken();
+            string? token2 = io.GetToken();
 
             mTypeBase element;
             if (token2 != MTextIO.SCOPE_START.ToString())

@@ -75,7 +75,7 @@ public class AdhocProject
     /// <summary>
     /// Defines to pass to the preprocessor
     /// </summary>
-    public List<string> Defines { get; set; } = new();
+    public List<string> Defines { get; set; } = [];
 
     /// <summary>
     /// projects/<code>/<project_name>
@@ -572,6 +572,7 @@ public class AdhocProject
 [YamlStaticContext]
 [YamlSerializable(typeof(AdhocProject))]
 [YamlSerializable(typeof(AdhocProjectFile))]
+[YamlSerializable(typeof(AdhocProjectExtraResource))]
 public partial class YamlStaticContext : YamlDotNet.Serialization.StaticContext
 {
 }

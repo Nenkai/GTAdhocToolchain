@@ -33,17 +33,18 @@ public class MBinaryWriter : IDisposable
     public void WriteNode(mNode node)
     {
         using var fs = new FileStream(OutputFileName, FileMode.Create);
-
         Stream = new BinaryStream(fs, ByteConverter.Big);
+
         Stream.WriteString("MPRJ", StringCoding.Raw);
         Stream.WriteVarInt((int)Version);
 
         node.Write(this);
+        Stream.Flush();
     }
 
     public void Dispose()
     {
-        Stream.Dispose();
+        Stream?.Dispose();
         GC.SuppressFinalize(this);
     }
 }
