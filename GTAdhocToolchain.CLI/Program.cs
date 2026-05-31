@@ -29,14 +29,14 @@ namespace GTAdhocToolchain.CLI;
 
 public class Program
 {
-    public static readonly Version Version = Assembly.GetEntryAssembly().GetName().Version;
+    public static Version? GetExecutableVersion() => Assembly.GetEntryAssembly()?.GetName().Version;
 
     private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
     public static async Task<int> Main(string[] args)
     {
         Console.WriteLine("---------------------------------------------");
-        Console.WriteLine($"- GTAdhocToolchain {Version} by Nenkai");
+        Console.WriteLine($"- GTAdhocToolchain {GetExecutableVersion()?.ToString() ?? "vUnknown"} by Nenkai");
         Console.WriteLine("---------------------------------------------");
         Console.WriteLine("- https://github.com/Nenkai");
         Console.WriteLine("---------------------------------------------");
@@ -134,14 +134,14 @@ public class Program
         {
             if (file.ToLower().EndsWith(".adc"))
             {
-                List<AdhocFile> scripts = null;
+                List<AdhocFile>? scripts = null;
                 try
                 {
                     scripts = AdhocFile.ReadFromFile(file);
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine($"Errored while reading: {e.Message}");
+                    Logger.Error(e, "Errored while reading {}:", file);
                     return -1;
                 }
 
@@ -158,19 +158,19 @@ public class Program
                 var gpb = GpbBase.ReadFile(file);
                 if (gpb is null)
                 {
-                    Console.WriteLine("Could not parse GPB Header.");
+                    Logger.Error("Could not parse GPB Header.");
                     return -1;
                 }
 
                 string fileName = Path.GetFileNameWithoutExtension(file);
-                string dir = Path.GetDirectoryName(file);
+                string? dir = Path.GetDirectoryName(file);
 
-                gpb.Unpack(Path.GetFileNameWithoutExtension(file), Path.Combine(dir, fileName), convertImages: true);
+                gpb.Unpack(Path.GetFileNameWithoutExtension(file), Path.Combine(dir ?? string.Empty, fileName), convertImages: true);
             }
         }
         catch (Exception e)
         {
-            Console.WriteLine($"Error: {e}");
+            Logger.Error(e, "Errored while processing file {}", file);
             return -1;
         }
 
@@ -268,7 +268,7 @@ public class Program
             }
             catch (Exception e)
             {
-                Console.WriteLine($"Failed to pack gpb - {e.Message}");
+                Logger.Error($"Failed to pack gpb - {e.Message}");
                 return -1;
             }
         }
@@ -281,13 +281,13 @@ public class Program
             }
             catch (Exception e)
             {
-                Console.WriteLine($"Failed to pack mpackage - {e.Message}");
+                Logger.Error(e, "Failed to pack mpackage {}", inputPath);
                 return -1;
             }
         }
         else
         {
-            Console.WriteLine("Found nothing to pack - ensure the provided output path has the proper file extension (gpb/mpackage)");
+            Logger.Error("Found nothing to pack - ensure the provided output path has the proper file extension (gpb/mpackage)");
             return -1;
         }
     }
@@ -317,7 +317,7 @@ public class Program
         }
         else
         {
-            Console.WriteLine("Found nothing to unpack - ensure the provided input file has the proper file extension (gpb/mpackage)");
+            Logger.Error("Found nothing to unpack - ensure the provided input file has the proper file extension (gpb/mpackage)");
             return -1;
         }
     }
@@ -326,13 +326,13 @@ public class Program
     {
         if (inputFile.ToLower().EndsWith("gpb"))
         {
-            Console.WriteLine($"[:] {inputFile} - assuming input is GPB");
+            Logger.Info($"[:] {inputFile} - assuming input is GPB");
             ExtractGpb(inputFile, outputPath, convertGpbFiles);
             return 0;
         }
         else if (inputFile.EndsWith("mpackage"))
         {
-            Console.WriteLine($"[:] {inputFile} - assuming input is MPackage");
+            Logger.Info($"[:] {inputFile} - assuming input is MPackage");
             try
             {
                 AdhocPackage.ExtractPackage(inputFile);
@@ -340,7 +340,7 @@ public class Program
             }
             catch (Exception e)
             {
-                Console.WriteLine($"ERROR: Failed to unpack mpackage - {e.Message}.");
+                Logger.Error($"Failed to unpack mpackage - {e.Message}.");
                 return -1;
             }
         }
@@ -353,21 +353,28 @@ public class Program
         var gpb = GpbBase.ReadFile(inputFile);
         if (gpb is null)
         {
-            Console.WriteLine("Could not parse GPB Header.");
+            Logger.Error("Could not parse GPB Header.");
             return -1;
         }
 
         if (string.IsNullOrEmpty(outputPath))
             outputPath = Path.GetDirectoryName(inputFile);
 
+        if (string.IsNullOrEmpty(outputPath))
+        {
+            Logger.Error("Could not determine an output directory.");
+            return -1;
+        }
+
         try
         {
             gpb.Unpack(Path.GetFileNameWithoutExtension(inputFile), outputPath, convertGpbFiles);
+            Logger.Info("Extracted to {outputPath}", outputPath);
             return 0;
         }
         catch (Exception e)
         {
-            Console.WriteLine($"Failed to unpack gpb - {e.Message}.");
+            Logger.Error(e, "Failed to unpack gpb {}", inputFile);
             return -1;
         }
     }
@@ -414,7 +421,13 @@ public class Program
 
         try
         {
-            string absoluteIncludePath = Path.GetDirectoryName(inputPath);
+            string? absoluteIncludePath = Path.GetDirectoryName(inputPath);
+            if (string.IsNullOrWhiteSpace(absoluteIncludePath))
+            {
+                Logger.Error("Could not determine base directory of input file?");
+                return -1;
+            }
+
             string sourceFile = inputPath;
             if (!string.IsNullOrWhiteSpace(baseIncludeFolder))
             {
@@ -509,8 +522,8 @@ public class Program
 
             if (line.StartsWith("/?"))
             {
-                Console.WriteLine("/clear - Clears the console");
-                Console.WriteLine("/version - Sets adhoc version");
+                Logger.Error("/clear - Clears the console");
+                Logger.Error("/version - Sets adhoc version");
                 continue;
             }
             else if (line.StartsWith("/clear"))
@@ -523,15 +536,15 @@ public class Program
                 ReadOnlySpan<char> range = line.AsSpan()["/version".Length..].Trim();
                 if (range.IsEmpty)
                 {
-                    Console.WriteLine($"Current adhoc version is set to {version}.");
+                    Logger.Error($"Current adhoc version is set to {version}.");
                 }
                 else if (uint.TryParse(range, out version))
                 {
-                    Console.WriteLine($"Now compiling for adhoc version {version}");
+                    Logger.Error($"Now compiling for adhoc version {version}");
                 }
                 else
                 {
-                    Console.WriteLine("Invalid version. Usage: /version <adhoc version>");
+                    Logger.Error("Invalid version. Usage: /version <adhoc version>");
                 }
 
                 continue;
@@ -575,7 +588,7 @@ public class Program
 
                     void Dissasemble(InstructionBase inst, int instNumber, int depth)
                     {
-                        Console.WriteLine($"{new string(' ', depth * 2)} {instNumber, 3} | {inst}");
+                        Logger.Error($"{new string(' ', depth * 2)} {instNumber, 3} | {inst}");
                         if (inst.IsFunctionOrMethod())
                         {
                             SubroutineBase subroutine = (SubroutineBase)inst;
@@ -612,17 +625,17 @@ public class Program
         uint version = parseResult.GetValue<uint>("--version");
         if (version == 0)
         {
-            Console.WriteLine("Version 0 is not currently supported.");
+            Logger.Error("Version 0 is not currently supported.");
             return -1;
         }
         else if (version > 1 || version < 0)
         {
-            Console.WriteLine("Version must be 0 or 1. (0 not currently supported).");
+            Logger.Error("Version must be 0 or 1. (0 not currently supported).");
             return -1;
         }
 
-        string? inputPath = parseResult.GetValue<string>("--input");
-        string? outputPath = parseResult.GetValue<string>("--output");
+        string inputPath = parseResult.GetRequiredValue<string>("--input");
+        string outputPath = parseResult.GetRequiredValue<string>("--output");
 
         var mbin = new MBinaryIO(inputPath);
         mNode rootNode = mbin.Read();
@@ -634,7 +647,7 @@ public class Program
 
             if (rootNode is null)
             {
-                Console.WriteLine("Could not read mproject.");
+                Logger.Error("Could not read mproject.");
                 return -1;
             }
         }
@@ -645,12 +658,12 @@ public class Program
             writer.Version = (int)version;
             writer.WriteNode(rootNode);
 
-            Console.WriteLine($"Done. Exported to '{outputPath}'.");
+            Logger.Info($"Done. Exported to '{outputPath}'.");
             return 0;
         }
         catch (Exception e)
         {
-            Console.WriteLine($"Failed to export - {e.Message}");
+            Logger.Error(e, "Failed to export to '{}'", outputPath);
             return -1;
         }
     }
@@ -671,7 +684,7 @@ public class Program
 
             if (rootNode is null)
             {
-                Console.WriteLine("Could not read mproject.");
+                Logger.Error("Could not read mproject.");
                 return -1;
             }
         }
@@ -682,12 +695,12 @@ public class Program
             writer.Debug = debug;
             writer.WriteNode(rootNode);
 
-            Console.WriteLine($"Done. Exported to '{outputPath}'.");
+            Logger.Info("Done. Exported to '{}'.", outputPath);
             return 0;
         }
         catch (Exception e)
         {
-            Console.WriteLine($"Failed to export - {e.Message}");
+            Logger.Error(e, "Failed to export to '{}'", outputPath);
             return -1;
         }
     }

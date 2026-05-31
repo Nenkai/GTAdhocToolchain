@@ -729,7 +729,7 @@ public class AdhocScriptPreprocessor
                             if (tken.Type != TokenType.Identifier)
                                 continue;
 
-                            string tokenStr = tken.Value as string;
+                            string tokenStr = (string)tken.Value;
                             if (callArgs.TryGetValue(tokenStr, out List<Token> callTokens))
                             {
                                 // Remove arg identifier

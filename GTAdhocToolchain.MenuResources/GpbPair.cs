@@ -11,6 +11,6 @@ namespace GTAdhocToolchain.Menu.Resources;
 
 public class GpbPair
 {
-    public string FileName { get; set; }
-    public byte[] FileData { get; set; }
+    public required string FileName { get; set; }
+    public required byte[] FileData { get; set; }
 }

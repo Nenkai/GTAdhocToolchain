@@ -27,9 +27,9 @@ public abstract class GpbBase
 
     public abstract void Read(string fileName);
 
-    public static GpbBase ReadFile(string file)
+    public static GpbBase? ReadFile(string file)
     {
-        GpbBase gpb;
+        GpbBase? gpb;
         using (var fs = new FileStream(file, FileMode.Open))
         using (var bs = new BinaryStream(fs)) 
         {
@@ -61,7 +61,7 @@ public abstract class GpbBase
             if (this is GpbData2)
                 path = file.FileName;
             else
-                path = Path.Combine(file.FileName.Substring(1));
+                path = Path.Combine(file.FileName[1..]);
 
             string outputFile = Path.Combine(outputFolder, path);
             Directory.CreateDirectory(Path.GetDirectoryName(outputFile));
@@ -120,8 +120,6 @@ public abstract class GpbBase
 
         foreach (var file in files)
         {
-            var pair = new GpbPair();
-
             string fileName = file.Replace('\\', '/'); // Replace to any wanted path separator
             fileName = fileName.Substring(fileName.IndexOf('/')); // Remove the parent
             if (!gt5)
@@ -132,11 +130,15 @@ public abstract class GpbBase
             else
             {
                 if (fileName.StartsWith('/'))
-                    fileName = fileName.Substring(1); // Ensure it DOESN'T start with '/' if GT5
+                    fileName = fileName[1..]; // Ensure it DOESN'T start with '/' if GT5
             }
 
-            pair.FileName = fileName;
-            pair.FileData = File.ReadAllBytes(file);
+            var pair = new GpbPair()
+            {
+                FileName = fileName,
+                FileData = File.ReadAllBytes(file),
+            };
+
             Files.Add(pair);
         }
     }
