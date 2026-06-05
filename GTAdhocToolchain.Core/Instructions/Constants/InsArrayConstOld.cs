@@ -15,9 +15,9 @@ namespace GTAdhocToolchain.Core.Instructions
 
         public override string InstructionName => "ARRAY_CONST_OLD";
 
-        public uint ArraySize { get; set; }
+        public int ArraySize { get; set; }
 
-        public InsArrayConstOld(uint size)
+        public InsArrayConstOld(int size)
         {
             ArraySize = size;
         }
@@ -29,12 +29,12 @@ namespace GTAdhocToolchain.Core.Instructions
 
         public override void Serialize(AdhocStream stream)
         {
-            stream.WriteUInt32(ArraySize);
+            stream.WriteInt32(ArraySize);
         }
 
         public override void Deserialize(AdhocStream stream)
         {
-            ArraySize = stream.ReadUInt32();
+            ArraySize = stream.ReadInt32();
         }
 
         public override string ToString()

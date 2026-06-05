@@ -2,6 +2,8 @@
 using GTAdhocToolchain.Core.Stack;
 using GTAdhocToolchain.Core.Variables;
 
+using Syroot.BinaryData;
+
 using System.Text;
 
 namespace GTAdhocToolchain.Core;
@@ -36,58 +38,16 @@ public class AdhocCodeFrame
     /// <summary>
     /// Captured variables for function consts
     /// </summary>
-    public List<LocalVariable> CapturedCallbackVariables { get; set; } = [];
+    public List<(int StackIndex, AdhocSymbol Symbol)> CapturedCallbackVariables { get; set; } = [];
 
-    /// <summary>
-    /// Current stack for the block.
-    /// </summary>
-    public IAdhocStack Stack { get; set; }
-
-    /// <summary>
-    /// Parent frame for this frame, if exists.
-    /// </summary>
-    public AdhocCodeFrame ParentFrame { get; set; }
-
-    /// <summary>
-    /// Modules defined within this frame.
-    /// </summary>
-    public Stack<AdhocModule> Modules { get; set; } = new();
-
-    /// <summary>
-    /// Used for function variables/callbacks. Should be true for function consts.
-    /// </summary>
-    public bool ContextAllowsVariableCaptureFromParentFrame { get; set; }
+    public int MaxLocalIndex { get; set; }
+    public int MaxStaticIndex { get; set; }
+    public int MaxStackIndex { get; set; }
 
     /// <summary>
     /// Source file for this block.
     /// </summary>
     public AdhocSymbol SourceFilePath { get; set; }
-
-    /// <summary>
-    /// To keep track of the current loops, to compile continue and break statements at the end of one.
-    /// </summary>
-    public Stack<LoopContext> CurrentLoops { get; set; } = new();
-
-    /// <summary>
-    /// To keep track of the current scope depth within the block. Used to whether a return or not has been writen to insert one later for instance.
-    /// </summary>
-    public Stack<ScopeContext> CurrentScopes { get; set; } = new();
-
-    /// <summary>
-    /// Gets the current scope.
-    /// </summary>
-    public ScopeContext CurrentScope => CurrentScopes.Peek();
-
-    /// <summary>
-    /// Returns whether the current scope is the top block level.
-    /// </summary>
-    public bool IsCurrentScopeTopScope => CurrentScopes.Count == 1;
-
-    /// <summary>
-    /// Gets the current/last loop.
-    /// </summary>
-    /// <returns></returns>
-    public LoopContext GetLastLoop() => CurrentLoops.Peek();
 
     public uint InstructionCountOffset { get; set; }
     public bool HasDebuggingInformation { get; set; } = true;
@@ -108,497 +68,17 @@ public class AdhocCodeFrame
     /// </summary>
     private void CreateStack()
     {
-        if (Version.UsesNewSplitStack())
-            Stack = new AdhocStack();
-        else
-            Stack = new AdhocStackOld();
+
     }
 
-    public void SetSourcePath(AdhocSymbolMap symbolMap, string path)
+    public void SetSourcePath(AdhocSymbol symbol)
     {
-        SourceFilePath = symbolMap.RegisterSymbol(path);
+        SourceFilePath = symbol;
     }
 
-    /// <summary>
-    /// Adds a new instruction and updates the stack counter.
-    /// </summary>
-    /// <param name="ins"></param>
-    /// <param name="lineNumber"></param>
-    /// <exception cref="Exception"></exception>
-    public void AddInstruction(InstructionBase ins, int lineNumber)
-    {
-        ins.LineNumber = (uint)lineNumber;
-        Instructions.Add(ins);
-
-        switch (ins.InstructionType)
-        {
-            case AdhocInstructionType.ARRAY_CONST:
-            case AdhocInstructionType.MAP_CONST:
-            case AdhocInstructionType.FLOAT_CONST:
-            case AdhocInstructionType.INT_CONST:
-            case AdhocInstructionType.U_INT_CONST:
-            case AdhocInstructionType.NIL_CONST:
-            case AdhocInstructionType.STRING_CONST:
-            case AdhocInstructionType.LONG_CONST:
-            case AdhocInstructionType.U_LONG_CONST:
-            case AdhocInstructionType.BOOL_CONST:
-            case AdhocInstructionType.DOUBLE_CONST:
-            case AdhocInstructionType.VARIABLE_PUSH:
-            case AdhocInstructionType.VARIABLE_EVAL:
-            case AdhocInstructionType.SYMBOL_CONST:
-            case AdhocInstructionType.VOID_CONST:
-            case AdhocInstructionType.BYTE_CONST:
-            case AdhocInstructionType.U_BYTE_CONST:
-            case AdhocInstructionType.SHORT_CONST:
-            case AdhocInstructionType.U_SHORT_CONST:
-                Stack.IncrementStackCounter(); 
-                break;
-            case AdhocInstructionType.FUNCTION_DEFINE:
-                InsFunctionDefine func = ins as InsFunctionDefine;
-                if (Version.VersionNumber >= 8)
-                    Stack.DecreaseStackCounter(func.CodeFrame.FunctionParameters.Count);
-
-                if (Version.VersionNumber >= 8)
-                    Stack.DecreaseStackCounter(func.CodeFrame.CapturedCallbackVariables.Count);
-                break;
-            case AdhocInstructionType.METHOD_DEFINE:
-                InsMethodDefine method = ins as InsMethodDefine;
-                if (Version.VersionNumber >= 8)
-                    Stack.DecreaseStackCounter(method.CodeFrame.FunctionParameters.Count);
-
-                if (Version.VersionNumber >= 8)
-                    Stack.DecreaseStackCounter(method.CodeFrame.CapturedCallbackVariables.Count);
-                break;
-            case AdhocInstructionType.FUNCTION_CONST:
-                InsFunctionConst funcConst = ins as InsFunctionConst;
-                if (Version.VersionNumber >= 8)
-                    Stack.DecreaseStackCounter(funcConst.CodeFrame.FunctionParameters.Count); // Ver > 8
-
-                if (Version.VersionNumber >= 8)
-                    Stack.DecreaseStackCounter(funcConst.CodeFrame.CapturedCallbackVariables.Count);
-
-                Stack.IncrementStackCounter(); // Function itself
-                break;
-            case AdhocInstructionType.METHOD_CONST:
-                InsMethodConst methodConst = ins as InsMethodConst;
-                if (Version.VersionNumber >= 8)
-                    Stack.DecreaseStackCounter(methodConst.CodeFrame.FunctionParameters.Count); // Ver > 8
-
-                if (Version.VersionNumber >= 8)
-                    Stack.DecreaseStackCounter(methodConst.CodeFrame.CapturedCallbackVariables.Count);
-
-                Stack.IncrementStackCounter(); // method itself
-                break;
-            case AdhocInstructionType.POP:
-            case AdhocInstructionType.POP_OLD:
-            case AdhocInstructionType.ASSIGN:
-            case AdhocInstructionType.JUMP_IF_FALSE:
-            case AdhocInstructionType.JUMP_IF_TRUE:
-            case AdhocInstructionType.JUMP_IF_NIL:
-            case AdhocInstructionType.REQUIRE:
-            case AdhocInstructionType.ARRAY_PUSH:
-            case AdhocInstructionType.MODULE_CONSTRUCTOR:
-            case AdhocInstructionType.THROW:
-                Stack.DecrementStackCounter();
-                break;
-
-            case AdhocInstructionType.ATTRIBUTE_DEFINE: // Note: Investigate check potential pop by attribute_define only if Version > 6
-                if (Version.VersionNumber > 6)
-                    Stack.DecrementStackCounter();
-                break;
-
-            case AdhocInstructionType.ASSIGN_POP:
-            case AdhocInstructionType.MAP_INSERT:
-                Stack.DecreaseStackCounter(2);
-                break;
-            case AdhocInstructionType.ATTRIBUTE_PUSH:
-            // Verify these two later
-            case AdhocInstructionType.LOGICAL_AND:
-            case AdhocInstructionType.LOGICAL_OR:
-            case AdhocInstructionType.LOGICAL_AND_OLD:
-            case AdhocInstructionType.LOGICAL_OR_OLD:
-            case AdhocInstructionType.UNARY_ASSIGN_OPERATOR:
-            case AdhocInstructionType.UNARY_OPERATOR:
-                Stack.DecrementStackCounter();
-                Stack.IncrementStackCounter();
-                break;
-            case AdhocInstructionType.ASSIGN_OLD:
-            case AdhocInstructionType.BINARY_ASSIGN_OPERATOR:
-            case AdhocInstructionType.BINARY_OPERATOR:
-            case AdhocInstructionType.OBJECT_SELECTOR:
-            case AdhocInstructionType.ELEMENT_PUSH:
-            case AdhocInstructionType.ELEMENT_EVAL:
-            case AdhocInstructionType.VA_CALL:
-                Stack.DecreaseStackCounter(2);
-                Stack.IncrementStackCounter();
-                break;
-            case AdhocInstructionType.CALL:
-                InsCall call = ins as InsCall;
-                Stack.DecrementStackCounter(); // Function
-                Stack.DecreaseStackCounter(call.ArgumentCount);
-                Stack.IncrementStackCounter(); // Return value
-                break;
-            case AdhocInstructionType.LIST_ASSIGN_OLD:
-                // TODO
-                // Arg count remove
-                Stack.IncrementStackCounter();
-                break;
-            case AdhocInstructionType.PRINT:
-                // TODO
-                // Arg count remove
-                Stack.IncrementStackCounter();
-                break;
-            case AdhocInstructionType.MAP_CONST_OLD:
-                // TODO
-                // Arg count remove * 2
-                Stack.IncrementStackCounter();
-                break;
-            case AdhocInstructionType.ARRAY_CONST_OLD:
-                var arrayConstOld = ins as InsArrayConstOld;
-                Stack.DecreaseStackCounter((int)arrayConstOld.ArraySize);
-                Stack.IncrementStackCounter();
-                break;
-            case AdhocInstructionType.STRING_PUSH:
-                InsStringPush push = ins as InsStringPush;
-                Stack.DecreaseStackCounter(push.StringCount);
-                Stack.IncrementStackCounter();
-                break;
-            case AdhocInstructionType.LIST_ASSIGN:
-                InsListAssign listAssign = ins as InsListAssign;
-                Stack.DecreaseStackCounter(listAssign.VariableCount);
-                Stack.DecrementStackCounter(); // Array
-                Stack.IncrementStackCounter();
-                break;
-
-            case AdhocInstructionType.SET_STATE:
-                InsSetState state = ins as InsSetState;
-                if (state.State == AdhocRunState.RETURN || state.State == AdhocRunState.YIELD)
-                    Stack.DecrementStackCounter();
-                break;
-
-            // These have no effect on stack
-            case AdhocInstructionType.CLASS_DEFINE:
-            case AdhocInstructionType.EVAL:
-            case AdhocInstructionType.IMPORT:
-            case AdhocInstructionType.JUMP:
-            case AdhocInstructionType.LOCAL_DEFINE:
-            case AdhocInstructionType.MODULE_DEFINE:
-                break;
-
-            case AdhocInstructionType.STATIC_DEFINE:
-                break;
-
-            case AdhocInstructionType.NOP:
-            case AdhocInstructionType.SET_STATE_OLD:
-            case AdhocInstructionType.TRY_CATCH:
-            case AdhocInstructionType.UNDEF:
-            case AdhocInstructionType.ATTRIBUTE_EVAL:
-            case AdhocInstructionType.SOURCE_FILE:
-            case AdhocInstructionType.CODE_EVAL:
-            case AdhocInstructionType.LEAVE: // FIX ME LATER
-            case AdhocInstructionType.DELEGATE_DEFINE:
-                break;
-
-            case AdhocInstructionType.LOGICAL_OPTIONAL:
-                break; // To figure if it has any effect
-
-            default:
-                throw new Exception($"Unimplemented instruction handling for stack calculation: {ins.InstructionType}");
-        }
-
-
-        // CALL_OLD
-        // LEAVE
-    }
-
-    public int GetLastInstructionIndex()
+    public int GetInstructionCount()
     {
         return Instructions.Count;
-    }
-
-    public void FreeLocalVariable(LocalVariable localVariable)
-    {
-        Stack.FreeLocalVariable(localVariable);
-    }
-
-    public void FreeStaticVariable(StaticVariable staticVariable)
-    {
-        Stack.FreeStaticVariable(staticVariable);
-    }
-
-    /// <summary>
-    /// Adds a new scope variable to this frame.
-    /// </summary>
-    /// <param name="symbol"></param>
-    /// <param name="isAssignment"></param>
-    /// <param name="isStatic"></param>
-    /// <param name="isLocalDeclaration"></param>
-    /// <returns></returns>
-    /// <exception cref="Exception"></exception>
-    public Variable AddScopeVariable(AdhocSymbol symbol,
-        bool isAssignment = false, 
-        bool isStatic = false, 
-        bool isLocalDeclaration = false)
-    {
-        // TODO: This whole thing should be redone, honestly. It's janky.
-        // Namely, consolidate scopes. Stop relying on the stack itself so much, and let scopes declare their variables and search these instead
-        // We shouldn't be trying to search the stack so much (i.e Stack.TryAdd.. etc), even per frame
-
-        Variable newVariable;
-        var lastScope = CurrentScope;
-
-        if (isAssignment)
-        {
-            if (isStatic)
-            {
-                bool added = Stack.TryAddStaticVariable(symbol, out StaticVariable staticVariable);
-                if (added)
-                    lastScope.StaticScopeVariables.Add(symbol.Name, staticVariable);
-                newVariable = staticVariable;
-            }
-            else if (isLocalDeclaration)// Actually declaring a new local 
-            {
-                bool added = Stack.TryAddLocalVariable(symbol, out LocalVariable localVariable);
-                if (added)
-                    lastScope.LocalScopeVariables.Add(symbol.Name, localVariable);
-                newVariable = localVariable;
-            }
-            else // Assigning to a symbol without a declaration, i.e 'hello = "world"'
-            {
-                if (IsVariableCapturedFromParentScope(symbol))
-                    return AddCapturedVariableFromParentScope(symbol);
-
-                // Are we trying to assign to a local variable?
-                if (Stack.HasLocalVariable(symbol))
-                {
-                    // Assigning to a local that already exists
-                    bool added = Stack.TryAddLocalVariable(symbol, out LocalVariable local_);
-                    if (added)
-                        lastScope.LocalScopeVariables.Add(symbol.Name, local_);
-                    newVariable = local_;
-                }
-                else
-                {
-                    // Nope. Assuming this is a static reference
-
-                    // Is it declared in the current scopes? (statics with same names are allowed to be
-                    // new declarations in different modules, thus go into a different slot)
-                    // i.e:
-                    /* module a
-                     * {
-                     *     static value; <- should be 1
-                     * }
-                     * 
-                     * module b
-                     * {
-                     *     static value; <- should be 2
-                     * }
-                     */
-                    foreach (var scope in CurrentScopes)
-                    {
-                        if (scope.StaticScopeVariables.TryGetValue(symbol.Name, out StaticVariable staticVar))
-                        {
-                            if (staticVar.StackIndex == -1) // Likely wasn't pushed to stack yet. Old adhoc versions don't declare functions as static slots until used
-                                Stack.AddStaticVariable(staticVar);
-
-                            return staticVar;
-                        }
-                    }
-
-                    StaticVariable static_;
-                    if (ParentFrame is null) // No parent frame? we may be referencing a static not declared in this frame's scopes - probably not the best way to handle this..
-                    {
-                        static_ = new StaticVariable() { Symbol = symbol };
-                        Stack.AddStaticVariable(static_);
-                    }
-                    else
-                    {
-                        // Otherwise we are in a function or method.
-                        // We need to track whether a static was already evaluated
-                        // i.e:
-                        /* if (a) <- should be 1
-                         *     ;
-                         * if (a) <- should still be 1!
-                         *     ;
-                         */
-                        Stack.TryAddStaticVariable(symbol, out static_);
-                    }
-                    lastScope.StaticScopeVariables.TryAdd(symbol.Name, static_);
-                    newVariable = static_;
-                }
-            }
-        }
-        else
-        {
-            // Undeclared variable accesses
-
-            // Captured variable from parent function?
-            if (IsVariableCapturedFromParentScope(symbol))
-                return AddCapturedVariableFromParentScope(symbol);
-
-            if (isStatic || !Stack.HasLocalVariable(symbol))
-            {
-                // Is it declared in the current scopes?
-                foreach (var scope in CurrentScopes)
-                {
-                    if (scope.StaticScopeVariables.TryGetValue(symbol.Name, out StaticVariable staticVar))
-                    {
-                        if (staticVar.StackIndex == -1) // Likely wasn't pushed to stack yet. Old adhoc versions don't declare functions as static slots until used
-                            Stack.AddStaticVariable(staticVar);
-
-                        return staticVar;
-                    }
-                }
-
-                StaticVariable static_;
-                if (ParentFrame is null) // No parent frame? we may be referencing a static not declared in this frame's scopes - probably not the best way to handle this..
-                {
-                    static_ = new StaticVariable() { Symbol = symbol };
-                    Stack.AddStaticVariable(static_);
-                }
-                else
-                    Stack.TryAddStaticVariable(symbol, out static_);
-
-                lastScope.StaticScopeVariables.TryAdd(symbol.Name, static_);
-                newVariable = static_;
-            }
-            else
-            {
-                // Variable already exists, just get the index
-                Stack.TryAddLocalVariable(symbol, out LocalVariable localVariable);
-                newVariable = localVariable;
-            }
-        }
-
-        // Grab our variable index, whether it's been added or not
-        if (newVariable is LocalVariable local)
-        {
-            if (local.StackIndex == -1)
-                throw new Exception($"Could not find local variable index for {local}");
-
-            return local;
-        }
-        else if (newVariable is StaticVariable staticVar)
-        {
-            if (staticVar.StackIndex == -1)
-                throw new Exception($"Could not find static variable index for {staticVar}");
-            return staticVar;
-        }
-        else
-            throw new Exception("Variable is not a local or static variable..?");
-    }
-
-    /// <summary>
-    /// Checks whether a certain symbol is a captured variable.
-    /// </summary>
-    /// <param name="symbol"></param>
-    /// <returns></returns>
-    private bool IsVariableCapturedFromParentScope(AdhocSymbol symbol)
-    {
-        if (!ContextAllowsVariableCaptureFromParentFrame)
-            return false;
-
-        if (ParentFrame is null) // No parent? Not capturing anything
-            return false;
-
-        if (!ParentFrame.Stack.HasLocalVariable(symbol)) // Does the symbol exist in parent? If not, not capturing anything
-            return false;
-
-        // Check conflicts with other locals or params
-        return (!Stack.HasLocalVariable(symbol) && !FunctionParameters.Contains(symbol) || CapturedCallbackVariables.Any(e => e.Symbol.Name == symbol.Name));
-    }
-
-
-    /// <summary>
-    /// Adds a captured symbol to the current frame.
-    /// </summary>
-    /// <param name="symbol"></param>
-    /// <param name="newVariable"></param>
-    /// <returns>Returns stack index of captured variable</returns>
-    private LocalVariable AddCapturedVariableFromParentScope(AdhocSymbol symbol)
-    {
-        LocalVariable local = CapturedCallbackVariables.FirstOrDefault(e => e.Symbol == symbol);
-        if (local is null)
-        {
-            // Add captured variable to current frame
-            Stack.TryAddLocalVariable(symbol, out local);
-
-            CapturedCallbackVariables.Add(local);
-        }
-
-        // Captured variables have backward indices
-        local.StackIndex = -(CapturedCallbackVariables.IndexOf(local) + 1); // 0 -> -1, 1 -> -2 etc
-        return local;
-    }
-
-    public bool IsStaticModuleFieldOrAttribute(AdhocSymbol symbol, AdhocModule relativeTo)
-    {
-        // Recursively check all modules
-        static bool HasStatic(AdhocSymbol symbol, AdhocModule module)
-        {
-            if (module.IsDefinedStaticMember(symbol) || module.IsDefinedAttributeMember(symbol))
-                return true;
-            else if (module.ParentModule is not null)
-                return HasStatic(symbol, module.ParentModule);
-            else
-                return false;
-        }
-
-        return HasStatic(symbol, relativeTo);
-    }
-
-    public void AddAttributeOrStaticMemberVariable(AdhocSymbol symbol)
-    {
-        var newVar = new StaticVariable() { Symbol = symbol };
-
-        // TODO: Refactor me maybe?
-        Stack.AddStaticVariable(newVar);
-        CurrentScope.StaticScopeVariables.TryAdd(symbol.Name, newVar);
-    }
-
-    /// <summary>
-    /// Returns whether a symbol is a static variable for this frame and module context.
-    /// </summary>
-    /// <param name="symb"></param>
-    /// <param name="relativeTo"></param>
-    /// <returns></returns>
-    public bool IsStaticVariable(AdhocSymbol symb, AdhocModule relativeTo)
-    {
-        if (symb.Name == AdhocConstants.SELF)
-            return false;
-
-        if (Stack.HasLocalVariable(symb))
-            return false; // Priorize local variables
-
-        if (IsStaticModuleFieldOrAttribute(symb, relativeTo))
-            return true;
-
-        return true;
-    }
-
-    public LoopContext GetLoopByLabel(string label)
-    {
-        foreach (var scope in CurrentScopes)
-        {
-            if (scope is LoopContext loopCtx)
-            {
-                if (loopCtx.IsLabeled && loopCtx.Label == label)
-                    return loopCtx;
-            }
-        }
-
-        return null;
-    }
-
-    public ScopeContext GetLastBreakControlledScope()
-    {
-        foreach (var scope in CurrentScopes)
-        {
-            if (scope is LoopContext || scope is SwitchContext)
-                return scope;
-        }
-
-        return null;
     }
 
     public void Write(AdhocStream stream)
@@ -609,10 +89,9 @@ public class AdhocCodeFrame
             stream.WriteByte((byte)Version.VersionNumber);
         }
 
-        if (SourceFilePath != null)
-            stream.WriteSymbol(SourceFilePath);
+        stream.WriteSymbol(SourceFilePath);
 
-        if (Version.VersionNumber >= 12)
+        if (Version.SupportsRestElement())
             stream.WriteBoolean(HasRestElement); // Not sure for Version 14
 
         if (Version.VersionNumber > 3)
@@ -632,7 +111,7 @@ public class AdhocCodeFrame
             stream.WriteInt32(CapturedCallbackVariables.Count);
             for (int i = 0; i < CapturedCallbackVariables.Count; i++)
             {
-                LocalVariable capturedVariable = CapturedCallbackVariables[i];
+                (int StackIndex, AdhocSymbol Symbol) capturedVariable = CapturedCallbackVariables[i];
                 stream.WriteSymbol(capturedVariable.Symbol);
                 stream.WriteInt32(capturedVariable.StackIndex);
             }
@@ -641,19 +120,19 @@ public class AdhocCodeFrame
         }
 
 
-        if (!Version.UsesNewSplitStack())
+        if (Version.UsesNewSplitStack())
         {
-            stream.WriteInt32(Stack.GetLocalVariableStorageSize());
-            stream.WriteInt32(Stack.GetStackSize());
+            // Actual stack size
+            stream.WriteInt32(MaxStackIndex);
+
+            /* These two are combined to make the size of the storage for variables */
+            stream.WriteInt32(MaxLocalIndex);
+            stream.WriteInt32(MaxStaticIndex);
         }
         else
         {
-            // Actual stack size
-            stream.WriteInt32(Stack.GetStackSize());
-
-            /* These two are combined to make the size of the storage for variables */
-            stream.WriteInt32(Stack.GetLocalVariableStorageSize());
-            stream.WriteInt32(Stack.GetStaticVariableStorageSize());
+            stream.WriteInt32(MaxLocalIndex);
+            stream.WriteInt32(MaxStackIndex);
         }
 
         stream.WriteInt32(Instructions.Count);
@@ -712,12 +191,8 @@ public class AdhocCodeFrame
                 for (int i = 0; i < funcArgs; i++)
                 {
                     var symbol = stream.ReadSymbol();
-                    int stackIdx = stream.ReadInt32();
-                    CapturedCallbackVariables.Add(new LocalVariable()
-                    {
-                        Symbol = symbol,
-                        StackIndex = stackIdx,
-                    });
+                    int stackIndex = stream.ReadInt32();
+                    CapturedCallbackVariables.Add((stackIndex, symbol));
                 }
             }
 
@@ -726,16 +201,14 @@ public class AdhocCodeFrame
 
         if (!Version.UsesNewSplitStack())
         {
-            var stackOld = Stack as AdhocStackOld;
-            stackOld.VariableStorageSize = stream.ReadInt32();
-            stackOld.StackSize = stream.ReadInt32();
+            MaxStackIndex = stream.ReadInt32();
+            MaxLocalIndex = stream.ReadInt32();
         }
         else
         {
-            var stack = Stack as AdhocStack;
-            stack.StackSize = stream.ReadInt32();
-            stack.LocalVariableStorageSize = stream.ReadInt32();
-            stack.StaticVariableStorageSize = stream.ReadInt32();
+            MaxStackIndex = stream.ReadInt32();
+            MaxLocalIndex = stream.ReadInt32();
+            MaxStackIndex = stream.ReadInt32();
         }
 
         InstructionCountOffset = (uint)stream.Position;
@@ -790,7 +263,7 @@ public class AdhocCodeFrame
             sb.Append('[');
             for (int i = 0; i < CapturedCallbackVariables.Count; i++)
             {
-                sb.Append(CapturedCallbackVariables[i].Symbol.Name);//.Append($"[{CapturedCallbackVariables[i].Id}]");
+                sb.Append(CapturedCallbackVariables[i].Symbol);//.Append($"[{CapturedCallbackVariables[i].Id}]");
                 if (i != CapturedCallbackVariables.Count - 1)
                     sb.Append(", ");
             }
@@ -804,7 +277,7 @@ public class AdhocCodeFrame
             sb.Append(" (").Append(InstructionCountOffset.ToString("X2")).Append(')');
         sb.AppendLine();
 
-        sb.Append($"  > Stack Size: {Stack.GetStackSize()} - Variable Heap Size: {Stack.GetLocalVariableStorageSize()} - Variable Heap Size Static: {(!Version.UsesNewSplitStack() ? "=Variable Heap Size" : $"{Stack.GetStaticVariableStorageSize()}")}");
+        sb.Append($"  > Stack Size: {MaxStackIndex} - MaxLocalIndex: {MaxLocalIndex} - MaxStaticIndex: {(!Version.UsesNewSplitStack() ? "=MaxLocalIndex" : $"{MaxStaticIndex}")}");
 
         return sb.ToString();
     }

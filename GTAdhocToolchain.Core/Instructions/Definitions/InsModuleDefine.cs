@@ -15,21 +15,21 @@ public class InsModuleDefine : InstructionBase
 
     public override string InstructionName => "MODULE_DEFINE";
 
-    public List<AdhocSymbol> Names { get; set; } = [];
+    public List<AdhocSymbol> Path { get; set; } = [];
 
-    public InsModuleDefine()
+    public InsModuleDefine(List<AdhocSymbol>? path = null)
     {
-        
+        Path = path ?? [];
     }
 
     public override void Serialize(AdhocStream stream)
     {
-        stream.WriteSymbols(Names);
+        stream.WriteSymbols(Path);
     }
 
     public override void Deserialize(AdhocStream stream)
     {
-        Names = stream.ReadSymbols();
+        Path = stream.ReadSymbols();
     }
 
     public override string ToString()
@@ -38,5 +38,5 @@ public class InsModuleDefine : InstructionBase
     }
 
     public override string Disassemble(bool asCompareMode = false)
-       => $"{InstructionType}: {string.Join(",", Names.Select(e => e.Name))}";
+       => $"{InstructionType}: {string.Join(",", Path.Select(e => e.Name))}";
 }

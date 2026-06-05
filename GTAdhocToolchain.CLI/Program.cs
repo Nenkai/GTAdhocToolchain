@@ -21,6 +21,7 @@ using GTAdhocToolchain.Packaging;
 using GTAdhocToolchain.Preprocessor;
 using GTAdhocToolchain.Project;
 using System.Reflection;
+using GTAdhocToolchain.Core;
 
 namespace GTAdhocToolchain.CLI;
 
@@ -371,17 +372,14 @@ public class Program
 
             var compiler = new AdhocScriptCompiler(version);
             if (!string.IsNullOrWhiteSpace(baseIncludeFolder))
-            {
                 compiler.SetBaseIncludeFolder(absoluteIncludePath);
-            }
-            compiler.SetSourcePath(inputPath);
 
             if (debugExceptions)
                 compiler.BuildTryCatchDebugStatements();
 
-            compiler.CompileScript(program);
+            AdhocCodeFrame codeFrame = compiler.CompileScript(program, inputPath);
 
-            AdhocCodeGen codeGen = new AdhocCodeGen(compiler.MainFrame, compiler.SymbolMap);
+            AdhocCodeGen codeGen = new AdhocCodeGen(codeFrame, compiler.SymbolMap);
             codeGen.Generate();
             codeGen.SaveTo(output);
 
@@ -476,10 +474,9 @@ public class Program
                 try
                 {
                     var compiler = new AdhocScriptCompiler(replVerbs.Version);
-                    compiler.SetSourcePath("test.ad");
-                    compiler.CompileScript(program);
+                    AdhocCodeFrame codeFrame = compiler.CompileScript(program, "test.ad");
 
-                    AdhocCodeGen codeGen = new AdhocCodeGen(compiler.MainFrame, compiler.SymbolMap);
+                    AdhocCodeGen codeGen = new AdhocCodeGen(codeFrame, compiler.SymbolMap);
                     codeGen.Generate();
 
                     for (int i = 0; i < codeGen.Frame.Instructions.Count; i++)

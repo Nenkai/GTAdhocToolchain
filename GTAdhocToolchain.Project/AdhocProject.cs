@@ -16,6 +16,7 @@ using GTAdhocToolchain.Packaging;
 using GTAdhocToolchain.Menu;
 using GTAdhocToolchain.Menu.Fields;
 using GTAdhocToolchain.Preprocessor;
+using GTAdhocToolchain.Core;
 
 namespace GTAdhocToolchain.Project;
 
@@ -189,14 +190,13 @@ public class AdhocProject
             var compiler = new AdhocScriptCompiler(Version);
             compiler.SetBaseIncludeFolder(BaseIncludeFolder);
             compiler.SetProjectDirectory(ProjectDir);
-            compiler.SetSourcePath(ProjectFolder + "/" + tmpFileName);
 
             if (debug)
                 compiler.BuildTryCatchDebugStatements();
 
-            compiler.CompileScript(program);
+            AdhocCodeFrame codeFrame = compiler.CompileScript(program, ProjectFolder + "/" + tmpFileName);
 
-            AdhocCodeGen codeGen = new AdhocCodeGen(compiler.MainFrame, compiler.SymbolMap);
+            AdhocCodeGen codeGen = new AdhocCodeGen(codeFrame, compiler.SymbolMap);
             codeGen.Generate();
             customOutputDir = string.IsNullOrWhiteSpace(customOutputDir) ? "" : Path.GetDirectoryName(customOutputDir);
             var outputPath = Path.Combine(string.IsNullOrWhiteSpace(customOutputDir) ? ProjectDir : customOutputDir, OutputName) + ".adc";
@@ -281,10 +281,9 @@ public class AdhocProject
                 var compiler = new AdhocScriptCompiler(Version);
                 compiler.SetBaseIncludeFolder(BaseIncludeFolder);
                 compiler.SetProjectDirectory(ProjectDir);
-                compiler.SetSourcePath(srcFile.SourcePath);
-                compiler.CompileScript(program);
+                AdhocCodeFrame codeFrame = compiler.CompileScript(program, srcFile.SourcePath);
 
-                AdhocCodeGen codeGen = new AdhocCodeGen(compiler.MainFrame, compiler.SymbolMap);
+                AdhocCodeGen codeGen = new AdhocCodeGen(codeFrame, compiler.SymbolMap);
                 codeGen.Generate();
                 codeGen.SaveTo(Path.Combine(pkgContentPath, Path.ChangeExtension(srcFile.Name, ".adc")));
 

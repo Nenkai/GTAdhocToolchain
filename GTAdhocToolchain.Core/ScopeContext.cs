@@ -14,21 +14,42 @@ namespace GTAdhocToolchain.Core;
 public class ScopeContext
 {
     /// <summary>
-    /// Declared local variables for this scope.
+    /// Variables declared in this scope.
     /// </summary>
-    public Dictionary<string, LocalVariable> LocalScopeVariables { get; set; } = [];
+    public Dictionary<AdhocSymbol, Variable> Variables { get; set; } = [];
 
     /// <summary>
-    /// Declared static variables for this scope.
-    /// This is used to clean up static references on module leaves, so that some static references don't conflict.
-    /// i.e: Root "hidden.visible".
+    /// Type of scope.
     /// </summary>
-    public Dictionary<string, StaticVariable> StaticScopeVariables { get; set; } = [];
+    public AdhocScopeType Type { get; set; } = AdhocScopeType.Normal;
 
-    public Node SourceNode { get; set; }
+    /// <summary>
+    /// Number of locals declared in this scope.
+    /// </summary>
+    public int NumLocals { get; set; }
 
-    public ScopeContext(Node node)
-    {
-        SourceNode = node;
-    }
+    public int StackCounter { get; set; }
+
+    /// <summary>
+    /// Whether to emit a LEAVE instruction on scope exit.
+    /// </summary>
+    public bool CleanupOnExit { get; set; } = false;
+}
+
+public enum AdhocScopeType
+{
+    /// <summary>
+    /// Regular scope.
+    /// </summary>
+    Normal = 0,
+
+    /// <summary>
+    /// Scope is top level frame.
+    /// </summary>
+    TopLevel = 1,
+
+    /// <summary>
+    /// Scope is also a module or class definition.
+    /// </summary>
+    ModuleOrClass = 2,
 }

@@ -6,7 +6,11 @@ using GTAdhocToolchain.Core;
 using GTAdhocToolchain.Core.Instructions;
 using GTAdhocToolchain.Core.Variables;
 
+using System.Data.SqlTypes;
 using System.Diagnostics;
+using System.Drawing;
+using System.Net;
+using System.Xml.Linq;
 
 namespace GTAdhocToolchain.Compiler;
 
@@ -17,32 +21,77 @@ public class AdhocScriptCompiler
 {
     private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
+    ///////////////////////////////////////////////////////////////////
+    // The following proeprties are part of the original compiler
+    ///////////////////////////////////////////////////////////////////
+
+    /// <summary>
+    /// List of all code frames.
+    /// </summary>
+    public List<AdhocCodeFrame> Frames { get; set; } = [];
+
+    /// <summary>
+    /// Current code frame.
+    /// </summary>
+    public AdhocCodeFrame CurrentFrame => Frames.Count > 0 ? Frames[^1] : null;
+
+    /// <summary>
+    /// List of all defined scopes.
+    /// </summary>
+    public List<ScopeContext> Scopes { get; set; } = [];
+
+    /// <summary>
+    /// Current scope.
+    /// </summary>
+    public ScopeContext CurrentLocalScope => Scopes.Count > 0 ? Scopes[^1] : null;
+
+    /// <summary>
+    /// List of all module or class scopes.
+    /// </summary>
+    public List<ScopeContext> ModuleOrClassScopes { get; set; } = [];
+
+    /// <summary>
+    /// Current module or class scope.
+    /// </summary>
+    public ScopeContext CurrentModuleOrClassScope => ModuleOrClassScopes.Count > 0 ? ModuleOrClassScopes[^1] : null;
+
+    // Original compiler has these two as std::list<std::pair<Symbol, std::vector<int>>>.
+    public List<(string Label, List<int> Jumps)> Continues { get; set; } = [];
+    public List<(string Label, List<int> Jumps)> Breaks { get; set; } = [];
+
+    // This would be part of hParser
+
+    /// <summary>
+    /// Parent modules. Does not include the current module. Use <see cref="CurrentModule"/> to get the current module.<br/>
+    /// Only used to determine the current module/class. When leaving modules/classes.
+    /// </summary>
+    // GT7 1.00: 305E6D0 (ParserModuleListMaybe::Push)
+    public List<DeclModule> ParentModules { get; set; } = [];
+
+    /// <summary>
+    /// Top level module (__toplevel__).
+    /// </summary>
+    public DeclModule TopLevel { get; set; }
+
+    /// <summary>
+    /// Current module.
+    /// </summary>
+    public DeclModule CurrentModule { get; set; }
+
+    /// <summary>
+    /// Module or class depth per frame.
+    /// </summary>
+    public LinkedList<int> DepthPerFrame { get; set; } = new();
+
+    ///////////////////////////////////////////////////////////////////
+    // ... End of original compiler properties
+    ///////////////////////////////////////////////////////////////////
+
+    // Additional fields relevant to us
     /// <summary>
     /// All the symbols defined for the current compilation unit.
     /// </summary>
     public AdhocSymbolMap SymbolMap { get; set; } = new();
-
-    /// <summary>
-    /// Main code frame.
-    /// </summary>
-    public AdhocCodeFrame MainFrame { get; set; }
-
-    /// <summary>
-    /// FULL Module stack. Top level is included.
-    /// </summary>
-    public Stack<AdhocModule> Modules { get; set; } = new();
-
-    /// <summary>
-    /// Current operating module.
-    /// </summary>
-    public AdhocModule CurrentModule => Modules.Peek();
-
-    /// <summary>
-    /// Current module/class scopes. Top level is not included.
-    /// </summary>
-    public Stack<ScopeContext> ModuleOrClassScopes { get; set; } = new();
-
-    public Dictionary<string, AdhocModule> TopLevelModules { get; set; } = [];
 
     public HashSet<string> PostCompilationWarnings = [];
 
@@ -51,20 +100,14 @@ public class AdhocScriptCompiler
 
     public AdhocScriptCompiler(uint version)
     {
-        var topLevelModule = new AdhocModule();
-        Modules.Push(topLevelModule); // Top Level Module
-
-        SetupFrame(version);
+        // Normally part of parser
+        CurrentModule = new DeclModule(parent: null, "__toplevel__", AdhocVariableType.Module);
+        TopLevel = CurrentModule;
     }
 
     public string BaseIncludeFolder { get; set; }
     public string ProjectDirectory { get; set; }
     public string BaseDirectory { get; set; }
-
-    public void SetSourcePath(string path)
-    {
-        MainFrame.SetSourcePath(SymbolMap, path);
-    }
 
     public void SetBaseIncludeFolder(string dir)
     {
@@ -77,39 +120,42 @@ public class AdhocScriptCompiler
     }
 
     /// <summary>
-    /// Setups the compiler's version and the stack along with it.
-    /// </summary>
-    /// <param name="version"></param>
-    private void SetupFrame(uint version)
-    {
-        MainFrame = new AdhocCodeFrame(new AdhocVersion(version));
-    }
-
-    /// <summary>
     /// Compiles a script.
     /// </summary>
     /// <param name="script"></param>
-    public void CompileScript(Script script)
+    public AdhocCodeFrame CompileScript(Script script, string? sourcePath = null)
     {
         Logger.Info("Started script compilation.");
 
-        if (MainFrame.SourceFilePath is null)
-            MainFrame.SetSourcePath(SymbolMap, "<unnamed file>");
+        ParentModules.Add(CurrentModule);
+        SetCurrentModulePath(["main", "main"], AdhocVariableType.Module);
+
+        EnterCodeFrame();
+
+        if (!string.IsNullOrEmpty(sourcePath))
+            CurrentFrame.SetSourcePath(SymbolMap.RegisterSymbol(sourcePath, false));
+
+        if (CurrentFrame.SourceFilePath is null)
+            CurrentFrame.SetSourcePath(SymbolMap.RegisterSymbol("<unnamed file>", false));
 
         // Always an empty one in old versions (same in subroutines)
-        if (MainFrame.Version.HasReservedLocalInFrame())
-            MainFrame.Stack.AddLocalVariable(new LocalVariable() { Symbol = null });
+        if (CurrentFrame.Version.HasReservedLocalInFrame())
+            ;// MainFrame.Stack.AddLocalVariable(new LocalVariable() { Symbol = null }); TODO
 
-        EnterScope(MainFrame, script);
-        CompileScriptBody(MainFrame, script);
-        LeaveScope(MainFrame, insertLeaveInstruction: MainFrame.CurrentScope.LocalScopeVariables.Count > 0);
+        CompileScriptBody(script);
 
         // Script done.
-        InsertSetState(MainFrame, AdhocRunState.EXIT);
+        InsertSetState(AdhocRunState.EXIT);
+        var mainCodeFrame = LeaveCodeFrame();
+        ParentModules.Remove(CurrentModule);
 
+        //////////////////////////////////////////////
+        // Done With everything.
+        //////////////////////////////////////////////
         PrintPostCompilationWarnings();
-
         Logger.Info($"Script successfully compiled.");
+
+        return mainCodeFrame;
 
     }
 
@@ -118,9 +164,9 @@ public class AdhocScriptCompiler
     /// </summary>
     /// <param name="frame"></param>
     /// <param name="script"></param>
-    public void CompileScriptBody(AdhocCodeFrame frame, Script script)
+    public void CompileScriptBody(Script script)
     {
-        CompileStatements(frame, script.Body);
+        CompileStatements(script.Body);
     }
 
     /// <summary>
@@ -132,145 +178,148 @@ public class AdhocScriptCompiler
         _debugThrow = new AdhocAbstractSyntaxTree("throw __ex;").ParseScript();
     }
 
-    public void CompileStatements(AdhocCodeFrame frame, Node node)
+    public void CompileStatementList(Node node)
     {
         foreach (var n in node.ChildNodes)
-            CompileStatement(frame, n);
+            CompileStatement(n);
     }
 
-    public void CompileStatements(AdhocCodeFrame frame, NodeList<Statement> nodes)
+    public void CompileStatements(NodeList<Statement> nodes)
     {
         if (_debugPrintException != null)
         {
             // This is super hacky. But the intent is a hack anyway.
             var tryCatch = new InsTryCatch();
-            frame.AddInstruction(tryCatch, 0);
+            AddInstruction(tryCatch, 0);
 
             foreach (var n in nodes)
-                CompileStatement(frame, n);
+                CompileStatement(n);
 
-            InsertSetState(frame, AdhocRunState.EXIT);
-            tryCatch.InstructionIndex = frame.GetLastInstructionIndex();
+            InsertSetState(AdhocRunState.EXIT);
+            tryCatch.InstructionIndex = CurrentFrame.GetInstructionCount();
 
             InsJump catchClauseSkipper = new InsJump();
-            frame.AddInstruction(catchClauseSkipper, 0);
+            AddInstruction(catchClauseSkipper, 0);
 
-            frame.AddInstruction(new InsIntConst(0), 0);
-            InsertVariablePush(frame, new Identifier("__ex"), true);
-            frame.AddInstruction(InsAssign.Default, 0);
+            AddInstruction(new InsIntConst(0), 0);
+            InsertLocalVariablePush("__ex", 0);
+            AddInstruction(InsAssign.Default, 0);
 
             string tmpCaseVariable = $"catch#{SymbolMap.TempVariableCounter++}";
-            InsertVariablePush(frame, new Identifier(tmpCaseVariable), true);
-            InsertAssignPop(frame);
+            InsertLocalVariablePush(tmpCaseVariable, 0);
+            InsertAssignPop();
 
-            CompileStatement(frame, _debugPrintException.Body[0]);
-            CompileStatement(frame, _debugThrow.Body[0]);
+            CompileStatement(_debugPrintException.Body[0]);
+            CompileStatement(_debugThrow.Body[0]);
 
-            catchClauseSkipper.JumpInstructionIndex = frame.GetLastInstructionIndex();
+            catchClauseSkipper.JumpInstructionIndex = CurrentFrame.GetInstructionCount();
         }
         else
         {
             foreach (var n in nodes)
-                CompileStatement(frame, n);
+                CompileStatement(n);
         }
     }
 
-    public void CompileStatement(AdhocCodeFrame frame, Node node)
+    public void CompileStatement(Node node)
     {
         switch (node.Type)
         {
             case Nodes.ClassDeclaration:
-                CompileClassDeclaration(frame, node as ClassDeclaration);
+                CompileClassDeclaration(node as ClassDeclaration);
+                break;
+            case Nodes.ModuleDeclaration:
+                CompileModuleDeclaration(node as ModuleDeclaration);
                 break;
             case Nodes.FunctionDeclaration:
-                CompileFunctionDeclaration(frame, node as FunctionDeclaration);
+                CompileFunctionDeclaration(node as FunctionDeclaration);
                 break;
             case Nodes.MethodDeclaration:
-                CompileMethodDeclaration(frame, node as MethodDeclaration);
+                CompileMethodDeclaration(node as MethodDeclaration);
                 break;
             case Nodes.ForStatement:
-                CompileFor(frame, node as ForStatement);
+                CompileFor(node as ForStatement);
                 break;
             case Nodes.ForeachStatement:
-                CompileForeach(frame, node as ForeachStatement);
+                CompileForeach(node as ForeachStatement);
                 break;
             case Nodes.WhileStatement:
-                CompileWhile(frame, node as WhileStatement);
+                CompileWhile(node as WhileStatement);
                 break;
             case Nodes.DoWhileStatement:
-                CompileDoWhile(frame, node as DoWhileStatement);
+                CompileDoWhile(node as DoWhileStatement);
                 break;
             case Nodes.ListAssignmentStatement:
-                CompileListAssignmentStatement(frame, node as ListAssignementStatement);
+                CompileListAssignmentStatement(node as ListAssignementStatement);
                 break;
             case Nodes.VariableDeclaration:
-                CompileVariableDeclaration(frame, node as VariableDeclaration);
+                CompileVariableDeclaration(node as VariableDeclaration);
                 break;
             case Nodes.StaticDeclaration:
-                CompileStaticDeclaration(frame, node as StaticDeclaration);
+                CompileStaticDeclaration(node as StaticDeclaration);
                 break;
             case Nodes.AttributeDeclaration:
-                CompileAttributeDeclaration(frame, node as AttributeDeclaration);
+                CompileAttributeDeclaration(node as AttributeDeclaration);
                 break;
             case Nodes.ReturnStatement:
-                CompileReturnStatement(frame, node as ReturnStatement);
+                CompileReturnStatement(node as ReturnStatement);
                 break;
             case Nodes.ImportDeclaration:
-                CompileImport(frame, node as ImportDeclaration);
+                CompileImport(node as ImportDeclaration);
                 break;
             case Nodes.IfStatement:
-                CompileIfStatement(frame, node as IfStatement);
+                CompileIfStatement(node as IfStatement);
                 break;
             case Nodes.BlockStatement:
-                CompileStatementWithScope(frame, node as BlockStatement);
+                CompileBlockStatement(node as BlockStatement);
                 break;
             case Nodes.ExpressionStatement:
-                CompileExpressionStatement(frame, node as ExpressionStatement);
+                CompileExpressionStatement(node as ExpressionStatement);
                 break;
             case Nodes.SwitchStatement:
-                CompileSwitch(frame, node as SwitchStatement);
+                CompileSwitch(node as SwitchStatement);
                 break;
             case Nodes.ContinueStatement:
-                CompileContinue(frame, node as ContinueStatement);
+                CompileContinue(node as ContinueStatement);
                 break;
             case Nodes.BreakStatement:
-                CompileBreak(frame, node as BreakStatement);
+                CompileBreak(node as BreakStatement);
                 break;
             case Nodes.IncludeStatement:
-                CompileIncludeStatement(frame, node as IncludeStatement);
+                CompileIncludeStatement(node as IncludeStatement);
                 break;
             case Nodes.RequireStatement:
-                CompileRequireStatement(frame, node as RequireStatement);
+                CompileRequireStatement(node as RequireStatement);
                 break;
             case Nodes.ThrowStatement:
-                CompileThrowStatement(frame, node as ThrowStatement);
+                CompileThrowStatement(node as ThrowStatement);
                 break;
             case Nodes.FinalizerStatement:
-                CompileFinalizerStatement(frame, node as FinalizerStatement);
+                CompileFinalizerStatement(node as FinalizerStatement);
                 break;
             case Nodes.TryStatement:
-                CompileTryStatement(frame, node as TryStatement);
+                CompileTryStatement(node as TryStatement);
                 break;
             case Nodes.UndefStatement:
-                CompileUndefStatement(frame, node as UndefStatement);
+                CompileUndefStatement(node as UndefStatement);
                 break;
             case Nodes.SourceFileStatement:
-                CompileSourceFileStatement(frame, node as SourceFileStatement);
+                CompileSourceFileStatement(node as SourceFileStatement);
                 break;
             case Nodes.ModuleConstructorStatement:
-                CompileModuleConstructorStatement(frame, node as ModuleConstructorStatement);
+                CompileModuleConstructorStatement(node as ModuleConstructorStatement);
                 break;
             case Nodes.PrintStatement:
-                CompilePrintStatement(frame, node as PrintStatement);
+                CompilePrintStatement(node as PrintStatement);
                 break;
             case Nodes.DelegateDeclaration:
-                CompileDelegateDefinition(frame, node as DelegateDeclaration);
+                CompileDelegateDefinition(node as DelegateDeclaration);
                 break;
             case Nodes.EmptyStatement:
-                CompileEmptyStatement(frame, node);
+                CompileEmptyStatement(node);
                 break;
-            case Nodes.LabeledStatement:
-                CompileLabeledStatement(frame, node as LabeledStatement);
+            case Nodes.LabeledStatement: // NOTE: The original compiler doesn't have this. Instead, the label is part of each loop statement.
+                CompileLabeledStatement(node as LabeledStatement);
                 break;
             default:
                 ThrowCompilationError(node, $"Unsupported statement: {node.Type}");
@@ -278,7 +327,8 @@ public class AdhocScriptCompiler
         }
     }
 
-    private void CompileLabeledStatement(AdhocCodeFrame frame, LabeledStatement labeledStatement)
+    // NOTE: The original compiler doesn't have this. Instead, the label is part of each loop statement.
+    private void CompileLabeledStatement(LabeledStatement labeledStatement)
     {
         if (labeledStatement.Body.Type != Nodes.ForStatement &&
             labeledStatement.Body.Type != Nodes.ForeachStatement &&
@@ -293,64 +343,73 @@ public class AdhocScriptCompiler
         switch (labeledStatement.Body.Type)
         {
             case Nodes.ForStatement:
-                CompileFor(frame, labeledStatement.Body as ForStatement, label);
+                CompileFor(labeledStatement.Body as ForStatement, label);
                 break;
             case Nodes.ForeachStatement:
-                CompileForeach(frame, labeledStatement.Body as ForeachStatement, label);
+                CompileForeach(labeledStatement.Body as ForeachStatement, label);
                 break;
             case Nodes.WhileStatement:
-                CompileWhile(frame, labeledStatement.Body as WhileStatement, label);
+                CompileWhile(labeledStatement.Body as WhileStatement, label);
                 break;
             case Nodes.DoWhileStatement:
-                CompileDoWhile(frame, labeledStatement.Body as DoWhileStatement, label);
+                CompileDoWhile(labeledStatement.Body as DoWhileStatement, label);
                 break;
         }
     }
 
-    private void CompileEmptyStatement(AdhocCodeFrame frame, Node node)
+    private void CompileEmptyStatement(Node node)
     {
-        InsertNop(frame, node.Location.Start.Line);
+        InsertNop(node.Location.Start.Line);
     }
 
-    public void CompilePrintStatement(AdhocCodeFrame frame, PrintStatement printStatement)
+    public void CompilePrintStatement(PrintStatement printStatement)
     {
         foreach (var exp in printStatement.Expressions)
-            CompileExpression(frame, exp);
+            CompileExpression(exp);
 
-        frame.AddInstruction(new InsPrint(printStatement.Expressions.Count), printStatement.Location.Start.Line);
-        InsertPop(frame);
+        AddInstruction(new InsPrint(printStatement.Expressions.Count), printStatement.Location.Start.Line);
+        InsertPop();
     }
 
-    public void CompileModuleConstructorStatement(AdhocCodeFrame frame, ModuleConstructorStatement ctorStatement)
+    public void CompileModuleConstructorStatement(ModuleConstructorStatement ctorStatement)
     {
+        // TODO Push current module
+
         // Compile the target expression
-        CompileExpression(frame, ctorStatement.Id);
+        CompileExpression(ctorStatement.Id);
 
         // Grab target, define a new ctor scope
-        frame.AddInstruction(new InsModuleConstructor(), 0);
+        AddInstruction(new InsModuleConstructor(), 0);
 
-        // Build scope
-        CompileStatement(frame, ctorStatement.Body);
+        // TODO: Push & pop strict?
+        EnterModuleOrClassScope();
+        CompileStatement(ctorStatement.Body);
+        LeaveModuleOrClassScope();
 
         // Exit ctor
-        InsertSetState(frame, AdhocRunState.EXIT);
+        InsertSetState(AdhocRunState.EXIT);
+
+        CurrentModule = ParentModules[^1];
+        ParentModules.Remove(ParentModules[^1]);
     }
 
-    public void CompileSourceFileStatement(AdhocCodeFrame frame, SourceFileStatement srcFileStatement)
+    public void CompileSourceFileStatement(SourceFileStatement srcFileStatement)
     {
         // Source file instructions are supported starting in version 7
-        if (!frame.Version.HasSourceFileInstructionSupport())
+        if (!CurrentFrame.Version.HasSourceFileInstructionSupport())
             return;
 
         InsSourceFile srcFileIns = new InsSourceFile(SymbolMap.RegisterSymbol(srcFileStatement.Path, false));
-        frame.AddInstruction(srcFileIns, 0);
-        frame.SetSourcePath(SymbolMap, srcFileStatement.Path);
+        AddInstruction(srcFileIns, 0);
+        CurrentFrame.SetSourcePath(SymbolMap.RegisterSymbol(srcFileStatement.Path, false));
     }
 
-    public void CompileUndefStatement(AdhocCodeFrame frame, UndefStatement undefStatement)
+    public void CompileUndefStatement(UndefStatement undefStatement)
     {
         // XX/FIXME: Undef may refer to a local variable aswell, it's not supported though
         // GT5 SoundUtil.ad undefs BootInitialize as a local which is a defined user function
+
+        // TODO: Redo this
 
         InsUndef undefIns = new InsUndef();
         var parts = undefStatement.Symbol.Split("::");
@@ -365,65 +424,90 @@ public class AdhocScriptCompiler
 
         undefIns.Symbols.Add(SymbolMap.RegisterSymbol(undefStatement.Symbol)); // full
 
-        frame.AddInstruction(undefIns, undefStatement.Location.Start.Line);
+        AddInstruction(undefIns, undefStatement.Location.Start.Line);
     }
 
-    public void CompileTryStatement(AdhocCodeFrame frame, TryStatement tryStatement)
+    public void CompileTryStatement(TryStatement tryStatement)
     {
         InsTryCatch tryCatch = new InsTryCatch();
-        frame.AddInstruction(tryCatch, tryStatement.Location.Start.Line);
+        AddInstruction(tryCatch, tryStatement.Location.Start.Line);
 
-        if (tryStatement.Block.Type != Nodes.BlockStatement)
-            ThrowCompilationError(tryStatement.Block, CompilationMessages.Error_TryClauseNotBody);
-
-        CompileBlockStatement(frame, tryStatement.Block as BlockStatement);
-        InsertSetState(frame, AdhocRunState.EXIT);
-
-        tryCatch.InstructionIndex = frame.GetLastInstructionIndex();
-
-        if (tryStatement.Handler is not null)
+        if (tryStatement.Block.Type == Nodes.BlockStatement)
         {
-            InsJump catchClauseSkipper = new InsJump();
-            frame.AddInstruction(catchClauseSkipper, 0);
-
-            CompileCatchClause(frame, tryStatement.Handler);
-            catchClauseSkipper.JumpInstructionIndex = frame.GetLastInstructionIndex();
+            CompileStatement(tryStatement.Block);
+        }
+        else
+        {
+            EnterScope();
+            CompileStatement(tryStatement.Block);
+            LeaveScope();
         }
 
-        if (tryStatement.Finalizer is not null)
+        InsertSetState(AdhocRunState.EXIT);
+
+        InsJump catchClauseSkipper = new InsJump();
+        AddInstruction(catchClauseSkipper, 0);
+
+        tryCatch.InstructionIndex = CurrentFrame.GetInstructionCount() - 1;
+
+        var catchClause = tryStatement.Handler as CatchClause;
+        if (catchClause is not null)
         {
-            if (tryStatement.Finalizer.Type != Nodes.BlockStatement)
-                ThrowCompilationError(tryStatement.Block, CompilationMessages.Error_CatchClauseNotBody);
-
-            CompileStatementWithScope(frame, tryStatement.Finalizer);
-        }
-    }
-
-    public void CompileCatchClause(AdhocCodeFrame frame, CatchClause catchClause)
-    {
-        if (catchClause.Param is not null)
-        {
-            if (catchClause.Param.Type != Nodes.Identifier)
-                ThrowCompilationError(catchClause.Param, CompilationMessages.Error_CatchClauseParameterNotIdentifier);
-
-            // Create temp variable for the exception
-            frame.AddInstruction(new InsIntConst(0), 0);
-            InsertVariablePush(frame, catchClause.Param as Identifier, true);
-            frame.AddInstruction(InsAssign.Default, 0);
-
-            string tmpCaseVariable = $"catch#{SymbolMap.TempVariableCounter++}";
-            InsertVariablePush(frame, new Identifier(tmpCaseVariable), true);
-            InsertAssignPop(frame);
+            CompileCatchClause(tryStatement.Handler);
         }
         else
         {
             // Discard (pop) exception object as 0
-            frame.AddInstruction(new InsIntConst(0), 0);
-            frame.AddInstruction(InsPop.Default, 0);
-
+            AddInstruction(new InsIntConst(0), 0);
+            AddInstruction(InsPop.Default, 0);
         }
 
-        CompileBlockStatement(frame, catchClause.Body);
+        catchClauseSkipper.JumpInstructionIndex = CurrentFrame.GetInstructionCount();
+    }
+
+    // GT7 1.00: mCompiler::CompileCatch
+    public void CompileCatchClause(CatchClause catchClause)
+    {
+        // TODO: Support case keyword (with isInstanceOf)
+
+        EnterScope();
+        RegisterLoopLabelForBreak(AdhocConstants.NIL);
+
+        if (catchClause.Param is null)
+            ThrowCompilationError(catchClause, CompilationMessages.Error_CatchClauseParameterNotIdentifier);
+
+        if (catchClause.Param.Type != Nodes.Identifier)
+            ThrowCompilationError(catchClause.Param, CompilationMessages.Error_CatchClauseParameterNotIdentifier);
+
+        var identifier = catchClause.Param as Identifier;
+
+        // Create temp variable for the exception
+        string tmpCaseVariable = $"catch#{SymbolMap.TempVariableCounter++}";
+        DefineVariableInCurrentScope(SymbolMap.RegisterSymbol(tmpCaseVariable), AdhocVariableType.LocalVariable);
+
+        AddInstruction(new InsIntConst(0), 0);
+        InsertLocalVariablePush(identifier.Name, 0); // FIXME: as per original compiler, technically it can be any expression here that is pushed to. so a::b would be allowed
+        AddInstruction(InsAssign.Default, 0);
+
+        InsertLocalVariablePush(tmpCaseVariable, 0);
+        InsertAssignPop();
+
+        var defaultCaseJump = new InsJump();
+        AddInstruction(defaultCaseJump, 0);
+
+        CompileBlockStatement(catchClause.Body);
+
+        int index = LeaveScope();
+        if (/* noDefault */ true)
+        {
+            defaultCaseJump.JumpInstructionIndex = index;
+        }
+        else
+        {
+            // Index of default body
+        }
+
+        ProcessBreaks(index);
     }
 
     /// <summary>
@@ -431,29 +515,27 @@ public class AdhocScriptCompiler
     /// </summary>
     /// <param name="frame"></param>
     /// <param name="BlockStatement"></param>
-    /// <param name="insertLeaveInstruction">Whether to compile a leave scope, which isnt needed for function returns.</param>
-    public void CompileBlockStatement(AdhocCodeFrame frame, BlockStatement BlockStatement, 
-        bool openScope = true, 
-        bool insertLeaveInstruction = true,
+    public void CompileBlockStatement(BlockStatement BlockStatement,
+        bool openScope = true,
         bool emitNops = true)
     {
         if (emitNops)
-            InsertNop(frame, BlockStatement.Location.Start.Line);
+            InsertNop(BlockStatement.Location.Start.Line);
         if (openScope)
-            EnterScope(frame, BlockStatement);
+            EnterScope();
 
-        CompileStatements(frame, BlockStatement.Body);
+        CompileStatements(BlockStatement.Body);
 
         if (openScope)
-            LeaveScope(frame, insertLeaveInstruction && BlockStatement.Body.Count > 0);
+            LeaveScope();
         if (emitNops)
-            InsertNop(frame, BlockStatement.Location.End.Line);
+            InsertNop(BlockStatement.Location.End.Line);
     }
 
-    public void CompileIncludeStatement(AdhocCodeFrame frame, IncludeStatement include)
+    public void CompileIncludeStatement(IncludeStatement include)
     {
         if (string.IsNullOrEmpty(BaseIncludeFolder))
-            BaseIncludeFolder = Path.GetDirectoryName(frame.SourceFilePath.Name);
+            BaseIncludeFolder = Path.GetDirectoryName(CurrentFrame.SourceFilePath.Name);
 
         // Look for the file relative to the provided include path
         string pathToIncludeFile = Path.Combine(BaseIncludeFolder, include.Path);
@@ -469,9 +551,9 @@ public class AdhocScriptCompiler
             else
                 ThrowCompilationError(include, $"Include file does not exist: '{include.Path}'");
         }
-            
 
-        Logger.Info($"Linking include file '{include.Path}' for '{frame.SourceFilePath.Name}'.");
+
+        Logger.Info($"Linking include file '{include.Path}' for '{CurrentFrame.SourceFilePath.Name}'.");
 
         string file = File.ReadAllText(pathToIncludeFile);
 
@@ -480,229 +562,252 @@ public class AdhocScriptCompiler
         Script includeScript = parser.ParseScript();
 
         // Set frame file name to our include file's
-        string oldPath = frame.SourceFilePath.Name;
-        frame.SetSourcePath(SymbolMap, include.Path);
+        string oldPath = CurrentFrame.SourceFilePath.Name;
+        CurrentFrame.SetSourcePath(SymbolMap.RegisterSymbol(include.Path));
 
         // Alert interpreter that the current source file has changed for debugging
         InsSourceFile srcFileIns = new InsSourceFile(SymbolMap.RegisterSymbol(include.Path, false));
-        frame.AddInstruction(srcFileIns, include.Location.Start.Line);
+        AddInstruction(srcFileIns, include.Location.Start.Line);
 
         // Copy include into current frame
-        CompileScriptBody(frame, includeScript);
+        CompileScriptBody(includeScript);
 
         // Resume
-        InsSourceFile ogSrcFileIns = new InsSourceFile(frame.SourceFilePath);
-        frame.AddInstruction(ogSrcFileIns, include.Location.Start.Line);
+        InsSourceFile ogSrcFileIns = new InsSourceFile(CurrentFrame.SourceFilePath);
+        AddInstruction(ogSrcFileIns, include.Location.Start.Line);
 
-        frame.SetSourcePath(SymbolMap, oldPath);
+        CurrentFrame.SetSourcePath(SymbolMap.RegisterSymbol(oldPath));
     }
 
-    public void CompileRequireStatement(AdhocCodeFrame frame, RequireStatement require)
+    public void CompileRequireStatement(RequireStatement require)
     {
-        CompileExpression(frame, require.Path);
-        frame.AddInstruction(InsRequire.Default, require.Location.Start.Line);
+        CompileExpression(require.Path);
+        AddInstruction(InsRequire.Default, require.Location.Start.Line);
     }
 
-    public void CompileThrowStatement(AdhocCodeFrame frame, ThrowStatement throwStatement)
+    public void CompileThrowStatement(ThrowStatement throwStatement)
     {
-        CompileExpression(frame, throwStatement.Argument);
-        frame.AddInstruction(InsThrow.Default, throwStatement.Location.Start.Line);
+        CompileExpression(throwStatement.Argument);
+        AddInstruction(InsThrow.Default, throwStatement.Location.Start.Line);
     }
 
-    public void CompileBreak(AdhocCodeFrame frame, BreakStatement breakStatement)
+    // GT7 1.00: 30DB010 (mCompiler::CompileBreak)
+    public void CompileBreak(BreakStatement breakStatement)
     {
-        if (breakStatement.Label is not null)
+        if (breakStatement.Label is null)
         {
-            var loopCtx = frame.GetLoopByLabel(breakStatement.Label.Name);
-            if (loopCtx is null)
-                ThrowCompilationError(breakStatement.Label, string.Format(CompilationMessages.Error_LoopWithLabelNotFound, breakStatement.Label.Name));
-
-            InsJump breakJmp = new InsJump();
-            loopCtx.BreakJumps.Add(breakJmp);
-            frame.AddInstruction(breakJmp, breakStatement.Location.Start.Line);
-        }
-        else
-        {
-            var scope = frame.GetLastBreakControlledScope();
-            if (scope is LoopContext loopCtx)
-            {
-                InsJump breakJmp = new InsJump();
-                loopCtx.BreakJumps.Add(breakJmp);
-                frame.AddInstruction(breakJmp, breakStatement.Location.Start.Line);
-            }
-            else if (scope is SwitchContext swContext)
-            {
-                InsJump breakJmp = new InsJump();
-                swContext.BreakJumps.Add(breakJmp);
-                frame.AddInstruction(breakJmp, breakStatement.Location.Start.Line);
-            }
-            else
-            {
+            if (Breaks.Count == 0 || Breaks[^1].Label == AdhocConstants.FUNCTION)
                 ThrowCompilationError(breakStatement, CompilationMessages.Error_BreakWithoutContextualScope);
-            }
-        }
-    }
 
-    public void CompileClassDeclaration(AdhocCodeFrame frame, ClassDeclaration classDecl)
-    {
-        CompileNewClass(frame, classDecl.Id, classDecl.SuperClass, classDecl.Body, classDecl.IsModule);
-    }
+            int idx = CurrentFrame.GetInstructionCount();
+            InsJump continueJump = new InsJump();
+            AddInstruction(continueJump, breakStatement.Location.Start.Line);
 
-    private void CompileNewClass(AdhocCodeFrame frame, Expression id, Node superClass, Statement body, bool isModule = false)
-    {
-        if (id is null)
-        {
-            ThrowCompilationError(id, CompilationMessages.Error_ModuleOrClassNameInvalid);
-            return;
-        }
-        else if (!isModule && id.Type == Nodes.StaticIdentifier)
-        {
-            ThrowCompilationError(id, "Class name cannot be static.");
-            return;
-        }
-
-        bool isStatic = id.Type == Nodes.StaticIdentifier;
-        string name = id.Type == Nodes.StaticIdentifier ? (id as StaticIdentifier).Id.Name :
-                                                          (id as Identifier).Name;
-
-        Logger.Debug($"L{id.Location.Start.Line} - Compiling {(isModule ? "module" : "class")} '{name}'");
-        AdhocModule moduleOrClass = EnterModuleOrClass(frame, body);
-        TopLevelModules.TryAdd(name, moduleOrClass);
-
-        if (isModule)
-        {
-            InsModuleDefine mod = new InsModuleDefine();
-
-            if (name.Contains(AdhocConstants.OPERATOR_STATIC))
-            {
-                foreach (string identifier in name.Split(AdhocConstants.OPERATOR_STATIC))
-                    mod.Names.Add(SymbolMap.RegisterSymbol(identifier));
-                mod.Names.Add(SymbolMap.RegisterSymbol(name)); // Full
-            }
-            else
-            {
-                mod.Names.Add(SymbolMap.RegisterSymbol(name));
-
-                // Static modules mean they belong to strictly one path, so main,main in any module context is absolute
-                if (isStatic)
-                    mod.Names.Add(SymbolMap.RegisterSymbol(name));
-            }
-
-            frame.AddInstruction(mod, id.Location.Start.Line);
-            moduleOrClass.Name = name;
+            Breaks[^1].Jumps.Add(idx);
         }
         else
         {
-            if (name.Contains(AdhocConstants.OPERATOR_STATIC))
-                ThrowCompilationError(superClass, CompilationMessages.Error_ClassNameIsStatic);
-
-            InsClassDefine @class = new InsClassDefine();
-            @class.Name = SymbolMap.RegisterSymbol(name);
-            moduleOrClass.Name = name;
-
-            var superClassIdent = superClass as Identifier;
-            if (superClass is not null)
+            foreach (var labelKv in Breaks)
             {
-                if (superClassIdent.Name.Contains(AdhocConstants.OPERATOR_STATIC))
+                if (labelKv.Label == breakStatement.Label.Name)
                 {
-                    foreach (var path in superClassIdent.Name.Split(AdhocConstants.OPERATOR_STATIC))
-                        @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol(path));
-                }
+                    int idx = CurrentFrame.GetInstructionCount();
 
-                @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol(superClassIdent.Name));
+                    InsJump continueJump = new InsJump();
+                    AddInstruction(continueJump, breakStatement.Location.Start.Line);
+                    labelKv.Jumps.Add(idx);
+                    return;
+                }
+            }
+
+            ThrowCompilationError(breakStatement.Label, string.Format(CompilationMessages.Error_LoopWithLabelNotFound, breakStatement.Label.Name));
+        }
+    }
+
+    // GT7 1.00: 30DB530 (mCompiler::CompileContinue)
+    public void CompileContinue(ContinueStatement continueStatement)
+    {
+        if (continueStatement.Label is null)
+        {
+            if (Continues.Count == 0 || Continues[^1].Label == AdhocConstants.FUNCTION)
+                ThrowCompilationError(continueStatement, CompilationMessages.Error_ContinueWithoutContextualScope);
+
+            int idx = CurrentFrame.GetInstructionCount();
+            InsJump continueJump = new InsJump();
+            AddInstruction(continueJump, continueStatement.Location.Start.Line);
+
+            Continues[^1].Jumps.Add(idx);
+        }
+        else
+        {
+            foreach (var labelKv in Continues)
+            {
+                if (labelKv.Label == continueStatement.Label.Name)
+                {
+                    int idx = CurrentFrame.GetInstructionCount();
+
+                    InsJump continueJump = new InsJump();
+                    AddInstruction(continueJump, continueStatement.Location.Start.Line);
+                    labelKv.Jumps.Add(idx);
+                    return;
+                }
+            }
+
+            ThrowCompilationError(continueStatement.Label, string.Format(CompilationMessages.Error_LoopWithLabelNotFound, continueStatement.Label.Name));
+        }
+    }
+
+    public void CompileClassDeclaration(ClassDeclaration classDecl)
+    {
+        Identifier name = classDecl.Id as Identifier;
+        SetCurrentClass(name);
+
+        InsClassDefine @class = new InsClassDefine();
+        @class.Name = SymbolMap.RegisterSymbol(name.Name);
+
+        if (classDecl.SuperClass is not null)
+        {
+            var superClassIdent = classDecl.SuperClass as Identifier;
+            if (superClassIdent.Name.Contains(AdhocConstants.OPERATOR_STATIC))
+            {
+                foreach (var path in superClassIdent.Name.Split(AdhocConstants.OPERATOR_STATIC))
+                    @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol(path));
+            }
+
+            @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol(superClassIdent.Name));
+        }
+        else
+        {
+            // Not provided, inherits from base object (System::Object, or Object if old)
+            if (CurrentFrame.Version.ObjectInheritsFromSystemObject())
+            {
+                @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol(AdhocConstants.SYSTEM));
+                @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol(AdhocConstants.OBJECT));
+                @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol($"{AdhocConstants.SYSTEM}{AdhocConstants.OPERATOR_STATIC}{AdhocConstants.OBJECT}"));
             }
             else
-            {
-                // Not provided, inherits from base object (System::Object, or Object if old)
-                if (frame.Version.ObjectInheritsFromSystemObject())
-                {
-                    @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol(AdhocConstants.SYSTEM));
-                    @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol(AdhocConstants.OBJECT));
-                    @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol($"{AdhocConstants.SYSTEM}{AdhocConstants.OPERATOR_STATIC}{AdhocConstants.OBJECT}"));
-                }
-                else
-                    @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol(AdhocConstants.OBJECT));
-            }
-
-            frame.AddInstruction(@class, id.Location.Start.Line);
+                @class.ExtendsFrom.Add(SymbolMap.RegisterSymbol(AdhocConstants.OBJECT));
         }
 
-        // Compile statements directly, we don't need a regular leave.
-        CompileStatementWithScope(frame, body as BlockStatement);
+        AddInstruction(@class, classDecl.Location.Start.Line);
 
-        LeaveModuleOrClass(frame, fromSubroutine: frame.ParentFrame is not null);
+        EnterModuleOrClassScope();
+        CompileStatement(classDecl.Body);
+        LeaveModuleOrClassScope();
 
         // Exit class or module scope. Important.
-        InsertSetState(frame, AdhocRunState.EXIT);
+        InsertSetState(AdhocRunState.EXIT);
+
+        LeaveCurrentModule();
     }
 
-    public void CompileContinue(AdhocCodeFrame frame, ContinueStatement continueStatement)
+    // GT7 1.00: 305E970 (hParser::LeaveCurrentModule)
+    private void LeaveCurrentModule()
     {
-        if (frame.CurrentLoops.Count == 0)
-            ThrowCompilationError(continueStatement, CompilationMessages.Error_ContinueWithoutContextualScope);
+        if (CurrentModule != ParentModules[^1])
+            CurrentModule = ParentModules[^1];
 
-        if (continueStatement.Label is not null)
-        {
-            var loopCtx = frame.GetLoopByLabel(continueStatement.Label.Name);
-            if (loopCtx is null)
-                ThrowCompilationError(continueStatement.Label, string.Format(CompilationMessages.Error_LoopWithLabelNotFound, continueStatement.Label.Name));
-
-            InsJump continueJump = new InsJump();
-            loopCtx.ContinueJumps.Add(continueJump);
-            frame.AddInstruction(continueJump, continueStatement.Location.Start.Line);
-        }
-        else
-        {
-            LoopContext loop = frame.GetLastLoop();
-
-            InsJump continueJmp = new InsJump();
-            frame.AddInstruction(continueJmp, continueStatement.Location.Start.Line);
-
-            loop.ContinueJumps.Add(continueJmp);
-        }
+        if (ParentModules.Count != 0)
+            ParentModules.Remove(ParentModules[^1]);
     }
 
-    public void CompileIfStatement(AdhocCodeFrame frame, IfStatement ifStatement)
+    // GT7 1.00 - 305E8E0 (hParser::SetCurrentClass)
+    private void SetCurrentClass(Identifier name)
     {
-        EnterScope(frame, ifStatement);
+        ParentModules.Add(CurrentModule);
+        SetCurrentModulePath([name.Name], AdhocVariableType.Class);
+    }
 
-        CompileTestStatement(frame, ifStatement.Test);
+    private void CompileModuleDeclaration(ModuleDeclaration moduleDecl)
+    {
+        List<string> modulePath = [];
+        if (moduleDecl.Id is Identifier identifier)
+        {
+            if (identifier.Name.Contains("::"))
+                modulePath.AddRange(identifier.Name.Split("::"));
+            modulePath.Add(identifier.Name);
+        }
+        else if (moduleDecl.Id is StaticIdentifier staticIdentifier)
+        {
+             modulePath.AddRange(staticIdentifier.Id.Name.Split("::"));
+             modulePath.Add(staticIdentifier.Id.Name);
+        }
+
+        List<AdhocSymbol> modulePathSymbols = [];
+        foreach (var str in modulePath)
+            modulePathSymbols.Add(SymbolMap.RegisterSymbol(str));
+
+        var moduleDefine = new InsModuleDefine(modulePathSymbols);
+        AddInstruction(moduleDefine, moduleDecl.Location.End.Line);
+
+        ParentModules.Add(CurrentModule);
+        SetCurrentModulePath(modulePath, AdhocVariableType.Module);
+
+        EnterModuleOrClassScope();
+        CompileStatementList(moduleDecl.Body);
+        LeaveModuleOrClassScope();
+
+        InsertSetState(AdhocRunState.EXIT);
+
+        LeaveCurrentModule();
+    }
+
+    // GT7 1.00: 30EECE0 (mCompiler::CompileIf)
+    public void CompileIfStatement(IfStatement ifStatement)
+    {
+        CompileTestStatement(ifStatement.Test);
 
         // Create jump
         InsJumpIfFalse endOrNextIfJump = new InsJumpIfFalse();
-        frame.AddInstruction(endOrNextIfJump, 0);
+        AddInstruction(endOrNextIfJump, 0);
 
         // Apply frame
-        CompileStatementWithScope(frame, ifStatement.Consequent); // if body
+        if (ifStatement.Consequent.Type == Nodes.BlockStatement)
+        {
+            CompileStatement(ifStatement.Consequent); // if body
+        }
+        else
+        {
+            EnterScope();
+            CompileStatement(ifStatement.Consequent);
+            LeaveScope();
+        }
 
-        endOrNextIfJump.JumpIndex = frame.GetLastInstructionIndex();
+        endOrNextIfJump.JumpIndex = CurrentFrame.GetInstructionCount();
 
         // else if's..
         if (ifStatement.Alternate is not null)
         {
             // Jump to skip the else if frame if the if was already taken
             InsJump skipAlternateJmp = new InsJump();
-            frame.AddInstruction(skipAlternateJmp, 0);
+            AddInstruction(skipAlternateJmp, 0);
 
-            endOrNextIfJump.JumpIndex = frame.GetLastInstructionIndex();
+            endOrNextIfJump.JumpIndex = CurrentFrame.GetInstructionCount();
 
-            CompileStatementWithScope(frame, ifStatement.Alternate);
+            if (ifStatement.Alternate.Type == Nodes.BlockStatement)
+            {
+                CompileStatement(ifStatement.Alternate); // else (if) body
+            }
+            else
+            {
+                EnterScope();
+                CompileStatement(ifStatement.Alternate);
+                LeaveScope();
+            }
 
-            skipAlternateJmp.JumpInstructionIndex = frame.GetLastInstructionIndex();
+            skipAlternateJmp.JumpInstructionIndex = CurrentFrame.GetInstructionCount();
         }
         else // No else block
         {
-            if (frame.Version.IfConditionAlwaysHasAlternateJump())
+            if (CurrentFrame.Version.IfConditionAlwaysHasAlternateJump())
             {
                 InsJump skipAlternateJmp = new InsJump();
-                frame.AddInstruction(skipAlternateJmp, 0);
-                skipAlternateJmp.JumpInstructionIndex = frame.GetLastInstructionIndex();
+                AddInstruction(skipAlternateJmp, 0);
+                skipAlternateJmp.JumpInstructionIndex = CurrentFrame.GetInstructionCount();
             }
 
-            endOrNextIfJump.JumpIndex = frame.GetLastInstructionIndex();
+            endOrNextIfJump.JumpIndex = CurrentFrame.GetInstructionCount();
         }
-
-        LeaveScope(frame, insertLeaveInstruction: false);
     }
 
     /// <summary>
@@ -710,25 +815,29 @@ public class AdhocScriptCompiler
     /// </summary>
     /// <param name="frame"></param>
     /// <param name="testExpression"></param>
-    private void CompileTestStatement(AdhocCodeFrame frame, Expression testExpression)
+    private void CompileTestStatement(Expression testExpression)
     {
         if (testExpression.Type == Nodes.AssignmentExpression)
         {
-            CompileAssignmentExpression(frame, testExpression as AssignmentExpression, popResult: false); // if (<test>)
+            CompileAssignmentExpression(testExpression as AssignmentExpression, popResult: false); // if (<test>)
         }
         else if (testExpression.Type == Nodes.UpdateExpression)
         {
-            CompileUnaryExpression(frame, testExpression as UpdateExpression, popResult: false); // var a = ++b; - Do not discard b
+            CompileUnaryExpression(testExpression as UpdateExpression, popResult: false); // var a = ++b; - Do not discard b
         }
         else
         {
-            CompileExpression(frame, testExpression);
+            CompileExpression(testExpression);
         }
     }
 
-    public void CompileFor(AdhocCodeFrame frame, ForStatement forStatement, Identifier label = null)
+    // GT7 1.00: 30F1320 (mCompiler::CompileFor)
+    public void CompileFor(ForStatement forStatement, Identifier label = null)
     {
-        LoopContext loopCtx = EnterLoop(frame, forStatement, label);
+        EnterScope(shouldCleanupOnExit: true); // True because of init.
+
+        RegisterLoopLabelForContinue(label?.Name ?? AdhocConstants.NIL);
+        RegisterLoopLabelForBreak(label?.Name ?? AdhocConstants.NIL);
 
         // Initialization
         if (forStatement.Init is not null)
@@ -736,14 +845,14 @@ public class AdhocScriptCompiler
             switch (forStatement.Init.Type)
             {
                 case Nodes.VariableDeclaration:
-                    CompileVariableDeclaration(frame, forStatement.Init as VariableDeclaration); break;
+                    CompileVariableDeclaration(forStatement.Init as VariableDeclaration); break;
                 case Nodes.AssignmentExpression:
-                    CompileAssignmentExpression(frame, forStatement.Init as AssignmentExpression); break;
+                    CompileAssignmentExpression(forStatement.Init as AssignmentExpression); break;
                 case Nodes.Identifier:
-                    CompileIdentifier(frame, forStatement.Init as Identifier); break;
+                    CompileIdentifier(forStatement.Init as Identifier); break;
                 case Nodes.CallExpression:
-                    CompileCall(frame, forStatement.Init as CallExpression);
-                    InsertPop(frame);
+                    CompileCall(forStatement.Init as CallExpression);
+                    InsertPop();
                     break;
                 default:
                     ThrowCompilationError(forStatement.Init, CompilationMessages.Error_ForLoopInitializationType);
@@ -751,65 +860,72 @@ public class AdhocScriptCompiler
             }
         }
 
-        int startIndex = frame.GetLastInstructionIndex();
+        int startIndex = CurrentFrame.GetInstructionCount();
 
         // Condition
         InsJumpIfFalse jumpIfFalse = null; // will only be inserted if the condition exists, else its essentially a while true loop
         if (forStatement.Test is not null)
         {
-            CompileTestStatement(frame, forStatement.Test);
+            CompileTestStatement(forStatement.Test);
 
             // Insert jump to the end of loop frame
             jumpIfFalse = new InsJumpIfFalse();
-            frame.AddInstruction(jumpIfFalse, 0);
+            AddInstruction(jumpIfFalse, 0);
         }
 
-        CompileStatementWithScope(frame, forStatement.Body);
+        int jmpIndex;
+        if (forStatement.Body.Type == Nodes.BlockStatement)
+        {
+            CompileStatement(forStatement.Body);
+            jmpIndex = CurrentFrame.GetInstructionCount();
+        }
+        else
+        {
+            EnterScope();
+            CompileStatement(forStatement.Body);
+            jmpIndex = LeaveScope();
+        }
 
         // Reached bottom, proceed to do update
         // But first, process continue if any
-        int loopUpdInsIndex = frame.GetLastInstructionIndex();
-        foreach (var continueJmp in loopCtx.ContinueJumps)
-            continueJmp.JumpInstructionIndex = loopUpdInsIndex;
+        ProcessContinues(jmpIndex);
 
         // Update Counter
         if (forStatement.Update is not null)
-            CompileForUpdate(frame, forStatement);
+            CompileForUpdate(forStatement);
 
         // Insert jump to go back to the beginning of the loop
         InsJump startJump = new InsJump();
         startJump.JumpInstructionIndex = startIndex;
-        frame.AddInstruction(startJump, 0);
+        AddInstruction(startJump, 0);
+
+        // Done with it.
+        int scopeExitInstIndex = LeaveScope();
 
         // Update jump that exits the loop if it exists
-        int loopExitInsIndex = frame.GetLastInstructionIndex();
         if (jumpIfFalse is not null)
-            jumpIfFalse.JumpIndex = loopExitInsIndex;
+            jumpIfFalse.JumpIndex = scopeExitInstIndex;
 
-        // Process break jumps before doing the final exit
-        foreach (var breakJmp in loopCtx.BreakJumps)
-            breakJmp.JumpInstructionIndex = loopExitInsIndex;
-
-        LeaveLoop(frame);
+        ProcessBreaks(scopeExitInstIndex);
     }
 
-    private void CompileForUpdate(AdhocCodeFrame frame, ForStatement forStatement)
+    private void CompileForUpdate(ForStatement forStatement)
     {
         if (forStatement.Update.Type == Nodes.UpdateExpression)
         {
-            CompileUnaryExpression(frame, forStatement.Update as UpdateExpression, popResult: true);
+            CompileUnaryExpression(forStatement.Update as UpdateExpression, popResult: true);
         }
         else if (forStatement.Update.Type == Nodes.CallExpression)
         {
-            CompileCall(frame, forStatement.Update as CallExpression, popReturnValue: true);
+            CompileCall(forStatement.Update as CallExpression, popReturnValue: true);
         }
         else if (forStatement.Update.Type == Nodes.AssignmentExpression)
         {
-            CompileAssignmentExpression(frame, forStatement.Update as AssignmentExpression, popResult: true);
+            CompileAssignmentExpression(forStatement.Update as AssignmentExpression, popResult: true);
         }
         else if (forStatement.Update.Type == Nodes.SequenceExpression)
         {
-            CompileSequenceExpressionAssignmentsOrCall(frame, forStatement.Update as SequenceExpression);
+            CompileSequenceExpressionAssignmentsOrCall(forStatement.Update as SequenceExpression);
         }
         else
             ThrowCompilationError(forStatement.Update, CompilationMessages.Error_StatementExpressionOnly);
@@ -820,185 +936,218 @@ public class AdhocScriptCompiler
     /// </summary>
     /// <param name="frame"></param>
     /// <param name="sequenceExpression"></param>
-    private void CompileSequenceExpressionAssignmentsOrCall(AdhocCodeFrame frame, SequenceExpression sequenceExpression)
+    private void CompileSequenceExpressionAssignmentsOrCall(SequenceExpression sequenceExpression)
     {
         foreach (var exp in sequenceExpression.Expressions)
         {
             if (exp.Type == Nodes.AssignmentExpression)
             {
-                CompileAssignmentExpression(frame, exp as AssignmentExpression, popResult: true);
+                CompileAssignmentExpression(exp as AssignmentExpression, popResult: true);
             }
             else if (exp.Type == Nodes.UpdateExpression)
             {
-                CompileUnaryExpression(frame, exp as UpdateExpression, popResult: true);
+                CompileUnaryExpression(exp as UpdateExpression, popResult: true);
             }
             else if (exp.Type == Nodes.CallExpression)
             {
-                CompileCall(frame, exp as CallExpression, popReturnValue: true);
+                CompileCall(exp as CallExpression, popReturnValue: true);
             }
             else
                 ThrowCompilationError(exp, CompilationMessages.Error_StatementExpressionOnly);
         }
     }
 
-    public void CompileWhile(AdhocCodeFrame frame, WhileStatement whileStatement, Identifier label = null)
+    // GT7 1.00: 30F0E00 (mCompiler::CompileWhile)
+    public void CompileWhile(WhileStatement whileStatement, Identifier label = null)
     {
-        LoopContext loopCtx = EnterLoop(frame, whileStatement, label);
+        EnterScope();
 
-        int loopStartInsIndex = frame.GetLastInstructionIndex();
+        RegisterLoopLabelForContinue(label?.Name ?? AdhocConstants.NIL);
+        RegisterLoopLabelForBreak(label?.Name ?? AdhocConstants.NIL);
 
-        InsJumpIfFalse jumpIfFalse = new InsJumpIfFalse(); // End loop jumper
+        int loopStartInsIndex = CurrentFrame.GetInstructionCount();
 
         if (whileStatement.Test is not null)
+            CompileTestStatement(whileStatement.Test);
+
+        InsJumpIfFalse jumpIfFalse = new InsJumpIfFalse(); // End loop jumper
+        AddInstruction(jumpIfFalse, 0);
+
+        int jumpIdx;
+        if (whileStatement.Body.Type == Nodes.BlockStatement)
         {
-            CompileTestStatement(frame, whileStatement.Test);
-            frame.AddInstruction(jumpIfFalse, 0);
+            CompileStatement(whileStatement.Body);
+            jumpIdx = CurrentFrame.GetInstructionCount();
+        }
+        else
+        {
+            EnterScope();
+            CompileStatement(whileStatement.Body);
+            jumpIdx = LeaveScope();
         }
 
-        CompileStatementWithScope(frame, whileStatement.Body);
-
-        int jmpIndex = frame.GetLastInstructionIndex();
+        ProcessContinues(jumpIdx);
 
         // Insert jump to go back to the beginning of the loop
         InsJump startJump = new InsJump();
         startJump.JumpInstructionIndex = loopStartInsIndex;
-        frame.AddInstruction(startJump, 0);
+        AddInstruction(startJump, 0);
 
-        // Reached bottom, proceed to do update
-        // But first, process continue if any
-        foreach (var continueJmp in loopCtx.ContinueJumps)
-        {
-            // Ideally this should jump to the start of the loop.
-            // Theirs jump to the bottom jumper though, which is redundant since it will then jump back to the start.
-            // For accuracy, we do the same.
-            continueJmp.JumpInstructionIndex = jmpIndex; 
-        }
-
-        // Update jump that exits the loop
-        int loopExitInsIndex = frame.GetLastInstructionIndex();
+        int loopExitInsIndex = LeaveScope();
         jumpIfFalse.JumpIndex = loopExitInsIndex;
 
-        // Process break jumps before doing the final exit
-        foreach (var breakJmp in loopCtx.BreakJumps)
-            breakJmp.JumpInstructionIndex = loopExitInsIndex;
-
-        LeaveLoop(frame);
+        ProcessBreaks(loopExitInsIndex);
     }
 
-    public void CompileDoWhile(AdhocCodeFrame frame, DoWhileStatement doWhileStatement, Identifier label = null)
+    // GT7 1.00: 30F08E0 (mCompiler::CompileDoWhile)
+    public void CompileDoWhile(DoWhileStatement doWhileStatement, Identifier label = null)
     {
-        LoopContext loopCtx = EnterLoop(frame, doWhileStatement, label);
+        EnterScope();
 
-        int loopStartInsIndex = frame.GetLastInstructionIndex();
+        int loopStartInsIndex = CurrentFrame.GetInstructionCount();
 
-        CompileStatementWithScope(frame, doWhileStatement.Body);
-        
-        int testInsIndex = frame.GetLastInstructionIndex();
-        CompileTestStatement(frame, doWhileStatement.Test);
+        RegisterLoopLabelForContinue(label?.Name ?? AdhocConstants.NIL);
+        RegisterLoopLabelForBreak(label?.Name ?? AdhocConstants.NIL);
 
-        // Reached bottom, proceed to do update
-        // But first, process continue if any
-        foreach (var continueJmp in loopCtx.ContinueJumps)
-            continueJmp.JumpInstructionIndex = testInsIndex;
+        int jumpIdx;
+        if (doWhileStatement.Body.Type == Nodes.BlockStatement)
+        {
+            CompileStatement(doWhileStatement.Body);
+            jumpIdx = CurrentFrame.GetInstructionCount();
+        }
+        else
+        {
+            EnterScope();
+            CompileStatement(doWhileStatement.Body);
+            jumpIdx = LeaveScope();
+        }
+
+        ProcessContinues(jumpIdx);
+
+        CompileTestStatement(doWhileStatement.Test);
 
         InsJumpIfFalse jumpIfFalse = new InsJumpIfFalse(); // End loop jumper
-        frame.AddInstruction(jumpIfFalse, 0);
+        AddInstruction(jumpIfFalse, 0);
 
         InsJump startJmp = new InsJump();
         startJmp.JumpInstructionIndex = loopStartInsIndex;
-        frame.AddInstruction(startJmp, 0);
+        AddInstruction(startJmp, 0);
 
-        // Process break jumps before doing the final exit
-        int loopEndIndex = frame.GetLastInstructionIndex();
-        foreach (var breakJmp in loopCtx.BreakJumps)
-            breakJmp.JumpInstructionIndex = loopEndIndex;
+        int loopEndInsIndex = LeaveScope();
+        jumpIfFalse.JumpIndex = loopEndInsIndex;
 
-        jumpIfFalse.JumpIndex = loopEndIndex;
-
-        LeaveLoop(frame);
+        ProcessBreaks(loopEndInsIndex);
     }
 
-    public void CompileForeach(AdhocCodeFrame frame, ForeachStatement foreachStatement, Identifier label = null)
+    // GT7 1.00: 30EF440 (mCompiler::CompileForeach)
+    public void CompileForeach(ForeachStatement foreachStatement, Identifier label = null)
     {
-        if (!frame.Version.HasForeachSupport())
+        if (!CurrentFrame.Version.HasForeachSupport())
             ThrowCompilationError(foreachStatement, CompilationMessages.Error_ForeachUnsupported);
 
-        LoopContext loopCtx = EnterLoop(frame, foreachStatement, label);
+        EnterScope();
 
-        CompileExpression(frame, foreachStatement.Right);
+        RegisterLoopLabelForContinue(label?.Name ?? AdhocConstants.NIL);
+        RegisterLoopLabelForBreak(label?.Name ?? AdhocConstants.NIL);
+
+        // Define a temporary value to hold the iterator
+        AdhocSymbol tempName = SymbolMap.RegisterSymbol($"in#{SymbolMap.TempVariableCounter++}");
+        DefineVariableInCurrentScope(tempName, AdhocVariableType.LocalVariable, foreachStatement.Left.Location);
+        CompileExpression(foreachStatement.Right);
 
         // Access object iterator
         InsAttributeEvaluation attrIns = new InsAttributeEvaluation();
-        attrIns.AttributeSymbols.Add(SymbolMap.RegisterSymbol(AdhocConstants.ITERATOR));
-        frame.AddInstruction(attrIns, foreachStatement.Right.Location.Start.Line);
+        attrIns.AttributeSymbols.Add(SymbolMap.RegisterSymbol("iterator"));
+        AddInstruction(attrIns, foreachStatement.Left.Location.Start.Line);
 
-        // Assign it to a temporary value for the iteration
-        AdhocSymbol itorIdentifier = InsertNewLocalVariable(frame, null, $"in#{SymbolMap.TempVariableCounter++}", foreachStatement.Right.Location);
+        // Push it
+        InsVariablePush varPush = new InsVariablePush();
+        varPush.VariableSymbols.Add(tempName);
+        AddInstruction(varPush, foreachStatement.Left.Location.Start.Line);
+        InsertAssignPop();
 
-        // Test - fetch_next returns whether the iterator is done or not
-        int testInsIndex = frame.GetLastInstructionIndex();
-        InsertVariableEvalFromSymbol(frame, itorIdentifier, foreachStatement.Right.Location);
+        int testInsIndex = CurrentFrame.GetInstructionCount();
+
+        // Evaluate for test
+        InsVariableEvaluation varEval = new InsVariableEvaluation();
+        varEval.VariableSymbols.Add(tempName);
+        AddInstruction(varEval, foreachStatement.Left.Location.Start.Line);
+
         InsAttributeEvaluation fetchNextIns = new InsAttributeEvaluation();
         fetchNextIns.AttributeSymbols.Add(SymbolMap.RegisterSymbol("fetch_next"));
-        frame.AddInstruction(fetchNextIns, foreachStatement.Right.Location.Start.Line);
+        AddInstruction(fetchNextIns, foreachStatement.Right.Location.Start.Line);
 
         InsJumpIfFalse exitJump = new InsJumpIfFalse(); // End loop jumper
-        frame.AddInstruction(exitJump, 0);
+        AddInstruction(exitJump, 0);
 
-        // Entering body, but we need to get the iterator's value into our declared variable, equivalent to *iterator
-        InsertVariableEvalFromSymbol(frame, itorIdentifier);
-        frame.AddInstruction(new InsEval(), 0);
+        
+       // Entering body, but we need to get the iterator's value into our declared variable, equivalent to *iterator
+       var valueEval = new InsVariableEvaluation();
+       valueEval.VariableSymbols.Add(tempName);
+       AddInstruction(valueEval, foreachStatement.Left.Location.Start.Line);
+       AddInstruction(new InsEval(), 0);
 
         if (foreachStatement.Left.Type == Nodes.VariableDeclaration)
         {
             // foreach (var value in <right>)
-            CompileVariableDeclaration(frame, foreachStatement.Left as VariableDeclaration, pushWhenNoInit: true); // We're unboxing, gotta push anyway
+            CompileVariableDeclaration(foreachStatement.Left as VariableDeclaration, pushWhenNoInit: true); // We're unboxing, gotta push anyway
         }
         else if (foreachStatement.Left.Type == Nodes.ListAssignmentExpression)
         {
             // foreach (|var ..| in <right>)
             ListAssignementExpression list = foreachStatement.Left as ListAssignementExpression;
-            CompileListAsssignmentExpression(frame, list);
+            CompileListAsssignmentExpression(list);
         }
         else if (foreachStatement.Left is Expression)
         {
             // foreach (<expression> in <right>)
-            CompileVariableAssignment(frame, foreachStatement.Left as Expression);
+            CompileVariableAssignment(foreachStatement.Left as Expression);
         }
         else
         {
             ThrowCompilationError(foreachStatement.Left, CompilationMessages.Error_ForeachDeclarationNotDeclarationOrExpression);
         }
+        
 
-        // Compile body.
-        CompileStatementWithScope(frame, foreachStatement.Body);
+        int jumpIdx;
+        if (foreachStatement.Body.Type == Nodes.BlockStatement)
+        {
+            CompileStatement(foreachStatement.Body);
+            jumpIdx = CurrentFrame.GetInstructionCount();
+        }
+        else
+        {
+            EnterScope();
+            CompileStatement(foreachStatement.Body);
+            jumpIdx = LeaveScope();
+        }
 
-        // continue's...
-        foreach (var continueJmp in loopCtx.ContinueJumps)
-            continueJmp.JumpInstructionIndex = frame.GetLastInstructionIndex(); // To the jump that jumps to the test back
+        ProcessContinues(jumpIdx);
 
         // Add the jump back to the test
         InsJump beginJump = new InsJump();
         beginJump.JumpInstructionIndex = testInsIndex;
-        frame.AddInstruction(beginJump, 0);
+        AddInstruction(beginJump, 0);
 
-        // Main exit...
-        int loopExitIndex = frame.GetLastInstructionIndex();
-        exitJump.JumpIndex = loopExitIndex;
+        int loopEndJumpIdx = LeaveScope();
+        exitJump.JumpIndex = loopEndJumpIdx;
 
-        // break's...
-        foreach (var breakJmp in loopCtx.BreakJumps)
-            breakJmp.JumpInstructionIndex = loopExitIndex;
-
-        LeaveLoop(frame);
+        ProcessBreaks(loopEndJumpIdx);
     }
 
-    public void CompileSwitch(AdhocCodeFrame frame, SwitchStatement switchStatement)
+    // GT7 1.00: 30F19B0 (mCompiler::CompileSwitch)
+    public void CompileSwitch(SwitchStatement switchStatement)
     {
-        SwitchContext switchCtx = EnterSwitch(frame, switchStatement);
+        EnterScope();
+        RegisterLoopLabelForBreak(AdhocConstants.NIL);
 
         // Create a label for the temporary switch variable
-        AdhocSymbol caseSymb = InsertNewLocalVariable(frame, switchStatement.Discriminant, $"case#{SymbolMap.TempVariableCounter++}");
+        AdhocSymbol varName = SymbolMap.RegisterSymbol($"case#{SymbolMap.TempVariableCounter++}");
+        DefineVariableInCurrentScope(varName, AdhocVariableType.LocalVariable, switchStatement.Discriminant.Location);
+
+        CompileExpression(switchStatement.Discriminant);
+        AddInstruction(new InsVariablePush() { VariableSymbols = [varName] }, switchStatement.Location.Start.Line);
+        InsertAssignPop();
 
         Dictionary<SwitchCase, InsJumpIfTrue> caseBodyJumps = [];
         bool hasSpecifiedDefault = false;
@@ -1006,23 +1155,26 @@ public class AdhocScriptCompiler
         // Write switch table jumps
         for (int i = 0; i < switchStatement.Cases.Count; i++)
         {
+            if (switchStatement.Cases.Count == 6)
+                ;
+
             SwitchCase swCase = switchStatement.Cases[i];
             if (swCase.Test is not null) // Actual case
             {
                 // Get temp variable
-                InsertVariableEvalFromSymbol(frame, caseSymb);
+                AddInstruction(new InsVariableEvaluation() { VariableSymbols = [varName] }, 0);
 
                 // Write what we are comparing to 
-                CompileExpression(frame, swCase.Test);
+                CompileExpression(swCase.Test);
 
                 // Equal check
-                InsBinaryOperator eqOp = new InsBinaryOperator(SymbolMap.RegisterSymbol(AdhocConstants.OPERATOR_EQUAL, convertToOperand: frame.Version.ShouldUseInternalOperatorNames()));
-                frame.AddInstruction(eqOp, swCase.Location.Start.Line);
+                InsBinaryOperator eqOp = new InsBinaryOperator(SymbolMap.RegisterSymbol(AdhocConstants.OPERATOR_EQUAL, convertToOperand: CurrentFrame.Version.ShouldUseInternalOperatorNames()));
+                AddInstruction(eqOp, swCase.Location.Start.Line);
 
                 // Write the jump
                 InsJumpIfTrue jit = new InsJumpIfTrue();
                 caseBodyJumps.Add(swCase, jit); // To write the instruction index later on
-                frame.AddInstruction(jit, 0);
+                AddInstruction(jit, 0);
             }
             else // Default
             {
@@ -1035,7 +1187,7 @@ public class AdhocScriptCompiler
 
         // Default is always at the end of all the tests regardless of where the default statement is.
         InsJump defaultJump = new InsJump();
-        frame.AddInstruction(defaultJump, 0);
+        AddInstruction(defaultJump, 0);
 
         // Write bodies
         for (int i = 0; i < switchStatement.Cases.Count; i++)
@@ -1044,34 +1196,42 @@ public class AdhocScriptCompiler
 
             // Update body jump location
             if (swCase.Test is not null)
-                caseBodyJumps[swCase].JumpIndex = frame.GetLastInstructionIndex();
+                caseBodyJumps[swCase].JumpIndex = CurrentFrame.GetInstructionCount();
             else
-                defaultJump.JumpInstructionIndex = frame.GetLastInstructionIndex();
+                defaultJump.JumpInstructionIndex = CurrentFrame.GetInstructionCount();
 
             // Not counting as scopes
             foreach (var statement in swCase.Consequent)
-                CompileStatement(frame, statement);
-        }
-
-        // Update non explicit default case to jump to end
-        if (!hasSpecifiedDefault)
-            defaultJump.JumpInstructionIndex = frame.GetLastInstructionIndex();
-
-        // Update break case jumps
-        for (int i = 0; i < switchCtx.BreakJumps.Count; i++)
-        {
-            InsJump swCase = switchCtx.BreakJumps[i];
-            swCase.JumpInstructionIndex = frame.GetLastInstructionIndex();
+                CompileStatement(statement);
         }
 
         // Leave switch frame.
-        LeaveScope(frame);
+        int switchEndInsIndex = LeaveScope();
+
+        // Update non explicit default case to jump to end
+        if (!hasSpecifiedDefault)
+            defaultJump.JumpInstructionIndex = switchEndInsIndex;
+
+        // Update break case jumps
+        ProcessBreaks(switchEndInsIndex);
     }
 
-    public void CompileFunctionDeclaration(AdhocCodeFrame frame, FunctionDeclaration funcDecl)
+    /// <summary>
+    /// Compiles a function declaration.
+    /// </summary>
+    /// <param name="funcDecl"></param>
+    public void CompileFunctionDeclaration(FunctionDeclaration funcDecl)
     {
-        if (funcDecl.Id is not null)
-            CompileSubroutine(frame, funcDecl, funcDecl.Body, funcDecl.Id, funcDecl.Params, isMethod: false);
+        AdhocSymbol nameSymbol = SymbolMap.RegisterSymbol(funcDecl.Id.Name);
+        DefineAttributeForCurrentModule(funcDecl.Id.Name, AdhocVariableType.Function);
+        DefineVariableInCurrentScope(SymbolMap.RegisterSymbol(funcDecl.Id.Name), AdhocVariableType.Function, funcDecl.Id.Location);
+        
+        var functionFrame = CompileSubroutine(funcDecl, funcDecl.Body, funcDecl.Id, funcDecl.Params);
+
+        var functionDefine = new InsFunctionDefine(functionFrame);
+        functionDefine.Name = nameSymbol;
+        functionDefine.CodeFrame = functionFrame;
+        AddInstruction(functionDefine, funcDecl.Location.Start.Line);
     }
 
     /// <summary>
@@ -1084,66 +1244,74 @@ public class AdhocScriptCompiler
     /// <param name="subParams"></param>
     /// <param name="isMethod"></param>
     /// <param name="isAsync"></param>
-    public void CompileSubroutine(AdhocCodeFrame frame, Node parentNode, Node body, Identifier id, NodeList<Expression> subParams, bool isMethod = false, bool isAsync = false)
+    // GT7 1.00: 30E1D40 (mCompiler::CompileSubroutine)
+    public AdhocCodeFrame CompileSubroutine(Node parentNode, Node body, Identifier? id, NodeList<Expression> subParams)
     {
-        if (id is null)
-            ThrowCompilationError(parentNode, CompilationMessages.Error_SubroutineWithoutIdentifier);
+        Logger.Debug($"L{parentNode.Location.Start.Line} - Compiling subroutine '{id?.Name ?? "<no name>"}'");
 
-        Logger.Debug($"L{parentNode.Location.Start.Line} - Compiling subroutine '{id.Name}'");
-
-        SubroutineBase subroutine = isMethod ? new InsMethodDefine(frame.Version) : new InsFunctionDefine(frame.Version);
-        if (id is not null)
-            subroutine.Name = SymbolMap.RegisterSymbol(id.Name);
-        subroutine.CodeFrame.SourceFilePath = frame.SourceFilePath;
-        subroutine.CodeFrame.ParentFrame = frame;
-        subroutine.CodeFrame.ContextAllowsVariableCaptureFromParentFrame = true;
-
-        if (isMethod)
-        {
-            if (!CurrentModule.DefineMethod(subroutine.Name))
-                PrintCompilationWarning(id, $"Method name '{subroutine.Name}' already defined in this scope.");
-        }
-
-        EnterScope(subroutine.CodeFrame, parentNode);
+        // Default values
         foreach (Expression param in subParams)
-            CompileSubroutineParameter(frame, parentNode, subroutine, param);
+            CompileSubroutineParameterDefaultValue(parentNode, param);
 
-        // Methods always reserve a variable slot for 'self'
-        // For older versions it's always there anyway.
-        if (isMethod || frame.Version.ShouldAllocateVariableForSelf())
+        var oldFrame = CurrentFrame;
+        EnterCodeFrame();
+        CurrentFrame.SetSourcePath(oldFrame.SourceFilePath);
+
+        // Declare the arguments into our new frame
+        foreach (var param in subParams)
         {
-            // It's also after parameters
-            subroutine.CodeFrame.Stack.AddLocalVariable(new LocalVariable() { Symbol = null });
+            if (param.Type == Nodes.Identifier)
+            {
+                var paramIdent = param.As<Identifier>();
+                AdhocSymbol paramSymb = SymbolMap.RegisterSymbol(paramIdent.Name);
+                DefineVariableInCurrentScope(paramSymb, AdhocVariableType.LocalVariable, param.Location);
+                CurrentFrame.FunctionParameters.Add(paramSymb);
+            }
+            else
+            {
+                if (param is AssignmentExpression assignmentExpression) // Parameter default value set to another variable or static value
+                {
+                    AdhocSymbol paramSymb = SymbolMap.RegisterSymbol((assignmentExpression.Left as Identifier).Name);
+                    CurrentFrame.FunctionParameters.Add(paramSymb);
+                    DefineVariableInCurrentScope(paramSymb, AdhocVariableType.LocalVariable, assignmentExpression.Left.Location);
+                }
+                else if (param.Type == Nodes.AssignmentPattern)
+                {
+                    var pattern = param as AssignmentPattern;
+                    AdhocSymbol paramSymb = SymbolMap.RegisterSymbol((pattern.Left as Identifier).Name);
+                    CurrentFrame.FunctionParameters.Add(paramSymb);
+                    DefineVariableInCurrentScope(paramSymb, AdhocVariableType.LocalVariable, pattern.Left.Location);
+                }
+                else
+                    throw new NotSupportedException();
+            }
+            
         }
 
-        if (frame.CurrentScope.StaticScopeVariables.ContainsKey(subroutine.Name.Name))
-            PrintCompilationWarning(parentNode, $"Static subroutine name '{subroutine.Name.Name}' is already defined in this scope.");
-
-
-        if (frame.Version.ShouldDefineFunctionAsStaticVariables())
-        {
-            frame.AddAttributeOrStaticMemberVariable(subroutine.Name);
-        }
-        else
-        {
-            // In older versions the subroutines don't count towards the local storage (until referenced)
-            // Just keep track of it instead
-            if (!frame.CurrentScope.StaticScopeVariables.TryGetValue(subroutine.Name.Name, out StaticVariable staticVar))
-                frame.CurrentScope.StaticScopeVariables.Add(subroutine.Name.Name, new StaticVariable() { Symbol = subroutine.Name });
-        }
-
-        frame.AddInstruction(subroutine, parentNode.Location.Start.Line);
+        // In older versions the subroutines don't count towards the local storage (until referenced)
+        // Just keep track of it instead
+        // TODO!
 
         if (body.Type == Nodes.BlockStatement)
-            CompileBlockStatement(subroutine.CodeFrame, body as BlockStatement, openScope: false, insertLeaveInstruction: false, emitNops: false);
+            CompileStatementList(body as BlockStatement);
+        else if (body.Type == Nodes.CallExpression)
+            CompileExpression(body as CallExpression);
         else
             ThrowCompilationError(body, "Expected subroutine body to be frame statement.");
 
-        InsertFrameExitIfNeeded(subroutine.CodeFrame, body);
-        LeaveScope(subroutine.CodeFrame, insertLeaveInstruction: false);
+        InsertFrameExitIfNeeded(body);
+        var subroutineFrame = LeaveCodeFrame();
 
-        Logger.Debug($"Subroutine '{id.Name}' compiled ({subroutine.CodeFrame.Instructions.Count} ins, " +
-            $"Stack Size: {subroutine.CodeFrame.Stack.GetStackSize()}, Variable Storage Size: {subroutine.CodeFrame.Stack.GetLocalVariableStorageSize()})");
+        foreach (var (StackIndex, Symbol) in subroutineFrame.CapturedCallbackVariables)
+        {
+            AddInstruction(new InsVariableEvaluation() { VariableSymbols = [Symbol] }, 0);
+        }
+
+        // TODO
+        //Logger.Debug($"Subroutine '{id.Name}' compiled ({subroutineFrame.Instructions.Count} ins, " +
+        //    $"Stack Size: {subroutineFrame.Stack.GetStackSize()}, Variable Storage Size: {subroutineFrame.MaxStaticIndex})");
+
+        return subroutineFrame;
     }
 
     /// <summary>
@@ -1153,21 +1321,17 @@ public class AdhocScriptCompiler
     /// <param name="parentNode"></param>
     /// <param name="subroutine"></param>
     /// <param name="param"></param>
-    private void CompileSubroutineParameter(AdhocCodeFrame frame, Node parentNode, SubroutineBase subroutine, Expression param)
+    private void CompileSubroutineParameterDefaultValue(Node parentNode, Expression param)
     {
         // Parameter with no default value
         if (param.Type == Nodes.Identifier)
         {
             var paramIdent = param as Identifier;
 
-            AdhocSymbol paramSymb = SymbolMap.RegisterSymbol(paramIdent.Name);
-            subroutine.CodeFrame.FunctionParameters.Add(paramSymb);
-            subroutine.CodeFrame.AddScopeVariable(paramSymb, isAssignment: true, isLocalDeclaration: true);
-
-            if (frame.Version.HasSupportForFunctionParametersDefaultValues())
+            if (CurrentFrame.Version.HasSupportForFunctionParametersDefaultValues())
             {
                 // Subroutine param does not have a default parameter, push nil into current frame
-                frame.AddInstruction(new InsNilConst(), paramIdent.Location.Start.Line);
+                AddInstruction(new InsNilConst(), paramIdent.Location.Start.Line);
             }
         }
         else if (param.Type == Nodes.ListAssignmentExpression)
@@ -1186,18 +1350,18 @@ public class AdhocScriptCompiler
 
             string tempArgName = $"arg#{SymbolMap.TempVariableCounter++}";
             AdhocSymbol paramSymb = SymbolMap.RegisterSymbol(tempArgName);
-            subroutine.CodeFrame.AddScopeVariable(paramSymb, isAssignment: true, isLocalDeclaration: true);
+            DefineVariableInCurrentScope(paramSymb, AdhocVariableType.LocalVariable, listExpr.Location);
 
             // We create a new list with identifiers remapped as variable declarations.
             // Any other expression type is not supported, so this doubles as an argument verifier.
-            var listClone = CreateAndVerifyListAssignmentForFunctionParameter(listExpr); 
+            var listClone = CreateAndVerifyListAssignmentForFunctionParameter(listExpr);
 
             ListAssignementStatement assignmentExpr = new ListAssignementStatement(listClone, new Identifier(tempArgName));
-            CompileListAssignmentStatement(subroutine.CodeFrame, assignmentExpr);
+            CompileListAssignmentStatement(assignmentExpr);
         }
         else
         {
-            if (!frame.Version.HasSupportForFunctionParametersDefaultValues())
+            if (!CurrentFrame.Version.HasSupportForFunctionParametersDefaultValues())
                 ThrowCompilationError(param, CompilationMessages.Error_DefaultParameterValuesUnsupported);
 
             if (param is AssignmentExpression assignmentExpression) // Parameter default value set to another variable or static value
@@ -1206,11 +1370,11 @@ public class AdhocScriptCompiler
                     ThrowCompilationError(parentNode, CompilationMessages.Error_InvalidParameterValueAssignment);
 
                 AdhocSymbol paramSymb = SymbolMap.RegisterSymbol((assignmentExpression.Left as Identifier).Name);
-                subroutine.CodeFrame.FunctionParameters.Add(paramSymb);
-                subroutine.CodeFrame.AddScopeVariable(paramSymb, isAssignment: true, isLocalDeclaration: true);
+                CurrentFrame.FunctionParameters.Add(paramSymb);
+                DefineVariableInCurrentScope(paramSymb, AdhocVariableType.LocalVariable, assignmentExpression.Left.Location);
 
                 // Push default value
-                CompileLiteral(frame, assignmentExpression.Right as Literal);
+                CompileLiteral(assignmentExpression.Right as Literal);
             }
             else if (param.Type == Nodes.AssignmentPattern)
             {
@@ -1225,25 +1389,25 @@ public class AdhocScriptCompiler
                     ThrowCompilationError(parentNode, "Subroutine default parameter value must be an identifier to a literal or other identifier.");
 
                 AdhocSymbol paramSymb = SymbolMap.RegisterSymbol((pattern.Left as Identifier).Name);
-                subroutine.CodeFrame.FunctionParameters.Add(paramSymb);
-                subroutine.CodeFrame.AddScopeVariable(paramSymb, isAssignment: true, isLocalDeclaration: true);
+                CurrentFrame.FunctionParameters.Add(paramSymb);
+                DefineVariableInCurrentScope(paramSymb, AdhocVariableType.LocalVariable, pattern.Left.Location);
 
                 // Push default value
-                CompileExpression(frame, pattern.Right);
+                CompileExpression(pattern.Right);
             }
             else if (param.Type == Nodes.RestElement) // Rest element function(args...)
             {
-                if (subroutine.CodeFrame.HasRestElement)
+                if (CurrentFrame.HasRestElement)
                     ThrowCompilationError(parentNode, "Subroutine already has a rest parameter");
 
-                subroutine.CodeFrame.HasRestElement = true;
+                CurrentFrame.HasRestElement = true;
 
                 Identifier paramIdent = (param as RestElement).Argument as Identifier;
                 AdhocSymbol paramSymb = SymbolMap.RegisterSymbol(paramIdent.Name);
-                subroutine.CodeFrame.FunctionParameters.Add(paramSymb);
-                subroutine.CodeFrame.AddScopeVariable(paramSymb, isAssignment: true, isLocalDeclaration: true);
+                CurrentFrame.FunctionParameters.Add(paramSymb);
+                DefineVariableInCurrentScope(paramSymb, AdhocVariableType.LocalVariable);
 
-                frame.AddInstruction(new InsNilConst(), paramIdent.Location.Start.Line);
+                AddInstruction(new InsNilConst(), paramIdent.Location.Start.Line);
             }
             else
                 ThrowCompilationError(parentNode, "Subroutine definition parameters must all be identifier or assignment to a literal.");
@@ -1283,7 +1447,7 @@ public class AdhocScriptCompiler
     /// </summary>
     /// <param name="frame"></param>
     /// <param name="retStatement"></param>
-    public void CompileReturnStatement(AdhocCodeFrame frame, ReturnStatement retStatement)
+    public void CompileReturnStatement(ReturnStatement retStatement)
     {
         if (retStatement.Argument is not null) // Return has argument?
         {
@@ -1293,32 +1457,32 @@ public class AdhocScriptCompiler
                 if (assignmentExpression.Operator == AssignmentOperator.Assign)
                 {
                     // return a = b;
-                    CompileAssignmentExpression(frame, retStatement.Argument as AssignmentExpression, popResult: false);
+                    CompileAssignmentExpression(retStatement.Argument as AssignmentExpression, popResult: false);
                 }
                 else
                 {
                     // return a += b;
-                    CompileExpression(frame, assignmentExpression);
-                    CompileExpression(frame, assignmentExpression.Left); // If we are returning an assignment i.e return <variable or path> += "hi", we need to eval str again
+                    CompileExpression(assignmentExpression);
+                    CompileExpression(assignmentExpression.Left); // If we are returning an assignment i.e return <variable or path> += "hi", we need to eval str again
                 }
             }
             else
             {
                 // return <non assignment expr>
-                CompileExpression(frame, retStatement.Argument);
+                CompileExpression(retStatement.Argument);
             }
 
             // Initial return indicates a return value in older versions
-            if (frame.Version.ShouldPopOnReturnStatementWithValue())
-                InsertPop(frame);
+            if (CurrentFrame.Version.ShouldPopOnReturnStatementWithValue())
+                InsertPop();
         }
         else
         {
-            if (frame.Version.ShouldReturnVoidForEmptyFunctionReturn())
-                InsertVoid(frame); // Void const is returned
+            if (CurrentFrame.Version.ShouldReturnVoidForEmptyFunctionReturn())
+                InsertVoid(); // Void const is returned
         }
 
-        InsertSetState(frame, AdhocRunState.RETURN);
+        InsertSetState(AdhocRunState.RETURN);
     }
 
     /// <summary>
@@ -1327,7 +1491,7 @@ public class AdhocScriptCompiler
     /// <param name="frame"></param>
     /// <param name="varDeclaration"></param>
     /// <param name="pushWhenNoInit"></param>
-    public void CompileVariableDeclaration(AdhocCodeFrame frame, VariableDeclaration varDeclaration, bool pushWhenNoInit = false)
+    public void CompileVariableDeclaration(VariableDeclaration varDeclaration, bool pushWhenNoInit = false)
     {
         foreach (VariableDeclarator declarator in varDeclaration.Declarations)
         {
@@ -1335,25 +1499,25 @@ public class AdhocScriptCompiler
             Expression id = declarator.Id;
 
             // In later versions, we first compile the call
-            if (frame.Version.ExpressionBeforeEvalOrPush())
+            if (CurrentFrame.Version.ExpressionBeforeEvalOrPush())
             {
                 if (initValue is not null)
                 {
                     if (initValue.Type == Nodes.UpdateExpression)
                     {
-                        CompileUnaryExpression(frame, initValue.As<UpdateExpression>(), popResult: false); // var a = ++b; - Do not discard b
+                        CompileUnaryExpression(initValue.As<UpdateExpression>(), popResult: false); // var a = ++b; - Do not discard b
                     }
                     else if (IsUnaryReferenceOfExpression(initValue))
                     {
-                        CompileUnaryExpression(frame, initValue.As<UnaryExpression>(), popResult: false, asReference: true); // var a = &b;
+                        CompileUnaryExpression(initValue.As<UnaryExpression>(), popResult: false, asReference: true); // var a = &b;
                     }
                     else if (initValue.Type == Nodes.AssignmentExpression)
                     {
-                        CompileAssignmentExpression(frame, initValue.As<AssignmentExpression>(), popResult: false); // var a = b = c; - Do not discard b
+                        CompileAssignmentExpression(initValue.As<AssignmentExpression>(), popResult: false); // var a = b = c; - Do not discard b
                     }
                     else
                     {
-                        CompileExpression(frame, initValue);
+                        CompileExpression(initValue);
                     }
                 }
 
@@ -1367,19 +1531,16 @@ public class AdhocScriptCompiler
                     if (idIdentifier.Name == "nil")
                         ThrowCompilationError(varDeclaration, CompilationMessages.Error_NilNotValidVarialbleName);
 
+                    AdhocSymbol varSymb = SymbolMap.RegisterSymbol(idIdentifier.Name);
+                    DefineVariableInCurrentScope(varSymb, AdhocVariableType.LocalVariable);
+
                     if (initValue is not null || pushWhenNoInit)
                     {
                         // Variable is being defined with a value.
-                        InsertVariablePush(frame, idIdentifier, isVariableDeclaration: true);
+                        InsertLocalVariablePush(idIdentifier.Name, idIdentifier.Location.Start.Line);
 
                         // Perform assignment
-                        InsertAssignPop(frame);
-                    }
-                    else
-                    {
-                        // Variable is declared but not assigned to anything yet. Do not add any variable push.
-                        AdhocSymbol varSymb = SymbolMap.RegisterSymbol(idIdentifier.Name);
-                        frame.AddScopeVariable(varSymb, isAssignment: true, isLocalDeclaration: true);
+                        InsertAssignPop();
                     }
                 }
                 else
@@ -1394,16 +1555,13 @@ public class AdhocScriptCompiler
                     if (idIdentifier.Name == "nil")
                         ThrowCompilationError(varDeclaration, CompilationMessages.Error_NilNotValidVarialbleName);
 
+                    AdhocSymbol varSymb = SymbolMap.RegisterSymbol(idIdentifier.Name);
+                    DefineVariableInCurrentScope(varSymb, AdhocVariableType.LocalVariable);
+
                     if (initValue is not null || pushWhenNoInit)
                     {
                         // Variable is being defined with a value.
-                        InsertVariablePush(frame, idIdentifier, isVariableDeclaration: true);
-                    }
-                    else
-                    {
-                        // Variable is declared but not assigned to anything yet. Do not add any variable push.
-                        AdhocSymbol varSymb = SymbolMap.RegisterSymbol(idIdentifier.Name);
-                        frame.AddScopeVariable(varSymb, isAssignment: true, isLocalDeclaration: true);
+                        InsertLocalVariablePush(idIdentifier.Name, idIdentifier.Location.Start.Line);
                     }
                 }
                 else
@@ -1415,26 +1573,25 @@ public class AdhocScriptCompiler
                 {
                     if (initValue.Type == Nodes.UpdateExpression)
                     {
-                        CompileUnaryExpression(frame, initValue as UpdateExpression, popResult: false); // var a = ++b; - Do not discard b
+                        CompileUnaryExpression(initValue as UpdateExpression, popResult: false); // var a = ++b; - Do not discard b
                     }
                     else if (IsUnaryReferenceOfExpression(initValue))
                     {
-                        CompileUnaryExpression(frame, initValue as UnaryExpression, popResult: false, asReference: true); // var a = &b;
+                        CompileUnaryExpression(initValue as UnaryExpression, popResult: false, asReference: true); // var a = &b;
                     }
                     else if (initValue.Type == Nodes.AssignmentExpression)
                     {
-                        CompileAssignmentExpression(frame, initValue as AssignmentExpression, popResult: false); // var a = b = c; - Do not discard b
+                        CompileAssignmentExpression(initValue as AssignmentExpression, popResult: false); // var a = b = c; - Do not discard b
                     }
                     else
                     {
-                        CompileExpression(frame, initValue);
+                        CompileExpression(initValue);
                     }
 
 
-                    InsertAssignPop(frame);
+                    InsertAssignPop();
                 }
             }
-            
         }
     }
 
@@ -1444,13 +1601,13 @@ public class AdhocScriptCompiler
     /// <param name="frame"></param>
     /// <param name="listAssignment"></param>
     /// <param name="pushWhenNoInit"></param>
-    public void CompileListAssignmentStatement(AdhocCodeFrame frame, ListAssignementStatement listAssignment)
+    public void CompileListAssignmentStatement(ListAssignementStatement listAssignment)
     {
-        if (frame.Version.ExpressionBeforeEvalOrPush()) // Must be before in late versions
-            CompileExpression(frame, listAssignment.Right);
+        if (CurrentFrame.Version.ExpressionBeforeEvalOrPush()) // Must be before in late versions
+            CompileExpression(listAssignment.Right);
 
-        var before = !frame.Version.ExpressionBeforeEvalOrPush() ? listAssignment.Right : null;
-        CompileListAsssignmentExpression(frame, listAssignment.Left, init: before);
+        var before = !CurrentFrame.Version.ExpressionBeforeEvalOrPush() ? listAssignment.Right : null;
+        CompileListAsssignmentExpression(listAssignment.Left, init: before);
     }
 
     /// <summary>
@@ -1459,9 +1616,9 @@ public class AdhocScriptCompiler
     /// <param name="frame"></param>
     /// <param name="list"></param>
     /// <param name="init"></param>
-    private void CompileListAsssignmentExpression(AdhocCodeFrame frame, ListAssignementExpression list, Expression? init = null, bool popResult = true)
+    private void CompileListAsssignmentExpression(ListAssignementExpression list, Expression? init = null, bool popResult = true)
     {
-        if (list.HasRestElement && !frame.Version.SupportsRestElement())
+        if (list.HasRestElement && !CurrentFrame.Version.SupportsRestElement())
             ThrowCompilationError(list, CompilationMessages.Error_ListAssignementRestElementUnsupported);
 
         Dictionary<ListAssignementExpression, AdhocSymbol> nestedLists = [];
@@ -1470,26 +1627,28 @@ public class AdhocScriptCompiler
             if (elem.Type == Nodes.Identifier)
             {
                 Identifier variableIdentifier = elem as Identifier;
-                InsertVariablePush(frame, variableIdentifier, isVariableDeclaration: false);
+                InsertLocalVariablePush(variableIdentifier.Name, variableIdentifier.Location.Start.Line);
             }
             else if (elem.Type == Nodes.VariableDeclarator)
             {
                 VariableDeclarator variableDeclarator = elem as VariableDeclarator;
                 Identifier variableIdentifier = variableDeclarator.Id as Identifier;
-                InsertVariablePush(frame, variableIdentifier, isVariableDeclaration: true);
+                DefineVariableInCurrentScope(SymbolMap.RegisterSymbol(variableIdentifier.Name), AdhocVariableType.LocalVariable);
+
+                InsertLocalVariablePush(variableIdentifier.Name, variableIdentifier.Location.Start.Line);
             }
             else if (elem is AttributeMemberExpression)
             {
-                CompileAttributeMemberAssignmentPush(frame, elem as AttributeMemberExpression);
+                CompileAttributeMemberAssignmentPush(elem as AttributeMemberExpression);
             }
             else if (elem is StaticMemberExpression)
             {
-                CompileStaticMemberExpressionPush(frame, elem as StaticMemberExpression);
+                CompileStaticMemberExpressionPush(elem as StaticMemberExpression);
             }
             else if (elem is ListAssignementExpression nestedList)
             {
                 string tmpTaskVariable = $"tmp#{SymbolMap.TempVariableCounter++}";
-                AdhocSymbol tempVariable = InsertVariablePush(frame, new Identifier(tmpTaskVariable), true);
+                AdhocSymbol tempVariable = InsertLocalVariablePush(tmpTaskVariable, 0);
 
                 // Keep track of these
                 nestedLists.Add(nestedList, tempVariable);
@@ -1499,36 +1658,36 @@ public class AdhocScriptCompiler
         }
 
         // FIXME: Logic can probably be improved
-        if (!frame.Version.ExpressionBeforeEvalOrPush() && init is not null)
+        if (!CurrentFrame.Version.ExpressionBeforeEvalOrPush() && init is not null)
         {
             if (init.Type == Nodes.AssignmentExpression)
             {
-                InsertListAssign(frame, list.Elements.Count, list.HasRestElement, list.Location.Start.Line);
-                CompileExpression(frame, init);
+                InsertListAssign(list.Elements.Count, list.HasRestElement, list.Location.Start.Line);
+                CompileExpression(init);
             }
             else
             {
-                CompileExpression(frame, init);
-                InsertListAssign(frame, list.Elements.Count, list.HasRestElement, list.Location.Start.Line);
+                CompileExpression(init);
+                InsertListAssign(list.Elements.Count, list.HasRestElement, list.Location.Start.Line);
             }
         }
         else
         {
-            InsertListAssign(frame, list.Elements.Count, list.HasRestElement, list.Location.Start.Line);
+            InsertListAssign(list.Elements.Count, list.HasRestElement, list.Location.Start.Line);
         }
 
         if (popResult)
-            InsertPop(frame);
+            InsertPop();
 
         foreach (KeyValuePair<ListAssignementExpression, AdhocSymbol> nestedListAndTmpVarPair in nestedLists)
         {
             ListAssignementExpression nestedList = nestedListAndTmpVarPair.Key;
             AdhocSymbol tempListVariable = nestedListAndTmpVarPair.Value;
 
-            if (frame.Version.ExpressionBeforeEvalOrPush())
-                InsertVariableEvalFromSymbol(frame, tempListVariable);
+            if (CurrentFrame.Version.ExpressionBeforeEvalOrPush())
+                AddInstruction(new InsVariableEvaluation() { VariableSymbols = [tempListVariable] }, 0);
 
-            CompileListAsssignmentExpression(frame, nestedList, new Identifier(tempListVariable.Name), popResult: true); // In a nested list, we are not reusing the result. pop it.
+            CompileListAsssignmentExpression(nestedList, new Identifier(tempListVariable.Name), popResult: true); // In a nested list, we are not reusing the result. pop it.
         }
     }
 
@@ -1537,150 +1696,137 @@ public class AdhocScriptCompiler
     /// </summary>
     /// <param name="frame"></param>
     /// <param name="import"></param>
-    public void CompileImport(AdhocCodeFrame frame, ImportDeclaration import)
+    public void CompileImport(ImportDeclaration import)
     {
-        string modulePath = "";
-
-        InsImport importIns = new InsImport();
-
-        for (int i = 0; i < import.Specifiers.Count; i++)
-        {
-            ImportDeclarationSpecifier specifier = import.Specifiers[i];
-            AdhocSymbol part = SymbolMap.RegisterSymbol(specifier.Local.Name);
-            importIns.ModulePath.Add(part);
-            modulePath += specifier.Local.Name;
-
-            if (i < import.Specifiers.Count - 1)
-                modulePath += AdhocConstants.OPERATOR_STATIC;
-        }
-
-        AdhocSymbol fullModulePathSymbol = SymbolMap.RegisterSymbol(!string.IsNullOrEmpty(modulePath) ? modulePath : AdhocConstants.NIL);
-        AdhocSymbol targetSymbol = SymbolMap.RegisterSymbol(import.Target.Name, convertToOperand: frame.Version.ShouldUseInternalOperatorNames());
-        AdhocSymbol aliasSymbol = SymbolMap.RegisterSymbol(import.Alias is not null ? import.Alias.Name : AdhocConstants.NIL);
-
-        importIns.ModulePath.Add(fullModulePathSymbol);
-        importIns.ModuleValue = targetSymbol;
-        importIns.ImportAs = aliasSymbol;
-
         if (import.Alias is not null) // Alias is defined as a static
         {
-            if (!frame.Version.SupportsImportAlias())
+            if (!CurrentFrame.Version.SupportsImportAlias())
                 ThrowCompilationError(import, CompilationMessages.Error_ImportAliasNotSupported);
 
             if (import.Target.Name == AdhocConstants.OPERATOR_IMPORT_ALL) // Should be caught by parser, but worth having anyway
                 ThrowCompilationError(import, CompilationMessages.Error_ImportWildcardWithAlias);
-
-            frame.Stack.AddStaticVariable(new StaticVariable() { Symbol = aliasSymbol });
-            
         }
-        else if (import.Target.Name == AdhocConstants.OPERATOR_IMPORT_ALL) // Imports actually copies the static members from the target
+
+        string modulePath = "";
+
+        List<AdhocSymbol> path = [];
+        AdhocSymbol target = SymbolMap.RegisterSymbol(import.Target.Name, convertToOperand: CurrentFrame.Version.ShouldUseInternalOperatorNames());
+        AdhocSymbol alias = import.Alias is not null ? SymbolMap.RegisterSymbol(import.Alias.Name) : null;
+
+        if (import.Specifiers.Count > 0)
         {
-            if (import.Target.Name == AdhocConstants.OPERATOR_IMPORT_ALL)
+            for (int i = 0; i < import.Specifiers.Count; i++)
             {
-                if (TopLevelModules.TryGetValue(modulePath, out AdhocModule mod))
-                {
-                    foreach (var memberSymbol in mod.GetAllMembers())
-                        frame.Stack.AddStaticVariable(new StaticVariable() { Symbol = memberSymbol });
-                }
-                else
-                {
-                    // TODO (how to handle this?)
-                    frame.Stack.AddStaticVariable(new StaticVariable() { Symbol = null, });
-                }
+                ImportDeclarationSpecifier specifier = import.Specifiers[i];
+                AdhocSymbol part = SymbolMap.RegisterSymbol(specifier.Local.Name);
+                path.Add(part);
+                modulePath += specifier.Local.Name;
+
+                if (i < import.Specifiers.Count - 1)
+                    modulePath += AdhocConstants.OPERATOR_STATIC;
+
+                if (i == import.Specifiers.Count - 1)
+                    path.Add(SymbolMap.RegisterSymbol(modulePath));
             }
         }
         else
         {
-            frame.Stack.AddStaticVariable(new StaticVariable() { Symbol = targetSymbol });
+            // Static
+            path.Add(SymbolMap.RegisterSymbol(import.Target.Name));
+            path.Add(SymbolMap.RegisterSymbol(import.Target.Name));
         }
 
-        frame.AddInstruction(importIns, import.Location.Start.Line);
+        AddModuleVariablesFromImport(path, target, alias);
+        DefineScopeVariablesFromImport(path, target, alias);
+
+        InsImport importIns = new InsImport();
+        importIns.ModulePath = path;
+        importIns.ModuleValue = target;
+        importIns.ImportAs = alias ?? SymbolMap.RegisterSymbol(AdhocConstants.NIL);
+        AddInstruction(importIns, import.Location.Start.Line);
     }
 
-    private void CompileExpression(AdhocCodeFrame frame, Expression exp)
+    private void CompileExpression(Expression exp)
     {
         switch (exp.Type)
         {
-            
+
             case Nodes.Identifier:
-                CompileIdentifier(frame, exp as Identifier);
+                CompileIdentifier(exp as Identifier);
                 break;
             case Nodes.StaticIdentifier:
-                CompileStaticIdentifier(frame, exp as StaticIdentifier);
+                CompileStaticIdentifier(exp as StaticIdentifier);
                 break;
             case Nodes.FunctionExpression:
-                CompileFunctionExpression(frame, exp as FunctionExpression);
+                CompileFunctionExpression(exp as FunctionExpression);
                 break;
             case Nodes.MethodExpression:
-                CompileMethodExpression(frame, exp as MethodExpression);
+                CompileMethodExpression(exp as MethodExpression);
                 break;
             case Nodes.CallExpression:
-                CompileCall(frame, exp as CallExpression);
+                CompileCall(exp as CallExpression);
                 break;
             case Nodes.UnaryExpression:
             case Nodes.UpdateExpression:
-                CompileUnaryExpression(frame, exp as UnaryExpression);
+                CompileUnaryExpression(exp as UnaryExpression);
                 break;
             case Nodes.BinaryExpression:
             case Nodes.LogicalExpression:
-                CompileBinaryExpression(frame, exp as BinaryExpression);
+                CompileBinaryExpression(exp as BinaryExpression);
                 break;
             case Nodes.Literal:
-                CompileLiteral(frame, exp as Literal);
+                CompileLiteral(exp as Literal);
                 break;
             case Nodes.ArrayExpression:
-                CompileArrayExpression(frame, exp as ArrayExpression);
+                CompileArrayExpression(exp as ArrayExpression);
                 break;
             case Nodes.MapExpression:
-                CompileMapExpression(frame, exp as MapExpression);
+                CompileMapExpression(exp as MapExpression);
                 break;
             case Nodes.MemberExpression when exp is ComputedMemberExpression:
-                CompileComputedMemberExpression(frame, exp as ComputedMemberExpression);
+                CompileComputedMemberExpression(exp as ComputedMemberExpression);
                 break;
             case Nodes.MemberExpression when exp is StaticMemberExpression:
-                CompileStaticMemberExpression(frame, exp as StaticMemberExpression);
+                CompileStaticMemberExpression(exp as StaticMemberExpression);
                 break;
             case Nodes.MemberExpression when exp is AttributeMemberExpression:
-                CompileAttributeMemberExpression(frame, exp as AttributeMemberExpression);
+                CompileAttributeMemberExpression(exp as AttributeMemberExpression);
                 break;
             case Nodes.MemberExpression when exp is ObjectSelectorMemberExpression:
-                CompileObjectSelectorExpression(frame, exp as ObjectSelectorMemberExpression);
+                CompileObjectSelectorExpression(exp as ObjectSelectorMemberExpression);
                 break;
             case Nodes.AssignmentExpression:
-                CompileAssignmentExpression(frame, exp as AssignmentExpression);
+                CompileAssignmentExpression(exp as AssignmentExpression);
                 break;
             case Nodes.ConditionalExpression:
-                CompileConditionalExpression(frame, exp as ConditionalExpression);
+                CompileConditionalExpression(exp as ConditionalExpression);
                 break;
             case Nodes.TemplateLiteral:
-                CompileTemplateLiteral(frame, exp as TemplateLiteral);
+                CompileTemplateLiteral(exp as TemplateLiteral);
                 break;
             case Nodes.TaggedTemplateExpression:
-                CompileTaggedTemplateExpression(frame, exp as TaggedTemplateExpression);
-                break;
-            case Nodes.ClassExpression:
-                CompileClassExpression(frame, exp as ClassExpression);
+                CompileTaggedTemplateExpression(exp as TaggedTemplateExpression);
                 break;
             case Nodes.ImportDeclaration:
-                CompileImport(frame, (exp as ImportExpression).Declaration);
+                CompileImport((exp as ImportExpression).Declaration);
                 break;
             case Nodes.YieldExpression:
-                CompileYield(frame, exp as YieldExpression);
+                CompileYield(exp as YieldExpression);
                 break;
             case Nodes.AwaitExpression:
-                CompileAwait(frame, exp as AwaitExpression);
+                CompileAwait(exp as AwaitExpression);
                 break;
             case Nodes.SpreadElement:
-                CompileSpreadElement(frame, exp as SpreadElement);
+                CompileSpreadElement(exp as SpreadElement);
                 break;
             case Nodes.SelfExpression:
-                CompileSelfExpression(frame, exp as SelfExpression);
+                CompileSelfExpression(exp as SelfExpression);
                 break;
             case Nodes.ChainExpression:
-                CompileChainExpression(frame, exp as ChainExpression);
+                CompileChainExpression(exp as ChainExpression);
                 break;
             case Nodes.SelfFinalizerExpression:
-                CompileSelfFinalizerExpression(frame, exp as SelfFinalizerExpression);
+                CompileSelfFinalizerExpression(exp as SelfFinalizerExpression);
                 break;
             default:
                 ThrowCompilationError(exp, $"Expression {exp.Type} not supported");
@@ -1693,21 +1839,19 @@ public class AdhocScriptCompiler
     /// </summary>
     /// <param name="frame"></param>
     /// <param name="chainExpression"></param>
-    private void CompileDelegateDefinition(AdhocCodeFrame frame, DelegateDeclaration delegateDefinition)
+    private void CompileDelegateDefinition(DelegateDeclaration delegateDefinition)
     {
-        if (frame.Version.IsMinimumVersionForDelegateSupport())
+        if (CurrentFrame.Version.IsMinimumVersionForDelegateSupport())
             ThrowCompilationError(delegateDefinition, CompilationMessages.Error_DelegatesUnsupported);
 
         var idSymb = SymbolMap.RegisterSymbol(delegateDefinition.Identifier.Name);
+        DefineAttributeForCurrentModule(idSymb.Name, AdhocVariableType.Delegate);
+        DefineVariableInCurrentScope(idSymb, AdhocVariableType.Delegate);
+
         InsDelegateDefine ins = new InsDelegateDefine(idSymb);
-        frame.AddInstruction(ins, delegateDefinition.Location.Start.Line);
+        AddInstruction(ins, delegateDefinition.Location.Start.Line);
 
-        if (!CurrentModule.DefineStatic(idSymb))
-            ThrowCompilationError(delegateDefinition, $"Member {idSymb.Name} was already declared in this module.");
-
-        frame.AddAttributeOrStaticMemberVariable(idSymb);
-
-        if (frame.Version.IsMinimumVersionForDelegateSupport())
+        if (CurrentFrame.Version.IsMinimumVersionForDelegateSupport())
             AddPostCompilationWarning(CompilationMessages.Warning_UsingDelegateCode);
     }
 
@@ -1716,9 +1860,9 @@ public class AdhocScriptCompiler
     /// </summary>
     /// <param name="frame"></param>
     /// <param name="chainExpression"></param>
-    private void CompileChainExpression(AdhocCodeFrame frame, ChainExpression chainExpression)
+    private void CompileChainExpression(ChainExpression chainExpression)
     {
-        CompileExpression(frame, chainExpression.Expression);
+        CompileExpression(chainExpression.Expression);
     }
 
     /// <summary>
@@ -1726,16 +1870,16 @@ public class AdhocScriptCompiler
     /// </summary>
     /// <param name="frame"></param>
     /// <param name="spreadElement"></param>
-    private void CompileSelfExpression(AdhocCodeFrame frame, SelfExpression selfExpression)
+    private void CompileSelfExpression(SelfExpression selfExpression)
     {
-        if (!frame.Version.HasSelfSupport())
+        if (!CurrentFrame.Version.HasSelfSupport())
             ThrowCompilationError(selfExpression, CompilationMessages.Error_SelfUnsupported);
 
         AdhocSymbol symb = SymbolMap.RegisterSymbol(AdhocConstants.SELF);
         int idx = 0; // Always 0 when refering to self
         var varEval = new InsVariableEvaluation(idx);
         varEval.VariableSymbols.Add(symb); // Self is always considered as a local. Just one
-        frame.AddInstruction(varEval, selfExpression.Location.Start.Line);
+        AddInstruction(varEval, selfExpression.Location.Start.Line);
     }
 
     /// <summary>
@@ -1743,16 +1887,16 @@ public class AdhocScriptCompiler
     /// </summary>
     /// <param name="frame"></param>
     /// <param name="spreadElement"></param>
-    private void CompileSpreadElement(AdhocCodeFrame frame, SpreadElement spreadElement)
+    private void CompileSpreadElement(SpreadElement spreadElement)
     {
-        CompileExpression(frame, spreadElement.Argument);
+        CompileExpression(spreadElement.Argument);
     }
 
-    private void CompileYield(AdhocCodeFrame frame, YieldExpression yield)
+    private void CompileYield(YieldExpression yield)
     {
         if (yield.Argument is not null)
         {
-            CompileExpression(frame, yield.Argument);
+            CompileExpression(yield.Argument);
             if (yield.Argument is AssignmentExpression)
             {
                 ThrowCompilationError(yield.Argument, $"Assignment expressions are not yet supported in yield statements.");
@@ -1760,19 +1904,19 @@ public class AdhocScriptCompiler
         }
         else
         {
-            frame.AddInstruction(new InsVoidConst(), yield.Location.Start.Line);
+            AddInstruction(new InsVoidConst(), yield.Location.Start.Line);
         }
 
-        InsertSetState(frame, AdhocRunState.YIELD);
+        InsertSetState(AdhocRunState.YIELD);
     }
 
-    private void CompileAwait(AdhocCodeFrame frame, AwaitExpression awaitExpr)
+    private void CompileAwait(AwaitExpression awaitExpr)
     {
         // Awaiting bare call?
         if (awaitExpr.Argument is CallExpression call)
         {
             var awaitStart = new StaticMemberExpression(new Identifier(AdhocConstants.SYSTEM), new Identifier("AwaitTaskStart"), false);
-            CompileExpression(frame, awaitStart);
+            CompileExpression(awaitStart);
             bool isAwaitTask = IsNewTaskCall(call);
 
             if (!isAwaitTask)
@@ -1786,7 +1930,7 @@ public class AdhocScriptCompiler
                     async: false);
                 subroutine.Location = new Location(call.Location.Start, call.Location.End, call.Location.Source);
 
-                CompileAnonymousSubroutine(frame, subroutine, call, new NodeList<Expression>());
+                CompileSubroutine(subroutine, call, null, new NodeList<Expression>());
             }
             else
             {
@@ -1796,28 +1940,28 @@ public class AdhocScriptCompiler
                 if (call.Arguments[0].Type != Nodes.FunctionExpression && call.Arguments[0].Type != Nodes.ArrowFunctionExpression)
                     ThrowCompilationError(call, "AwaitTask expects a function as argument");
 
-                CompileExpression(frame, call.Arguments[0]);
+                CompileExpression(call.Arguments[0]);
             }
         }
         else
         {
             var awaitStart = new StaticMemberExpression(new Identifier(AdhocConstants.SYSTEM), new Identifier("AwaitTaskStart"), false);
-            CompileExpression(frame, awaitStart);
-            CompileExpression(frame, awaitExpr.Argument);
+            CompileExpression(awaitStart);
+            CompileExpression(awaitExpr.Argument);
         }
 
 
         // Get task - <task> = System::AwaitTaskStart(<func>);
-        frame.AddInstruction(new InsCall(1), 0);
+        AddInstruction(new InsCall(1), 0);
         string tmpTaskVariable = $"task#{SymbolMap.TempVariableCounter++}";
-        AdhocSymbol taskSymb = InsertVariablePush(frame, new Identifier(tmpTaskVariable), true);
-        frame.AddInstruction(InsAssignPop.Default, 0);
+        AdhocSymbol taskSymb = InsertLocalVariablePush(tmpTaskVariable, 0);
+        AddInstruction(InsAssignPop.Default, 0);
 
         // Get result of task - <result> = System::AwaitTaskResult(<task>);
         var awaitResult = new StaticMemberExpression(new Identifier(AdhocConstants.SYSTEM), new Identifier("AwaitTaskResult"), false);
-        CompileExpression(frame, awaitResult);
-        InsertVariableEvalFromSymbol(frame, taskSymb);
-        frame.AddInstruction(new InsCall(1), 0);
+        CompileExpression(awaitResult);
+        AddInstruction(new InsVariableEvaluation() { VariableSymbols = [taskSymb] }, 0);
+        AddInstruction(new InsCall(1), 0);
 
         AddPostCompilationWarning(CompilationMessages.Warning_UsingAwait_Code);
     }
@@ -1839,84 +1983,30 @@ public class AdhocScriptCompiler
         }
 
         return false;
-                            
+
     }
 
-    // TODO/FIXME: Remove this, adhoc does not support arrow functions
-    /// <summary>
-    /// Compiles: .doThing(e => <statement>)
-    /// </summary>
-    /// <param name="frame"></param>
-    /// <param name="arrowFuncExpr"></param>
-    private void CompileAnonymousSubroutine(AdhocCodeFrame frame, Node parentNode, Node body, NodeList<Expression> funcParams, bool isMethod = false, bool isAsync = false)
+
+    private void CompileStaticDeclaration(StaticDeclaration staticDeclaration)
     {
-        SubroutineBase subroutine = isMethod ? new InsMethodConst(frame.Version) : new InsFunctionConst(frame.Version);
-        subroutine.CodeFrame.ParentFrame = frame;
-        subroutine.CodeFrame.SourceFilePath = frame.SourceFilePath;
+        var ident = staticDeclaration.Declaration.Id as Identifier;
 
-        /* Unlike JS, adhoc can capture variables from the parent frame
-         * Example:
-         *    var arr = [0, 1, 2];
-         *    var map = Map();               
-         *    arr.each(function(e) {
-         *        map[e.toString()] = e * 100; -> Inserts a new key/value pair into map, which is from the parent frame
-         *    });
-         */
-        subroutine.CodeFrame.ContextAllowsVariableCaptureFromParentFrame = true;
+        // static definition with no value
+        var idSymb = SymbolMap.RegisterSymbol(ident.Name);
+        DefineAttributeForCurrentModule(ident.Name, AdhocVariableType.Static);
+        DefineVariableInCurrentScope(idSymb, AdhocVariableType.Static);
 
-        EnterScope(subroutine.CodeFrame, parentNode);
-        foreach (Expression param in funcParams)
-            CompileSubroutineParameter(frame, parentNode, subroutine, param);
-
-        if (body.Type == Nodes.BlockStatement)
-        {
-            CompileBlockStatement(subroutine.CodeFrame, body as BlockStatement, insertLeaveInstruction: false);
-            InsertFrameExitIfNeeded(subroutine.CodeFrame, body);
-        }
-        else
-        {
-            CompileExpression(subroutine.CodeFrame, body as Expression);
-
-            // Add implicit return
-            InsertSetState(subroutine.CodeFrame, AdhocRunState.RETURN);
-        }
-
-        LeaveScope(subroutine.CodeFrame, insertLeaveInstruction: false);
-
-        // "Insert" by evaluating each captured variable
-        foreach (var capturedVariable in subroutine.CodeFrame.CapturedCallbackVariables)
-            InsertVariableEval(frame, new Identifier(capturedVariable.Symbol.Name));
-
-        frame.AddInstruction(subroutine, parentNode.Location.Start.Line);
-    }
-
-    private void CompileClassExpression(AdhocCodeFrame frame, ClassExpression classExpression)
-    {
-        CompileNewClass(frame, classExpression.Id, classExpression.SuperClass, classExpression.Body, classExpression.IsModule);
-    }
-
-    private void CompileStaticDeclaration(AdhocCodeFrame frame, StaticDeclaration staticDeclaration)
-    {
         if (staticDeclaration.Declaration.Init is null)
         {
-            var ident = staticDeclaration.Declaration.Id as Identifier;
-
-            // static definition with no value
-            var idSymb = SymbolMap.RegisterSymbol(ident.Name);
             InsStaticDefine staticDefine = new InsStaticDefine(idSymb);
-            frame.AddInstruction(staticDefine, staticDeclaration.Location.Start.Line);
+            AddInstruction(staticDefine, staticDeclaration.Location.Start.Line);
 
-            if (!CurrentModule.DefineStatic(idSymb))
-                ThrowCompilationError(staticDeclaration, $"Static member {idSymb.Name} was already declared in this module.");
-
-            frame.AddAttributeOrStaticMemberVariable(idSymb);
-            
             // Statics starting V7 until V10 are always set to a nil if not explicitly set to a value
-            if (frame.Version.ShouldInsertNilForStaticDefinition())
+            if (CurrentFrame.Version.ShouldInsertNilForStaticDefinition())
             {
-                InsertVariablePush(frame, ident, isVariableDeclaration: false);
-                frame.AddInstruction(new InsNilConst(), ident.Location.Start.Line);
-                InsertAssignPop(frame);
+                InsertLocalVariablePush(ident.Name, ident.Location.Start.Line);
+                AddInstruction(new InsNilConst(), ident.Location.Start.Line);
+                InsertAssignPop();
             }
         }
         else
@@ -1925,38 +2015,29 @@ public class AdhocScriptCompiler
                 ThrowCompilationError(staticDeclaration.Declaration.Id, "Expected static declaration to be an identifier.");
 
             var declValue = staticDeclaration.Declaration.Init;
-            Identifier identifier = staticDeclaration.Declaration.Id as Identifier;
-            var idSymb = SymbolMap.RegisterSymbol(identifier.Name);
 
             InsStaticDefine staticDefine = new InsStaticDefine(idSymb);
-            frame.AddInstruction(staticDefine, staticDeclaration.Location.Start.Line);
-
-            // This was previously an error
-            // But it turns out that you can define statics within function scopes, so they actually can be redefined (GT6 garage project)
-            // Will leave it as a warning from now on
-            if (!CurrentModule.DefineStatic(idSymb))
-                PrintCompilationWarning(staticDeclaration, $"Static member '{idSymb.Name}' was already declared in this module.");
-
-            frame.AddAttributeOrStaticMemberVariable(idSymb);
+            AddInstruction(staticDefine, staticDeclaration.Location.Start.Line);
 
             // Assigning to something new
-            if (frame.Version.ExpressionBeforeEvalOrPush())
+            if (CurrentFrame.Version.ExpressionBeforeEvalOrPush())
             {
-                CompileExpression(frame, declValue);
-                CompileVariableAssignment(frame, staticDeclaration.Declaration.Id);
+                CompileExpression(declValue);
+                CompileVariableAssignment(staticDeclaration.Declaration.Id);
             }
             else
             {
-                InsertVariablePush(frame, staticDeclaration.Declaration.Id as Identifier, isVariableDeclaration: false);
-                CompileExpression(frame, declValue);
+                var id = staticDeclaration.Declaration.Id as Identifier;
+                InsertLocalVariablePush(id.Name, id.Location.Start.Line);
+                CompileExpression(declValue);
 
-                InsertAssignPop(frame);
+                InsertAssignPop();
             }
         }
     }
 
 
-    private void CompileAttributeDeclaration(AdhocCodeFrame frame, AttributeDeclaration attrVariableDefinition)
+    private void CompileAttributeDeclaration(AttributeDeclaration attrVariableDefinition)
     {
         if (attrVariableDefinition.VarExpression.Type == Nodes.Identifier)
         {
@@ -1965,21 +2046,19 @@ public class AdhocScriptCompiler
             // attribute definition with no value
 
             // defaults to nil (when default values are supported)
-            if (frame.Version.HasSupportForAttributeDefinitionDefaultValues())
-                frame.AddInstruction(new InsNilConst(), ident.Location.Start.Line);
+            if (CurrentFrame.Version.HasSupportForAttributeDefinitionDefaultValues())
+                AddInstruction(new InsNilConst(), ident.Location.Start.Line);
 
             var idSymb = SymbolMap.RegisterSymbol(ident.Name);
+            DefineAttributeForCurrentModule(idSymb.Name, AdhocVariableType.Attribute);
+            DefineVariableInCurrentScope(idSymb, AdhocVariableType.Attribute);
+
             InsAttributeDefine staticDefine = new InsAttributeDefine(idSymb);
-            frame.AddInstruction(staticDefine, attrVariableDefinition.Location.Start.Line);
-
-            if (!CurrentModule.DefineAttribute(idSymb))
-                ThrowCompilationError(attrVariableDefinition, "Attribute is already defined.");
-
-            frame.AddAttributeOrStaticMemberVariable(idSymb);
+            AddInstruction(staticDefine, attrVariableDefinition.Location.Start.Line);
         }
         else
         {
-            if (!frame.Version.HasSupportForFunctionParametersDefaultValues())
+            if (!CurrentFrame.Version.HasSupportForFunctionParametersDefaultValues())
                 ThrowCompilationError(attrVariableDefinition.VarExpression, CompilationMessages.Error_DefaultAttributeValuesUnsupported);
 
             if (attrVariableDefinition.VarExpression is not AssignmentExpression)
@@ -1989,20 +2068,17 @@ public class AdhocScriptCompiler
             if (assignmentExpression.Left is not Identifier)
                 ThrowCompilationError(assignmentExpression, "Expected attribute declaration to be an identifier.");
 
-            // Value if any
-            CompileExpression(frame, assignmentExpression.Right);
-
             Identifier identifier = assignmentExpression.Left as Identifier;
             var idSymb = SymbolMap.RegisterSymbol(identifier.Name);
+            DefineAttributeForCurrentModule(idSymb.Name, AdhocVariableType.Attribute);
+            DefineVariableInCurrentScope(idSymb, AdhocVariableType.Attribute);
+
+            // Value if any
+            CompileExpression(assignmentExpression.Right);
 
             // Declaring a class attribute, so we don't push anything
             InsAttributeDefine attrDefine = new InsAttributeDefine(idSymb);
-            frame.AddInstruction(attrDefine, identifier.Location.Start.Line);
-
-            if (!CurrentModule.DefineAttribute(idSymb))
-                ThrowCompilationError(attrVariableDefinition, "Attribute is already defined.");
-
-            frame.AddAttributeOrStaticMemberVariable(idSymb);
+            AddInstruction(attrDefine, identifier.Location.Start.Line);
         }
     }
 
@@ -2011,12 +2087,12 @@ public class AdhocScriptCompiler
     /// </summary>
     /// <param name="frame"></param>
     /// <param name="arrayExpression"></param>
-    private void CompileArrayExpression(AdhocCodeFrame frame, ArrayExpression arrayExpression)
+    private void CompileArrayExpression(ArrayExpression arrayExpression)
     {
-        if (frame.Version.HasNewArrayConstSupport())
+        if (CurrentFrame.Version.HasNewArrayConstSupport())
         {
             // Version 11 and above - array is defined
-            frame.AddInstruction(new InsArrayConst((uint)arrayExpression.Elements.Count), arrayExpression.Location.Start.Line);
+            AddInstruction(new InsArrayConst((uint)arrayExpression.Elements.Count), arrayExpression.Location.Start.Line);
 
             // Then all items are pushed to it, one by one
             foreach (var elem in arrayExpression.Elements)
@@ -2024,9 +2100,9 @@ public class AdhocScriptCompiler
                 if (elem is null)
                     ThrowCompilationError(arrayExpression, "Unsupported empty element in array declaration.");
 
-                CompileExpression(frame, elem);
+                CompileExpression(elem);
 
-                frame.AddInstruction(InsArrayPush.Default, 0);
+                AddInstruction(InsArrayPush.Default, 0);
             }
         }
         else
@@ -2037,11 +2113,11 @@ public class AdhocScriptCompiler
                 if (elem is null)
                     ThrowCompilationError(arrayExpression, "Unsupported empty element in array declaration.");
 
-                CompileExpression(frame, elem);
+                CompileExpression(elem);
             }
 
             // Then the array is defined
-            frame.AddInstruction(new InsArrayConstOld((uint)arrayExpression.Elements.Count), arrayExpression.Location.Start.Line);
+            AddInstruction(new InsArrayConstOld(arrayExpression.Elements.Count), arrayExpression.Location.Start.Line);
         }
     }
 
@@ -2050,18 +2126,18 @@ public class AdhocScriptCompiler
     /// </summary>
     /// <param name="frame"></param>
     /// <param name="mapExpression"></param>
-    private void CompileMapExpression(AdhocCodeFrame frame, MapExpression mapExpression)
+    private void CompileMapExpression(MapExpression mapExpression)
     {
-        if (!frame.Version.HasMapSupport())
+        if (!CurrentFrame.Version.HasMapSupport())
             ThrowCompilationError(mapExpression, CompilationMessages.Error_MapUnsupported);
 
-        frame.AddInstruction(new InsMapConst(), mapExpression.Location.Start.Line);
+        AddInstruction(new InsMapConst(), mapExpression.Location.Start.Line);
 
         foreach (var (key, value) in mapExpression.Elements)
         {
-            CompileExpression(frame, key);
-            CompileExpression(frame, value);
-            frame.AddInstruction(InsMapInsert.Default, 0);
+            CompileExpression(key);
+            CompileExpression(value);
+            AddInstruction(InsMapInsert.Default, 0);
         }
     }
 
@@ -2070,45 +2146,51 @@ public class AdhocScriptCompiler
     /// </summary>
     /// <param name="frame"></param>
     /// <param name="expStatement"></param>
-    private void CompileExpressionStatement(AdhocCodeFrame frame, ExpressionStatement expStatement)
+    private void CompileExpressionStatement(ExpressionStatement expStatement)
     {
-        CompileExpression(frame, expStatement.Expression);
+        CompileExpression(expStatement.Expression);
 
         if (expStatement.Expression.Type != Nodes.AssignmentExpression
             && expStatement.Expression.Type != Nodes.StaticDeclaration
             && expStatement.Expression.Type != Nodes.AttributeDeclaration
             && expStatement.Expression.Type != Nodes.YieldExpression
             && expStatement.Expression.Type != Nodes.SelfFinalizerExpression)
-            InsertPop(frame);
+            InsertPop();
     }
 
-    private void CompileMethodDeclaration(AdhocCodeFrame frame, MethodDeclaration methodDefinition)
+    private void CompileMethodDeclaration(MethodDeclaration methodDecl)
     {
-        CompileSubroutine(frame, methodDefinition, methodDefinition.Body, methodDefinition.Id as Identifier, methodDefinition.Params, isMethod: true);
+        var symbol = SymbolMap.RegisterSymbol(methodDecl.Id.Name);
+        DefineAttributeForCurrentModule(methodDecl.Id.Name, AdhocVariableType.Method);
+        DefineVariableInCurrentScope(symbol, AdhocVariableType.Method);
+        AdhocCodeFrame methodFrame = CompileSubroutine(methodDecl, methodDecl.Body, methodDecl.Id as Identifier, methodDecl.Params);
+
+        var methodDefine = new InsMethodDefine();
+        methodDefine.CodeFrame = methodFrame;
+        methodDefine.Name = symbol;
+        AddInstruction(methodDefine, methodDecl.Location.Start.Line);
     }
 
-    private void CompileFunctionExpression(AdhocCodeFrame frame, FunctionExpression funcExp)
+    private void CompileFunctionExpression(FunctionExpression funcExp)
     {
-        if (funcExp.Id is not null)
-        {
-            // Assume its a regular function or method
-            CompileSubroutine(frame, funcExp, funcExp.Body, funcExp.Id, funcExp.Params, isMethod: false);
-        }
-        else
-        {
-            // Assume it's an anonymous function, where variables can be captured
-            CompileAnonymousSubroutine(frame, funcExp, funcExp.Body, funcExp.Params);
-        }
+        var functionConstFrame = CompileSubroutine(funcExp, funcExp.Body, funcExp.Id, funcExp.Params);
+
+        var functionConst = new InsFunctionConst();
+        functionConst.CodeFrame = functionConstFrame;
+        AddInstruction(functionConst, funcExp.Location.Start.Line);
     }
 
-    private void CompileMethodExpression(AdhocCodeFrame frame, MethodExpression methodExpression)
+    private void CompileMethodExpression(MethodExpression methodExpr)
     {
-        // Assume it's an anonymous function, where variables can be captured
-        CompileAnonymousSubroutine(frame, methodExpression, methodExpression.Body, methodExpression.Params, isMethod: true);
+        var methodConstFrame = CompileSubroutine(methodExpr, methodExpr.Body, methodExpr.Id, methodExpr.Params);
+
+        var methodConst = new InsMethodConst();
+        methodConst.CodeFrame = methodConstFrame;
+        AddInstruction(methodConst, methodExpr.Location.Start.Line);
     }
 
     // Combination of string literals/templates
-    private void CompileTaggedTemplateExpression(AdhocCodeFrame frame, TaggedTemplateExpression taggedTemplate)
+    private void CompileTaggedTemplateExpression(TaggedTemplateExpression taggedTemplate)
     {
         int elemCount = 0;
         BuildStringRecurse(taggedTemplate);
@@ -2126,7 +2208,7 @@ public class AdhocScriptCompiler
                         TemplateElement element = literal.Quasis[0];
                         AdhocSymbol strSymb = SymbolMap.RegisterSymbol(element.Value.Cooked, convertToOperand: false);
                         InsStringConst strConst = new InsStringConst(strSymb);
-                        frame.AddInstruction(strConst, element.Location.Start.Line);
+                        AddInstruction(strConst, element.Location.Start.Line);
 
                         elemCount++;
                     }
@@ -2146,11 +2228,11 @@ public class AdhocScriptCompiler
                             {
                                 AdhocSymbol valSymb = SymbolMap.RegisterSymbol(tElem.Value.Cooked, convertToOperand: false);
                                 InsStringConst strConst = new InsStringConst(valSymb);
-                                frame.AddInstruction(strConst, n.Location.Start.Line);
+                                AddInstruction(strConst, n.Location.Start.Line);
                             }
                             else if (n is Expression exp)
                             {
-                                CompileExpression(frame, exp);
+                                CompileExpression(exp);
                             }
                             else
                                 ThrowCompilationError(node, "Unexpected template element type");
@@ -2165,7 +2247,7 @@ public class AdhocScriptCompiler
         }
 
         InsStringPush strPush = new InsStringPush(elemCount);
-        frame.AddInstruction(strPush, taggedTemplate.Location.Start.Line);
+        AddInstruction(strPush, taggedTemplate.Location.Start.Line);
     }
 
     /// <summary>
@@ -2173,7 +2255,7 @@ public class AdhocScriptCompiler
     /// </summary>
     /// <param name="frame"></param>
     /// <param name="templateLiteral"></param>
-    private void CompileTemplateLiteral(AdhocCodeFrame frame, TemplateLiteral templateLiteral)
+    private void CompileTemplateLiteral(TemplateLiteral templateLiteral)
     {
         if (templateLiteral.Quasis.Count == 1 && templateLiteral.Expressions.Count == 0)
         {
@@ -2182,16 +2264,16 @@ public class AdhocScriptCompiler
 
             // On later versions, empty strings are always a string push with 0 args, which is a short hand for a static empty string
             // It also works on earlier versions, but that's just how they compiled it
-            if (string.IsNullOrEmpty(strElement.Value.Cooked) && frame.Version.ShouldUseStringPushForEmptyStrings())
+            if (string.IsNullOrEmpty(strElement.Value.Cooked) && CurrentFrame.Version.ShouldUseStringPushForEmptyStrings())
             {
                 InsStringPush strPush = new InsStringPush(0);
-                frame.AddInstruction(strPush, strElement.Location.Start.Line);
+                AddInstruction(strPush, strElement.Location.Start.Line);
             }
-            else 
+            else
             {
                 AdhocSymbol strSymb = SymbolMap.RegisterSymbol(strElement.Value.Cooked, convertToOperand: false, strElement.Value.HasHexEscape);
                 InsStringConst strConst = new InsStringConst(strSymb);
-                frame.AddInstruction(strConst, strElement.Location.Start.Line);
+                AddInstruction(strConst, strElement.Location.Start.Line);
             }
         }
         else
@@ -2210,11 +2292,11 @@ public class AdhocScriptCompiler
                 {
                     AdhocSymbol valSymb = SymbolMap.RegisterSymbol(tElem.Value.Cooked, convertToOperand: false, tElem.Value.HasHexEscape);
                     InsStringConst strConst = new InsStringConst(valSymb);
-                    frame.AddInstruction(strConst, tElem.Location.Start.Line);
+                    AddInstruction(strConst, tElem.Location.Start.Line);
                 }
                 else if (node is Expression exp)
                 {
-                    CompileExpression(frame, exp);
+                    CompileExpression(exp);
                 }
                 else
                     ThrowCompilationError(node, "Unexpected template element type");
@@ -2224,53 +2306,53 @@ public class AdhocScriptCompiler
             if (literalNodes.Count > 0)
             {
                 InsStringPush strPush = new InsStringPush(literalNodes.Count);
-                frame.AddInstruction(strPush, templateLiteral.Location.Start.Line);
+                AddInstruction(strPush, templateLiteral.Location.Start.Line);
             }
             else
             {
-                if (frame.Version.ShouldUseStringPushForEmptyStrings())
+                if (CurrentFrame.Version.ShouldUseStringPushForEmptyStrings())
                 {
                     InsStringPush strPush = new InsStringPush(0);
-                    frame.AddInstruction(strPush, templateLiteral.Location.Start.Line);
+                    AddInstruction(strPush, templateLiteral.Location.Start.Line);
                 }
                 else
-                { 
+                {
                     AdhocSymbol valSymb = SymbolMap.RegisterSymbol("");
                     InsStringConst strConst = new InsStringConst(valSymb);
-                    frame.AddInstruction(strConst, templateLiteral.Location.Start.Line);
+                    AddInstruction(strConst, templateLiteral.Location.Start.Line);
                 }
             }
         }
     }
 
     // TODO: split this into seperate functions for each version
-    private void CompileAssignmentExpression(AdhocCodeFrame frame, AssignmentExpression assignExpression, bool popResult = true)
+    private void CompileAssignmentExpression(AssignmentExpression assignExpression, bool popResult = true)
     {
         // Assigning to a variable or literal directly?
         if (assignExpression.Operator == AssignmentOperator.Assign)
         {
-            if (frame.Version.ExpressionBeforeEvalOrPush())
+            if (CurrentFrame.Version.ExpressionBeforeEvalOrPush())
             {
                 // a = b = c?
                 if (assignExpression.Right.Type == Nodes.AssignmentExpression)
                 {
                     // We are reusing the result (b in this case) - we do not pop it.
-                    CompileAssignmentExpression(frame, assignExpression.Right as AssignmentExpression, popResult: false);
+                    CompileAssignmentExpression(assignExpression.Right as AssignmentExpression, popResult: false);
                 }
                 else
                 {
                     // Regular assignment
-                    CompileExpression(frame, assignExpression.Right);
+                    CompileExpression(assignExpression.Right);
                 }
 
                 // |a, b| = |c, d| = ...?
                 if (assignExpression.Left.Type == Nodes.ListAssignmentExpression)
                 {
-                    CompileListAsssignmentExpression(frame, assignExpression.Left as ListAssignementExpression, popResult: false);
+                    CompileListAsssignmentExpression(assignExpression.Left as ListAssignementExpression, popResult: false);
                 }
                 else
                 {
-                    CompileVariableAssignment(frame, assignExpression.Left, popResult);
+                    CompileVariableAssignment(assignExpression.Left, popResult);
                 }
             }
             else // Target first in old versions
@@ -2280,31 +2362,32 @@ public class AdhocScriptCompiler
                 if (IsUnaryIndirection(assignExpression.Left)) // Assigning to a reference variable (*var = 1)
                 {
                     // Trivially compile left reference
-                    CompileUnaryExpression(frame, assignExpression.Left as UnaryExpression);
+                    CompileUnaryExpression(assignExpression.Left as UnaryExpression);
                 }
                 else if (assignExpression.Left.Type == Nodes.ListAssignmentExpression) // |a, b| = |c, d| = e;
                 {
                     var listAssignExpr = assignExpression.Left as ListAssignementExpression;
-                    CompileListAsssignmentExpression(frame, listAssignExpr, null, popResult: false);
+                    CompileListAsssignmentExpression(listAssignExpr, null, popResult: false);
                     return; // No actual assignment, covered by list assign.
                 }
                 else
                 {
                     if (assignExpression.Left.Type == Nodes.Identifier)
                     {
-                        InsertVariablePush(frame, assignExpression.Left as Identifier, isVariableDeclaration: false);
+                        var id = assignExpression.Left as Identifier;
+                        InsertLocalVariablePush(id.Name, id.Location.Start.Line);
                     }
                     else if (assignExpression.Left is AttributeMemberExpression attr)
                     {
-                        CompileAttributeMemberAssignmentPush(frame, attr);
+                        CompileAttributeMemberAssignmentPush(attr);
                     }
                     else if (assignExpression.Left is ComputedMemberExpression compExpression)
                     {
-                        CompileComputedMemberExpressionAssignmentPush(frame, compExpression);
+                        CompileComputedMemberExpressionAssignmentPush(compExpression);
                     }
                     else if (assignExpression.Left is StaticMemberExpression staticMember)
                     {
-                        CompileStaticMemberExpressionPush(frame, staticMember);
+                        CompileStaticMemberExpressionPush(staticMember);
                     }
                     else if (assignExpression.Left is ObjectSelectorMemberExpression objectSelector)
                     {
@@ -2318,22 +2401,22 @@ public class AdhocScriptCompiler
 
                 if (IsUnaryReferenceOfExpression(assignExpression.Right))
                 {
-                    CompileUnaryExpression(frame, assignExpression.Right as UnaryExpression, popResult: false, asReference: true); // a = &b;
+                    CompileUnaryExpression(assignExpression.Right as UnaryExpression, popResult: false, asReference: true); // a = &b;
                 }
                 else if (assignExpression.Right.Type == Nodes.AssignmentExpression)
                 {
                     // We are reusing the result (b in this case) - we do not pop it.
-                    CompileAssignmentExpression(frame, assignExpression.Right as AssignmentExpression, popResult: false);
+                    CompileAssignmentExpression(assignExpression.Right as AssignmentExpression, popResult: false);
                 }
                 else
                 {
-                    CompileExpression(frame, assignExpression.Right);
+                    CompileExpression(assignExpression.Right);
                 }
 
                 if (popResult)
-                    InsertAssignPop(frame);
+                    InsertAssignPop();
                 else
-                    InsertAssign(frame);
+                    InsertAssign();
             }
         }
         else if (IsAdhocAssignWithOperandOperator(assignExpression.Operator)) // += -= /= etc..
@@ -2342,7 +2425,7 @@ public class AdhocScriptCompiler
             if (IsUnaryIndirection(assignExpression.Left))
             {
                 // No need to push, eval
-                CompileUnaryExpression(frame, assignExpression.Left as UnaryExpression, asReference: false, isIndirectionBinaryAssignment: true);
+                CompileUnaryExpression(assignExpression.Left as UnaryExpression, asReference: false, isIndirectionBinaryAssignment: true);
             }
             else
             {
@@ -2350,15 +2433,16 @@ public class AdhocScriptCompiler
                 // Left-hand side needs to be pushed first
                 if (assignExpression.Left.Type == Nodes.Identifier)
                 {
-                    InsertVariablePush(frame, assignExpression.Left as Identifier, isVariableDeclaration: false);
+                    var id = assignExpression.Left as Identifier;
+                    InsertLocalVariablePush(id.Name, id.Location.Start.Line);
                 }
                 else if (assignExpression.Left is AttributeMemberExpression attr)
                 {
-                    CompileAttributeMemberAssignmentPush(frame, attr);
+                    CompileAttributeMemberAssignmentPush(attr);
                 }
                 else if (assignExpression.Left is ComputedMemberExpression compExpression)
                 {
-                    CompileComputedMemberExpressionAssignmentPush(frame, compExpression);
+                    CompileComputedMemberExpressionAssignmentPush(compExpression);
                 }
                 else if (assignExpression.Left is ObjectSelectorMemberExpression objectSelector)
                 {
@@ -2373,14 +2457,14 @@ public class AdhocScriptCompiler
             if (assignExpression.Right.Type == Nodes.AssignmentExpression) // a += b += c?
             {
                 // Then do not immediately discard result for the next inline operation
-                CompileAssignmentExpression(frame, assignExpression.Right as AssignmentExpression, popResult: false);
+                CompileAssignmentExpression(assignExpression.Right as AssignmentExpression, popResult: false);
             }
-            else 
-                CompileExpression(frame, assignExpression.Right);
+            else
+                CompileExpression(assignExpression.Right);
 
-            InsertBinaryAssignOperator(frame, assignExpression, assignExpression.Operator, assignExpression.Location.Start.Line);
+            InsertBinaryAssignOperator(assignExpression, assignExpression.Operator, assignExpression.Location.Start.Line);
             if (popResult)
-                InsertPop(frame);
+                InsertPop();
         }
         else
         {
@@ -2393,29 +2477,30 @@ public class AdhocScriptCompiler
     /// </summary>
     /// <param name="frame"></param>
     /// <param name="expression"></param>
-    public void CompileVariableAssignment(AdhocCodeFrame frame, Expression expression, bool popValue = true)
+    public void CompileVariableAssignment(Expression expression, bool popValue = true)
     {
         if (expression.Type == Nodes.Identifier) // hello = world
         {
-            InsertVariablePush(frame, expression as Identifier, isVariableDeclaration: false);
+            var id = expression as Identifier;
+            InsertLocalVariablePush(id.Name, id.Location.Start.Line);
         }
         else if (expression.Type == Nodes.MemberExpression)
         {
             if (expression is AttributeMemberExpression attrMember) // Pushing into an object i.e hello.world = "!"
             {
-                CompileAttributeMemberAssignmentPush(frame, attrMember);
+                CompileAttributeMemberAssignmentPush(attrMember);
             }
             else if (expression is ComputedMemberExpression compExpression) // hello[world] = "foo"
             {
-                CompileComputedMemberExpressionAssignmentPush(frame, compExpression);
+                CompileComputedMemberExpressionAssignmentPush(compExpression);
             }
             else if (expression is ObjectSelectorMemberExpression objSelectExpression)
             {
-                CompileObjectSelectorExpressionAssignmentPush(frame, objSelectExpression);
+                CompileObjectSelectorExpressionAssignmentPush(objSelectExpression);
             }
             else if (expression is StaticMemberExpression staticMembExpression) // main::hello = hi
             {
-                CompileStaticMemberExpressionPush(frame, staticMembExpression);
+                CompileStaticMemberExpressionPush(staticMembExpression);
             }
             else
                 ThrowCompilationError(expression, $"Unimplemented member expression assignment type: '{expression.Type}'");
@@ -2427,7 +2512,7 @@ public class AdhocScriptCompiler
                 unaryExp.Argument is AttributeMemberExpression ||
                 unaryExp.Argument is StaticMemberExpression ||
                 unaryExp.Argument is ComputedMemberExpression)
-                CompileExpression(frame, unaryExp.Argument);
+                CompileExpression(unaryExp.Argument);
             else
                 ThrowCompilationError(expression, "Unexpected assignment to unary argument. Only Indirection (*) is allowed.");
         }
@@ -2437,126 +2522,126 @@ public class AdhocScriptCompiler
         }
 
         if (popValue)
-            InsertAssignPop(frame);
+            InsertAssignPop();
         else
-            frame.AddInstruction(InsAssign.Default, 0);
+            InsertAssign();
     }
 
     /// <summary>
     /// Or ternary for short - test ? consequent : alternate;
     /// </summary>
     /// <param name="condExpression"></param>
-    private void CompileConditionalExpression(AdhocCodeFrame frame, ConditionalExpression condExpression)
+    private void CompileConditionalExpression(ConditionalExpression condExpression)
     {
         // Compile condition
-        CompileExpression(frame, condExpression.Test);
+        CompileExpression(condExpression.Test);
 
         InsJumpIfFalse alternateJump = new InsJumpIfFalse();
-        frame.AddInstruction(alternateJump, 0);
+        AddInstruction(alternateJump, 0);
 
         if (IsUnaryReferenceOfExpression(condExpression.Consequent))
-            CompileUnaryExpression(frame, condExpression.Consequent as UnaryExpression, popResult: false, asReference: true);
+            CompileUnaryExpression(condExpression.Consequent as UnaryExpression, popResult: false, asReference: true);
         else
-            CompileExpression(frame, condExpression.Consequent);
+            CompileExpression(condExpression.Consequent);
 
         // This jump will skip the alternate statement if the consequent path is taken
         InsJump altSkipJump = new InsJump();
-        frame.AddInstruction(altSkipJump, 0);
+        AddInstruction(altSkipJump, 0);
 
-        if (frame.Version.ShouldPopInTernary())
-            InsertPop(frame);
+        if (CurrentFrame.Version.ShouldPopInTernary())
+            InsertPop();
 
         // Update alternate jump index now that we've compiled the consequent
-        alternateJump.JumpIndex = frame.GetLastInstructionIndex();
+        alternateJump.JumpIndex = CurrentFrame.GetInstructionCount();
 
         // Proceed to compile alternate/no match statement
         if (IsUnaryReferenceOfExpression(condExpression.Alternate))
-            CompileUnaryExpression(frame, condExpression.Alternate as UnaryExpression, popResult: false, asReference: true);
+            CompileUnaryExpression(condExpression.Alternate as UnaryExpression, popResult: false, asReference: true);
         else
-            CompileExpression(frame, condExpression.Alternate);
+            CompileExpression(condExpression.Alternate);
 
         // Done completely, update alt skip jump to end of condition instruction frame
-        altSkipJump.JumpInstructionIndex = frame.GetLastInstructionIndex();
+        altSkipJump.JumpInstructionIndex = CurrentFrame.GetInstructionCount();
     }
 
     /// <summary>
     /// Compiles an identifier. var test = otherVariable;
     /// </summary>
     /// <param name="identifier"></param>
-    private void CompileIdentifier(AdhocCodeFrame frame, Identifier identifier, bool attribute = false)
+    private void CompileIdentifier(Identifier identifier, bool attribute = false)
     {
         if (attribute)
-            InsertAttributeEval(frame, identifier);
+            InsertAttributeEval(identifier);
         else
-            InsertVariableEval(frame, identifier);
+            InsertVariableEval(identifier);
     }
 
     /// <summary>
     /// Compiles an identifier. var test = otherVariable;
     /// </summary>
     /// <param name="identifier"></param>
-    private void CompileStaticIdentifier(AdhocCodeFrame frame, StaticIdentifier identifier, bool attribute = false)
+    private void CompileStaticIdentifier(StaticIdentifier identifier, bool attribute = false)
     {
-        InsertVariableEval(frame, identifier.Id, forceStatic: true);
+        InsertVariableEval(identifier.Id, forceStatic: true);
     }
 
 
     /// <summary>
     /// Compiles array or map access or anything that can be indexed
     /// </summary>
-    private void CompileComputedMemberExpression(AdhocCodeFrame frame, ComputedMemberExpression computedMember)
+    private void CompileComputedMemberExpression(ComputedMemberExpression computedMember)
     {
-        CompileExpression(frame, computedMember.Object);
+        CompileExpression(computedMember.Object);
 
         if (computedMember.Optional)
         {
-            if (!frame.Version.IsMinimumVersionForOptionalSupport())
+            if (!CurrentFrame.Version.IsMinimumVersionForOptionalSupport())
                 ThrowCompilationError(computedMember, CompilationMessages.Error_OptionalComputedMemberUnsupported);
             else
                 AddPostCompilationWarning(CompilationMessages.Warning_UsingOptional_Code);
 
-            frame.AddInstruction(new InsLogicalOptional(), computedMember.Location.Start.Line);
+            AddInstruction(new InsLogicalOptional(), computedMember.Location.Start.Line);
         }
 
-        CompileExpression(frame, computedMember.Property);
+        CompileExpression(computedMember.Property);
 
-        if (frame.Version.HasElementEvalSupport())
-            frame.AddInstruction(InsElementEval.Default, 0);
+        if (CurrentFrame.Version.HasElementEvalSupport())
+            AddInstruction(InsElementEval.Default, 0);
         else
         {
             // Below, including 11 uses direct symbols
-            var indexerIns = new InsBinaryOperator(SymbolMap.RegisterSymbol(AdhocConstants.OPERATOR_SUBSCRIPT, convertToOperand: frame.Version.ShouldUseInternalOperatorNames()));
+            var indexerIns = new InsBinaryOperator(SymbolMap.RegisterSymbol(AdhocConstants.OPERATOR_SUBSCRIPT, convertToOperand: CurrentFrame.Version.ShouldUseInternalOperatorNames()));
 
-            frame.AddInstruction(indexerIns, computedMember.Location.Start.Line);
-            frame.AddInstruction(new InsEval(), 0);
+            AddInstruction(indexerIns, computedMember.Location.Start.Line);
+            AddInstruction(new InsEval(), 0);
         }
     }
 
     /// <summary>
     /// Compiles array or map element assignment (ELEMENT_PUSH)
     /// </summary>
-    private void CompileComputedMemberExpressionAssignmentPush(AdhocCodeFrame frame, ComputedMemberExpression computedMember)
+    private void CompileComputedMemberExpressionAssignmentPush(ComputedMemberExpression computedMember)
     {
-        CompileExpression(frame, computedMember.Object);
-        CompileExpression(frame, computedMember.Property);
+        CompileExpression(computedMember.Object);
+        CompileExpression(computedMember.Property);
 
-        if (frame.Version.HasElementPushSupport())
-            frame.AddInstruction(InsElementPush.Default, 0);
+        if (CurrentFrame.Version.HasElementPushSupport())
+            AddInstruction(InsElementPush.Default, 0);
         else
         {
             // Below, including 11 uses direct symbols
-            var indexerIns = new InsBinaryOperator(SymbolMap.RegisterSymbol(AdhocConstants.OPERATOR_SUBSCRIPT, convertToOperand: frame.Version.ShouldUseInternalOperatorNames()));
+            var indexerIns = new InsBinaryOperator(SymbolMap.RegisterSymbol(AdhocConstants.OPERATOR_SUBSCRIPT, convertToOperand: CurrentFrame.Version.ShouldUseInternalOperatorNames()));
 
-            frame.AddInstruction(indexerIns, computedMember.Location.Start.Line);
+            AddInstruction(indexerIns, computedMember.Location.Start.Line);
         }
     }
 
-    private void CompileObjectSelectorExpressionAssignmentPush(AdhocCodeFrame frame, ObjectSelectorMemberExpression objSelector)
+    private void CompileObjectSelectorExpressionAssignmentPush(ObjectSelectorMemberExpression objSelector)
     {
-        CompileExpression(frame, objSelector.Object);
-        CompileExpression(frame, objSelector.Property);
+        CompileExpression(objSelector.Object);
+        CompileExpression(objSelector.Property);
 
-        frame.AddInstruction(InsObjectSelector.Default, 0);
+        AddInstruction(InsObjectSelector.Default, 0);
     }
 
     /// <summary>
@@ -2564,38 +2649,38 @@ public class AdhocScriptCompiler
     /// </summary>
     /// <param name="frame"></param>
     /// <param name="attrExp"></param>
-    private void CompileAttributeMemberExpression(AdhocCodeFrame frame, AttributeMemberExpression attrExp)
+    private void CompileAttributeMemberExpression(AttributeMemberExpression attrExp)
     {
-        CompileExpression(frame, attrExp.Object); // ORG
+        CompileExpression(attrExp.Object); // ORG
 
         if (attrExp.Optional)
         {
-            if (frame.Version.IsMinimumVersionForOptionalSupport())
+            if (CurrentFrame.Version.IsMinimumVersionForOptionalSupport())
                 ThrowCompilationError(attrExp, CompilationMessages.Error_OptionalMemberUnsupported);
             else
                 AddPostCompilationWarning(CompilationMessages.Warning_UsingOptional_Code);
 
-            frame.AddInstruction(new InsLogicalOptional(), attrExp.Location.Start.Line);
+            AddInstruction(new InsLogicalOptional(), attrExp.Location.Start.Line);
         }
 
         if (attrExp.Property.Type == Nodes.Identifier)
         {
-            CompileIdentifier(frame, attrExp.Property as Identifier, attribute: true); // inSession
+            CompileIdentifier(attrExp.Property as Identifier, attribute: true); // inSession
         }
         else if (attrExp.Property is StaticMemberExpression)
         {
-            CompileStaticMemberExpressionAttributeEval(frame, attrExp.Property as StaticMemberExpression);
+            CompileStaticMemberExpressionAttributeEval(attrExp.Property as StaticMemberExpression);
         }
         else
             ThrowCompilationError(attrExp, "Expected attribute member to be identifier or static member expression.");
     }
 
-    private void CompileObjectSelectorExpression(AdhocCodeFrame frame, ObjectSelectorMemberExpression objSelectExpr)
+    private void CompileObjectSelectorExpression(ObjectSelectorMemberExpression objSelectExpr)
     {
-        CompileExpression(frame, objSelectExpr.Object);
-        CompileExpression(frame, objSelectExpr.Property);
-        frame.AddInstruction(InsObjectSelector.Default, 0);
-        frame.AddInstruction(new InsEval(), 0);
+        CompileExpression(objSelectExpr.Object);
+        CompileExpression(objSelectExpr.Property);
+        AddInstruction(InsObjectSelector.Default, 0);
+        AddInstruction(new InsEval(), 0);
     }
 
     /// <summary>
@@ -2603,7 +2688,7 @@ public class AdhocScriptCompiler
     /// </summary>
     /// <param name="frame"></param>
     /// <param name="staticExp"></param>
-    private void CompileStaticMemberExpression(AdhocCodeFrame frame, StaticMemberExpression staticExp)
+    private void CompileStaticMemberExpression(StaticMemberExpression staticExp)
     {
         // Recursively build the namespace path
         List<string> pathParts = new(4);
@@ -2612,7 +2697,7 @@ public class AdhocScriptCompiler
         string fullPath = string.Join(AdhocConstants.OPERATOR_STATIC, pathParts);
         AdhocSymbol fullPathSymb = SymbolMap.RegisterSymbol(fullPath);
 
-        if (frame.Version.HasVariableEvalSupport())
+        if (CurrentFrame.Version.HasVariableEvalSupport())
         {
             InsVariableEvaluation eval = new InsVariableEvaluation();
             foreach (string part in pathParts)
@@ -2621,12 +2706,9 @@ public class AdhocScriptCompiler
                 eval.VariableSymbols.Add(symb);
             }
 
-
             eval.VariableSymbols.Add(fullPathSymb);
 
-            Variable variable = frame.AddScopeVariable(fullPathSymb, isAssignment: false, isStatic: true);
-            eval.VariableStorageIndex = variable.StackIndex;
-            frame.AddInstruction(eval, staticExp.Location.Start.Line);
+            AddInstruction(eval, staticExp.Location.Start.Line);
         }
         else
         {
@@ -2640,10 +2722,8 @@ public class AdhocScriptCompiler
 
             push.VariableSymbols.Add(fullPathSymb);
 
-            Variable variable = frame.AddScopeVariable(fullPathSymb, isAssignment: false, isStatic: true);
-            push.VariableStorageIndex = variable.StackIndex;
-            frame.AddInstruction(push, staticExp.Location.Start.Line);
-            frame.AddInstruction(new InsEval(), staticExp.Location.Start.Line);
+            AddInstruction(push, staticExp.Location.Start.Line);
+            AddInstruction(new InsEval(), staticExp.Location.Start.Line);
         }
     }
 
@@ -2652,7 +2732,7 @@ public class AdhocScriptCompiler
     /// </summary>
     /// <param name="frame"></param>
     /// <param name="staticExp"></param>
-    private void CompileStaticMemberExpressionPush(AdhocCodeFrame frame, StaticMemberExpression staticExp)
+    private void CompileStaticMemberExpressionPush(StaticMemberExpression staticExp)
     {
         // Recursively build the namespace path
         List<string> pathParts = new(4);
@@ -2669,10 +2749,7 @@ public class AdhocScriptCompiler
         AdhocSymbol fullPathSymb = SymbolMap.RegisterSymbol(fullPath);
         push.VariableSymbols.Add(fullPathSymb);
 
-        Variable variable = frame.AddScopeVariable(fullPathSymb, isAssignment: false, isStatic: true);
-        push.VariableStorageIndex = variable.StackIndex;
-
-        frame.AddInstruction(push, staticExp.Location.Start.Line);
+        AddInstruction(push, staticExp.Location.Start.Line);
     }
 
     /// <summary>
@@ -2680,7 +2757,7 @@ public class AdhocScriptCompiler
     /// </summary>
     /// <param name="frame"></param>
     /// <param name="staticExp"></param>
-    private void CompileStaticMemberExpressionAttributeEval(AdhocCodeFrame frame, StaticMemberExpression staticExp)
+    private void CompileStaticMemberExpressionAttributeEval(StaticMemberExpression staticExp)
     {
         // Recursively build the namespace path
         List<string> pathParts = new(4);
@@ -2696,7 +2773,7 @@ public class AdhocScriptCompiler
         string fullPath = string.Join(AdhocConstants.OPERATOR_STATIC, pathParts);
         AdhocSymbol fullPathSymb = SymbolMap.RegisterSymbol(fullPath);
         attrEval.AttributeSymbols.Add(fullPathSymb);
-        frame.AddInstruction(attrEval, staticExp.Location.Start.Line);
+        AddInstruction(attrEval, staticExp.Location.Start.Line);
     }
 
     /// <summary>
@@ -2704,7 +2781,7 @@ public class AdhocScriptCompiler
     /// </summary>
     /// <param name="frame"></param>
     /// <param name="call"></param>
-    private void CompileCall(AdhocCodeFrame frame, CallExpression call, bool popReturnValue = false)
+    private void CompileCall(CallExpression call, bool popReturnValue = false)
     {
         // Handle special types first
         if (call.Callee is Identifier ident && ident.Name == "call") // VA_CALL
@@ -2714,21 +2791,21 @@ public class AdhocScriptCompiler
 
             if (call.Arguments.Count < 2)
                 ThrowCompilationError(call, CompilationMessages.Error_VaCall_MissingArguments);
-            
-            foreach (var arg in call.Arguments)
-                CompileExpression(frame, arg);
 
-            var vaCallIns = new InsVaCall() { PopObjectCount = (uint)call.Arguments.Count };
-            frame.AddInstruction(vaCallIns, call.Location.Start.Line);
+            foreach (var arg in call.Arguments)
+                CompileExpression(arg);
+
+            var vaCallIns = new InsVaCall() { PopObjectCount = call.Arguments.Count };
+            AddInstruction(vaCallIns, call.Location.Start.Line);
             AddPostCompilationWarning(CompilationMessages.Warning_UsingVaCall_Code);
 
-            if (frame.Version.ShouldEvalOnCall())
-                frame.AddInstruction(new InsEval(), call.Location.Start.Line);
+            if (CurrentFrame.Version.ShouldEvalOnCall())
+                AddInstruction(new InsEval(), call.Location.Start.Line);
         }
-        else if (IsNumberTypeIdentifier(call.Callee) && call.Arguments.Count == 1 && call.Arguments[0].Type == Nodes.Literal && 
+        else if (IsNumberTypeIdentifier(call.Callee) && call.Arguments.Count == 1 && call.Arguments[0].Type == Nodes.Literal &&
             ((Literal)call.Arguments[0]).TokenType == TokenType.NumericLiteral) // UInt(1) => U_INT_CONST
         {
-            CompileNumberConstructor(frame, call);
+            CompileNumberConstructor(call);
         }
         else
         {
@@ -2742,10 +2819,10 @@ public class AdhocScriptCompiler
                     ThrowCompilationError(call, "AwaitTask expects a function as argument");
 
                 var awaitStart = new StaticMemberExpression(new Identifier(AdhocConstants.SYSTEM), new Identifier("AwaitTaskStart"), false);
-                CompileExpression(frame, awaitStart);
+                CompileExpression(awaitStart);
             }
             else
-                CompileExpression(frame, call.Callee);
+                CompileExpression(call.Callee);
 
             for (int i = 0; i < call.Arguments.Count; i++)
             {
@@ -2753,21 +2830,21 @@ public class AdhocScriptCompiler
                     ThrowCompilationError(call.Arguments[i], "Only a spread element as an argument is allowed in a Variable function call (VA_CALL). There must not be more than one argument.");
 
                 if (IsUnaryReferenceOfExpression(call.Arguments[i]))
-                    CompileUnaryExpression(frame, call.Arguments[i] as UnaryExpression, asReference: true); // We may be pushing it
+                    CompileUnaryExpression(call.Arguments[i] as UnaryExpression, asReference: true); // We may be pushing it
                 else
-                    CompileExpression(frame, call.Arguments[i]);
+                    CompileExpression(call.Arguments[i]);
             }
 
             var callIns = new InsCall(call.Arguments.Count);
-            frame.AddInstruction(callIns, call.Location.Start.Line);
+            AddInstruction(callIns, call.Location.Start.Line);
 
-            if (frame.Version.ShouldEvalOnCall())
-                frame.AddInstruction(new InsEval(), call.Location.Start.Line);
+            if (CurrentFrame.Version.ShouldEvalOnCall())
+                AddInstruction(new InsEval(), call.Location.Start.Line);
         }
 
         // When calling and not caring about returns
         if (popReturnValue)
-            InsertPop(frame);
+            InsertPop();
     }
 
     /// <summary>
@@ -2775,7 +2852,8 @@ public class AdhocScriptCompiler
     /// </summary>
     /// <param name="frame"></param>
     /// <param name="call"></param>
-    private void CompileNumberConstructor(AdhocCodeFrame frame, CallExpression call)
+    // NOTE: This was added after GT6
+    private void CompileNumberConstructor(CallExpression call)
     {
         Identifier calleeIdentifier = call.Callee as Identifier;
         if (call.Arguments.Count < 1)
@@ -2793,65 +2871,65 @@ public class AdhocScriptCompiler
             switch (calleeIdentifier.Name)
             {
                 case "Byte":
-                    if (!frame.Version.HasByteSupport())
+                    if (!CurrentFrame.Version.HasByteSupport())
                         ThrowCompilationError(calleeIdentifier, CompilationMessages.Error_V13ByteLiteralsUnsupported);
 
                     var byteConst = new InsByteConst(Convert.ToSByte(literal.NumericValue));
-                    frame.AddInstruction(byteConst, literal.Location.Start.Line);
+                    AddInstruction(byteConst, literal.Location.Start.Line);
                     break;
                 case "UByte":
-                    if (!frame.Version.HasUByteSupport())
+                    if (!CurrentFrame.Version.HasUByteSupport())
                         ThrowCompilationError(calleeIdentifier, CompilationMessages.Error_V13UByteLiteralsUnsupported);
 
                     var ubyteConst = new InsUByteConst(Convert.ToByte(literal.NumericValue));
-                    frame.AddInstruction(ubyteConst, literal.Location.Start.Line);
+                    AddInstruction(ubyteConst, literal.Location.Start.Line);
                     break;
                 case "Short":
-                    if (!frame.Version.HasShortSupport())
+                    if (!CurrentFrame.Version.HasShortSupport())
                         ThrowCompilationError(calleeIdentifier, CompilationMessages.Error_V13ShortLiteralsUnsupported);
 
                     var shortConst = new InsShortConst(Convert.ToInt16(literal.NumericValue));
-                    frame.AddInstruction(shortConst, literal.Location.Start.Line);
+                    AddInstruction(shortConst, literal.Location.Start.Line);
                     break;
                 case "UShort":
-                    if (!frame.Version.HasUShortSupport())
+                    if (!CurrentFrame.Version.HasUShortSupport())
                         ThrowCompilationError(calleeIdentifier, CompilationMessages.Error_V13UShortLiteralsUnsupported);
 
                     var ushortConst = new InsUShortConst(Convert.ToUInt16(literal.NumericValue));
-                    frame.AddInstruction(ushortConst, literal.Location.Start.Line);
+                    AddInstruction(ushortConst, literal.Location.Start.Line);
                     break;
                 case "Int":
                     var intConst = new InsIntConst(Convert.ToInt32(literal.NumericValue));
-                    frame.AddInstruction(intConst, literal.Location.Start.Line);
+                    AddInstruction(intConst, literal.Location.Start.Line);
                     break;
                 case "UInt":
-                    if (!frame.Version.HasUIntSupport())
+                    if (!CurrentFrame.Version.HasUIntSupport())
                         ThrowCompilationError(literal, CompilationMessages.Error_V12UIntLiteralUnsupported);
 
                     var uintConst = new InsUIntConst(Convert.ToUInt32(literal.NumericValue));
-                    frame.AddInstruction(uintConst, literal.Location.Start.Line);
+                    AddInstruction(uintConst, literal.Location.Start.Line);
                     break;
                 case "Long":
                     var longConst = new InsLongConst(Convert.ToInt64(literal.NumericValue));
-                    frame.AddInstruction(longConst, literal.Location.Start.Line);
+                    AddInstruction(longConst, literal.Location.Start.Line);
                     break;
                 case "ULong":
-                    if (!frame.Version.HasULongSupport())
+                    if (!CurrentFrame.Version.HasULongSupport())
                         ThrowCompilationError(literal, CompilationMessages.Error_V12ULongLiteralUnsupported);
 
                     var ulongConst = new InsULongConst(Convert.ToUInt64(literal.NumericValue));
-                    frame.AddInstruction(ulongConst, literal.Location.Start.Line);
+                    AddInstruction(ulongConst, literal.Location.Start.Line);
                     break;
                 case "Float":
                     var singleConst = new InsFloatConst(Convert.ToSingle(literal.NumericValue));
-                    frame.AddInstruction(singleConst, literal.Location.Start.Line);
+                    AddInstruction(singleConst, literal.Location.Start.Line);
                     break;
                 case "Double":
-                    if (!frame.Version.HasDoubleSupport())
+                    if (!CurrentFrame.Version.HasDoubleSupport())
                         ThrowCompilationError(literal, CompilationMessages.Error_V12DoubleLiteralUnsupported);
 
                     var doubleConst = new InsDoubleConst(Convert.ToDouble(literal.NumericValue));
-                    frame.AddInstruction(doubleConst, literal.Location.Start.Line);
+                    AddInstruction(doubleConst, literal.Location.Start.Line);
                     break;
             }
         }
@@ -2871,60 +2949,60 @@ public class AdhocScriptCompiler
     /// <param name="frame"></param>
     /// <param name="binExp"></param>
     /// <exception cref="InvalidOperationException"></exception>
-    private void CompileBinaryExpression(AdhocCodeFrame frame, BinaryExpression binExp)
+    private void CompileBinaryExpression(BinaryExpression binExp)
     {
         if (binExp.Left.Type == Nodes.AssignmentExpression)
         {
             // (r = x % y) != 0 - reuse result
-            CompileAssignmentExpression(frame, binExp.Left as AssignmentExpression, false);
+            CompileAssignmentExpression(binExp.Left as AssignmentExpression, false);
         }
         else
         {
-            CompileExpression(frame, binExp.Left);
+            CompileExpression(binExp.Left);
         }
 
         // Check for logical operators that checks between both conditions
-        if (binExp.Operator == BinaryOperator.LogicalAnd || 
+        if (binExp.Operator == BinaryOperator.LogicalAnd ||
             binExp.Operator == BinaryOperator.LogicalOr ||
             binExp.Operator == BinaryOperator.NullishCoalescing)
         {
             if (binExp.Operator == BinaryOperator.LogicalOr)
             {
-                InsLogicalBase orIns = frame.Version.UsesNewLogicalInstructions() ? new InsLogicalOr() : new InsLogicalOrOld();
-                frame.AddInstruction(orIns, 0);
-                if (!frame.Version.UsesNewLogicalInstructions())
-                    InsertPop(frame);
+                InsLogicalBase orIns = CurrentFrame.Version.UsesNewLogicalInstructions() ? new InsLogicalOr() : new InsLogicalOrOld();
+                AddInstruction(orIns, 0);
+                if (!CurrentFrame.Version.UsesNewLogicalInstructions())
+                    InsertPop();
 
-                CompileExpression(frame, binExp.Right);
-                orIns.InstructionJumpIndex = frame.GetLastInstructionIndex();
+                CompileExpression(binExp.Right);
+                orIns.InstructionJumpIndex = CurrentFrame.GetInstructionCount();
             }
             else if (binExp.Operator == BinaryOperator.LogicalAnd)
             {
-                InsLogicalBase andIns = frame.Version.UsesNewLogicalInstructions() ? new InsLogicalAnd() : new InsLogicalAndOld();
-                frame.AddInstruction(andIns, 0);
-                if (!frame.Version.UsesNewLogicalInstructions())
-                    InsertPop(frame);
+                InsLogicalBase andIns = CurrentFrame.Version.UsesNewLogicalInstructions() ? new InsLogicalAnd() : new InsLogicalAndOld();
+                AddInstruction(andIns, 0);
+                if (!CurrentFrame.Version.UsesNewLogicalInstructions())
+                    InsertPop();
 
-                CompileExpression(frame, binExp.Right);
-                andIns.InstructionJumpIndex = frame.GetLastInstructionIndex();
+                CompileExpression(binExp.Right);
+                andIns.InstructionJumpIndex = CurrentFrame.GetInstructionCount();
             }
             else if (binExp.Operator == BinaryOperator.NullishCoalescing)
             {
-                if (frame.Version.IsMinimumVersionForOptionalSupport())
+                if (CurrentFrame.Version.IsMinimumVersionForOptionalSupport())
                     ThrowCompilationError(binExp, CompilationMessages.Error_NullCoalescingUnsupported);
                 else
                     AddPostCompilationWarning(CompilationMessages.Warning_UsingOptional_Code);
 
                 var jumpIfNotNil = new InsJumpIfNil();
-                frame.AddInstruction(jumpIfNotNil, binExp.Location.Start.Line);
-                CompileExpression(frame, binExp.Right);
-                jumpIfNotNil.InstructionJumpIndex = frame.GetLastInstructionIndex();
+                AddInstruction(jumpIfNotNil, binExp.Location.Start.Line);
+                CompileExpression(binExp.Right);
+                jumpIfNotNil.InstructionJumpIndex = CurrentFrame.GetInstructionCount();
             }
             else
             {
                 throw new InvalidOperationException();
             }
-            
+
         }
         else if (binExp.Operator == BinaryOperator.InstanceOf)
         {
@@ -2932,8 +3010,8 @@ public class AdhocScriptCompiler
         }
         else
         {
-            
-            CompileExpression(frame, binExp.Right);
+
+            CompileExpression(binExp.Right);
 
             string opStr = binExp.Operator switch
             {
@@ -2960,14 +3038,18 @@ public class AdhocScriptCompiler
             if (opStr is null)
                 ThrowCompilationError(binExp, $"Binary operator {binExp.Operator} not implemented");
 
-            AdhocSymbol opSymbol = SymbolMap.RegisterSymbol(opStr, convertToOperand: frame.Version.ShouldUseInternalOperatorNames());
+            AdhocSymbol opSymbol = SymbolMap.RegisterSymbol(opStr, convertToOperand: CurrentFrame.Version.ShouldUseInternalOperatorNames());
             InsBinaryOperator binOpIns = new InsBinaryOperator(opSymbol);
-            frame.AddInstruction(binOpIns, binExp.Location.Start.Line);
+            AddInstruction(binOpIns, binExp.Location.Start.Line);
         }
     }
 
-    private void CompileFinalizerStatement(AdhocCodeFrame frame, FinalizerStatement finalizer)
+    private void CompileFinalizerStatement(FinalizerStatement finalizer)
     {
+        string finVariable = $"fin#{SymbolMap.FinalizerTempVariableCounter++}";
+        var finSymbol = SymbolMap.RegisterSymbol(finVariable);
+        DefineVariableInCurrentScope(finSymbol, AdhocVariableType.LocalVariable);
+
         var asSubroutine = new FunctionDeclaration(null,
             new NodeList<Expression>(), // No parameters
             new BlockStatement(NodeList.Create(new Statement[] { finalizer })),
@@ -2976,43 +3058,74 @@ public class AdhocScriptCompiler
             async: false);
         asSubroutine.Location = new Location(finalizer.Location.Start, finalizer.Location.End, finalizer.Location.Source);
 
-        CompileAnonymousSubroutine(frame, asSubroutine, finalizer.Body, new NodeList<Expression>());
+        var frame = CompileSubroutine(asSubroutine, finalizer.Body, null, new NodeList<Expression>());
 
-        // add temp value & set finally
-        InsertVariablePush(frame, new Identifier($"fin#{SymbolMap.FinalizerTempVariableCounter++}") { Location = finalizer.Body.Location }, true);
+        var functionConst = new InsFunctionConst();
+        functionConst.CodeFrame = frame;
+        AddInstruction(functionConst, finalizer.Location.Start.Line);
 
+        // Assign <temp var>.finally
+        InsertLocalVariablePush(finVariable, finalizer.Location.Start.Line);
         InsAttributePush push = new InsAttributePush();
         push.AttributeSymbols.Add(SymbolMap.RegisterSymbol("finally"));
-        frame.AddInstruction(push, finalizer.Body.Location.Start.Line);
-        InsertAssignPop(frame);
+        AddInstruction(push, finalizer.Body.Location.Start.Line);
+        InsertAssignPop();
     }
 
-    private void CompileSelfFinalizerExpression(AdhocCodeFrame frame, SelfFinalizerExpression finalizer)
+    // NOTE: This doesn't seem to exist past GT5 (no traces/support of it in GT7's compiler). But we gotta support it.
+    private void CompileSelfFinalizerExpression(SelfFinalizerExpression finalizer)
     {
-        // Push self
-        CompileSelfExpression(frame, new SelfExpression());
+        // Example:
+        ////////////////////////////////////////////////////////////////////////
+        //     VARIABLE_EVAL: self, Local:0
+        //     VARIABLE_EVAL: project, Local:2
+        //     METHOD_CONST - ()[project]
+        //           ATTRIBUTE_EVAL: unloadProject
+        //           VARIABLE_EVAL: project, Local:-1
+        //           CALL: ArgCount=1
+        //           POP
+        //           VOID_CONST
+        //           SET_STATE: State=RETURN(1)
+        //     
+        //     OBJECT_SELECTOR
+        //     EVAL
+        //     VARIABLE_PUSH: fin#2, Local:3
+        //     ATTRIBUTE_PUSH: finally
+        ////////////////////////////////////////////////////////////////////////
+        // Original compiler (GT7) doesn't handle it that way. Was this ^ the original way a simple finally statement was compiled in GT5?
+        // Before they switched to to setting self with an object selector? and method const?
 
-        var asSubroutine = new MethodDeclaration(null,
+        // Push self
+        CompileSelfExpression(new SelfExpression());
+
+        string finVariable = $"fin#{SymbolMap.FinalizerTempVariableCounter++}";
+        var finSymbol = SymbolMap.RegisterSymbol(finVariable);
+        DefineVariableInCurrentScope(finSymbol, AdhocVariableType.LocalVariable);
+
+        var asSubroutine = new FunctionDeclaration(null,
             new NodeList<Expression>(), // No parameters
-            new BlockStatement(NodeList.Create([finalizer.Body])),
+            new BlockStatement(NodeList.Create(new Statement[] { finalizer.Body })),
             generator: false,
             strict: true,
             async: false);
         asSubroutine.Location = new Location(finalizer.Location.Start, finalizer.Location.End, finalizer.Location.Source);
 
-        CompileAnonymousSubroutine(frame, asSubroutine, finalizer.Body, new NodeList<Expression>(), isMethod: true);
+        var frame = CompileSubroutine(asSubroutine, finalizer.Body, null, new NodeList<Expression>());
+
+        var methodConst = new InsMethodConst();
+        methodConst.CodeFrame = frame;
+        AddInstruction(methodConst, finalizer.Location.Start.Line);
 
         // .* finalizer
-        frame.AddInstruction(new InsObjectSelector(), 0);
-        frame.AddInstruction(new InsEval(), 0);
+        AddInstruction(new InsObjectSelector(), 0);
+        AddInstruction(new InsEval(), 0);
 
-        // add temp value & set finally
-        InsertVariablePush(frame, new Identifier($"fin#{SymbolMap.FinalizerTempVariableCounter++}") { Location = finalizer.Body.Location }, true);
-
+        // Assign <temp var>.finally
+        InsertLocalVariablePush(finVariable, finalizer.Location.Start.Line);
         InsAttributePush push = new InsAttributePush();
         push.AttributeSymbols.Add(SymbolMap.RegisterSymbol("finally"));
-        frame.AddInstruction(push, finalizer.Body.Location.Start.Line);
-        InsertAssignPop(frame);
+        AddInstruction(push, finalizer.Body.Location.Start.Line);
+        InsertAssignPop();
     }
 
     /// <summary>
@@ -3023,19 +3136,19 @@ public class AdhocScriptCompiler
     /// <param name="popResult">Whether to pop after the expression to not reuse the result.</param>
     /// <param name="asReference">Whether to treat the expression as a reference, result may or may not be pushed to the reference variable.</param>
     /// <exception cref="NotImplementedException"></exception>
-    private void CompileUnaryExpression(AdhocCodeFrame frame, UnaryExpression unaryExp, bool popResult = false, bool asReference = false, bool isIndirectionBinaryAssignment = false)
+    private void CompileUnaryExpression(UnaryExpression unaryExp, bool popResult = false, bool asReference = false, bool isIndirectionBinaryAssignment = false)
     {
         if (unaryExp is UpdateExpression upd) // ++var / --var etc
         {
             if (!asReference)
             {
                 // Assigning to a variable - we need to push
-                PushUnaryExpressionArgument(frame, unaryExp.Argument);
+                PushUnaryExpressionArgument(unaryExp.Argument);
             }
             else
             {
                 // Reference objects can just be eval'd when doing something like '&myObj--'
-                CompileExpression(frame, upd.Argument);
+                CompileExpression(upd.Argument);
             }
 
             bool preIncrement = unaryExp.Prefix;
@@ -3049,29 +3162,29 @@ public class AdhocScriptCompiler
                 _ => throw new UnreachableException("Invalid unary operator"),
             };
 
-            bool opToSymbol = frame.Version.ShouldUseInternalOperatorNames();
+            bool opToSymbol = CurrentFrame.Version.ShouldUseInternalOperatorNames();
             AdhocSymbol symb = SymbolMap.RegisterSymbol(op, opToSymbol);
             InsUnaryAssignOperator unaryIns = new InsUnaryAssignOperator(symb);
-            frame.AddInstruction(unaryIns, unaryExp.Location.Start.Line);
+            AddInstruction(unaryIns, unaryExp.Location.Start.Line);
         }
         else if (unaryExp.Operator == UnaryOperator.Indirection) // *var - eval variable
         {
             if (asReference)
-                PushUnaryExpressionArgument(frame, unaryExp.Argument);
+                PushUnaryExpressionArgument(unaryExp.Argument);
             else if (unaryExp.Argument is UpdateExpression updArg)
-                CompileUnaryExpression(frame, updArg, asReference: true);
+                CompileUnaryExpression(updArg, asReference: true);
             else
             {
-                CompileExpression(frame, unaryExp.Argument);
+                CompileExpression(unaryExp.Argument);
 
-                if (!isIndirectionBinaryAssignment && frame.Version.ShouldEvalInIndirection())
-                    frame.AddInstruction(new InsEval(), 0);
+                if (!isIndirectionBinaryAssignment && CurrentFrame.Version.ShouldEvalInIndirection())
+                    AddInstruction(new InsEval(), 0);
             }
-            
+
         }
         else if (unaryExp.Operator == UnaryOperator.ReferenceOf) // &var - get reference of variable
         {
-            PushUnaryExpressionArgument(frame, unaryExp.Argument);
+            PushUnaryExpressionArgument(unaryExp.Argument);
         }
         else // -var / +var / ~var
         {
@@ -3087,7 +3200,7 @@ public class AdhocScriptCompiler
                 }
             }
 
-            CompileExpression(frame, unaryExp.Argument);
+            CompileExpression(unaryExp.Argument);
             string op;
 
             switch (unaryExp.Operator)
@@ -3111,12 +3224,13 @@ public class AdhocScriptCompiler
                 default:
                     ThrowCompilationError(unaryExp, "Invalid operator");
                     return;
-            };
+            }
+            ;
 
-            bool opToSymbol = frame.Version.ShouldUseInternalOperatorNames();
+            bool opToSymbol = CurrentFrame.Version.ShouldUseInternalOperatorNames();
             AdhocSymbol symb = SymbolMap.RegisterSymbol(op, opToSymbol);
             InsUnaryOperator unaryIns = new InsUnaryOperator(symb);
-            frame.AddInstruction(unaryIns, unaryExp.Location.Start.Line);
+            AddInstruction(unaryIns, unaryExp.Location.Start.Line);
         }
 
         // If we aren't assigning, or not using the return value immediately, pop it
@@ -3124,31 +3238,32 @@ public class AdhocScriptCompiler
         //         for (var i = 0; i < 10; [i++])
 
         if (popResult)
-            InsertPop(frame);
+            InsertPop();
     }
 
-    private void PushUnaryExpressionArgument(AdhocCodeFrame frame, Expression expression)
+    private void PushUnaryExpressionArgument(Expression expression)
     {
         if (expression.Type == Nodes.Identifier)
         {
-            InsertVariablePush(frame, expression as Identifier, isVariableDeclaration: false);
+            var id = expression as Identifier;
+            InsertLocalVariablePush(id.Name, id.Location.Start.Line);
         }
         else if (expression.Type == Nodes.MemberExpression)
         {
             if (expression is AttributeMemberExpression attr)
             {
                 // ++myObj.property
-                CompileAttributeMemberAssignmentPush(frame, attr);
+                CompileAttributeMemberAssignmentPush(attr);
             }
             else if (expression is ComputedMemberExpression comp)
             {
                 // --hello["world"];
-                CompileComputedMemberExpressionAssignmentPush(frame, comp);
+                CompileComputedMemberExpressionAssignmentPush(comp);
             }
             else if (expression is StaticMemberExpression staticMemberExpression)
             {
                 // ++GameParameterUtil::loaded_time;
-                CompileStaticMemberExpressionPush(frame, staticMemberExpression);
+                CompileStaticMemberExpressionPush(staticMemberExpression);
             }
             else
                 ThrowCompilationError(expression, CompilationMessages.Error_UnsupportedUnaryOprationOnMemberExpression);
@@ -3156,17 +3271,17 @@ public class AdhocScriptCompiler
         else if (expression.Type == Nodes.Literal)
         {
             // Special case: -1 -> int const + unary op
-            CompileLiteral(frame, expression as Literal);
+            CompileLiteral(expression as Literal);
         }
         else if (expression.Type == Nodes.CallExpression)
         {
             // --doThing();
-            CompileCall(frame, expression as CallExpression);
+            CompileCall(expression as CallExpression);
         }
         else if (expression.Type == Nodes.BinaryExpression)
         {
             // ++(1 + 1)
-            CompileBinaryExpression(frame, expression as BinaryExpression);
+            CompileBinaryExpression(expression as BinaryExpression);
         }
         else
             ThrowCompilationError(expression, $"Unsupported unary operation on type: {expression.Type}");
@@ -3178,26 +3293,26 @@ public class AdhocScriptCompiler
     /// <param name="frame"></param>
     /// <param name="literal"></param>
     /// <exception cref="NotImplementedException"></exception>
-    private void CompileLiteral(AdhocCodeFrame frame, Literal literal)
+    private void CompileLiteral(Literal literal)
     {
         switch (literal.TokenType)
         {
             case TokenType.NilLiteral:
-                frame.AddInstruction(new InsNilConst(), literal.Location.Start.Line);
+                AddInstruction(new InsNilConst(), literal.Location.Start.Line);
                 break;
 
             case TokenType.BooleanLiteral:
-                if (frame.Version.HasBoolSupport())
+                if (CurrentFrame.Version.HasBoolSupport())
                 {
                     // On later versions, a specialized bool instruction was added
                     InsBoolConst boolConst = new InsBoolConst((literal.Value as bool?).Value);
-                    frame.AddInstruction(boolConst, literal.Location.Start.Line);
+                    AddInstruction(boolConst, literal.Location.Start.Line);
                 }
                 else
                 {
                     // Translate bool to int
                     InsIntConst intConst = new InsIntConst((literal.Value as bool?).Value ? 1 : 0);
-                    frame.AddInstruction(intConst, literal.Location.Start.Line);
+                    AddInstruction(intConst, literal.Location.Start.Line);
                 }
                 break;
 
@@ -3215,7 +3330,7 @@ public class AdhocScriptCompiler
                         break;
 
                     case NumericTokenType.UnsignedInteger:
-                        if (!frame.Version.HasUIntSupport())
+                        if (!CurrentFrame.Version.HasUIntSupport())
                             ThrowCompilationError(literal, CompilationMessages.Error_V12UIntLiteralUnsupported);
                         ins = new InsUIntConst((uint)literal.NumericValue);
                         break;
@@ -3225,13 +3340,13 @@ public class AdhocScriptCompiler
                         break;
 
                     case NumericTokenType.UnsignedLong:
-                        if (!frame.Version.HasULongSupport())
+                        if (!CurrentFrame.Version.HasULongSupport())
                             ThrowCompilationError(literal, CompilationMessages.Error_V12ULongLiteralUnsupported);
                         ins = new InsULongConst((ulong)literal.NumericValue);
                         break;
 
                     case NumericTokenType.Double:
-                        if (!frame.Version.HasDoubleSupport())
+                        if (!CurrentFrame.Version.HasDoubleSupport())
                             ThrowCompilationError(literal, CompilationMessages.Error_V12DoubleLiteralUnsupported);
                         ins = new InsDoubleConst((double)literal.NumericValue);
                         break;
@@ -3240,12 +3355,12 @@ public class AdhocScriptCompiler
                         throw GetCompilationError(literal, "Unknown numeric literal type");
                 }
 
-                frame.AddInstruction(ins, literal.Location.Start.Line);
+                AddInstruction(ins, literal.Location.Start.Line);
                 break;
 
             case TokenType.SymbolLiteral:
                 InsSymbolConst symbConst = new InsSymbolConst(SymbolMap.RegisterSymbol(literal.Value as string));
-                frame.AddInstruction(symbConst, literal.Location.Start.Line);
+                AddInstruction(symbConst, literal.Location.Start.Line);
                 break;
 
             default:
@@ -3255,25 +3370,18 @@ public class AdhocScriptCompiler
     }
 
     /// <summary>
-    /// Inserts a variable push instruction to push a variable into the heap.
+    /// Inserts a variable push instruction to push a variable.
     /// </summary>
     /// <param name="frame"></param>
     /// <param name="identifier"></param>
     /// <returns></returns>
-    private AdhocSymbol InsertVariablePush(AdhocCodeFrame frame, Identifier identifier, bool isVariableDeclaration)
+    private AdhocSymbol InsertLocalVariablePush(string identifier, int lineNumber)
     {
-        AdhocSymbol varSymb = SymbolMap.RegisterSymbol(identifier.Name);
-        Variable variable = frame.AddScopeVariable(varSymb, isAssignment: true, isLocalDeclaration: isVariableDeclaration);
+        AdhocSymbol varSymb = SymbolMap.RegisterSymbol(identifier);
 
         var varPush = new InsVariablePush();
         varPush.VariableSymbols.Add(varSymb);
-
-        // Refer to comment in InsertVariableEval
-        if (frame.IsStaticVariable(varSymb, CurrentModule))
-            varPush.VariableSymbols.Add(varSymb);
-            
-        varPush.VariableStorageIndex = variable.StackIndex;
-        frame.AddInstruction(varPush, identifier.Location.Start.Line);
+        AddInstruction(varPush, lineNumber);
 
         return varSymb;
     }
@@ -3283,10 +3391,10 @@ public class AdhocScriptCompiler
     /// </summary>
     /// <param name="frame"></param>
     /// <param name="attr"></param>
-    private void CompileAttributeMemberAssignmentPush(AdhocCodeFrame frame, AttributeMemberExpression attr)
+    private void CompileAttributeMemberAssignmentPush(AttributeMemberExpression attr)
     {
         // Pushing to object attribute
-        CompileExpression(frame, attr.Object);
+        CompileExpression(attr.Object);
         if (attr.Property is not Identifier)
             ThrowCompilationError(attr.Property, "Expected attribute member property identifier.");
 
@@ -3295,28 +3403,11 @@ public class AdhocScriptCompiler
         InsAttributePush attrPush = new InsAttributePush();
         AdhocSymbol attrSymbol = SymbolMap.RegisterSymbol(propIdent.Name);
         attrPush.AttributeSymbols.Add(attrSymbol);
-        frame.AddInstruction(attrPush, propIdent.Location.Start.Line);
+        AddInstruction(attrPush, propIdent.Location.Start.Line);
     }
 
 
-    #region Scope/Loop Handling
-    private LoopContext EnterLoop(AdhocCodeFrame frame, Statement loopStatement, Identifier label = null)
-    {
-        LoopContext loopCtx = new LoopContext(loopStatement, label?.Name);
-        if (label is not null && frame.CurrentLoops.Any(e => e.IsLabeled && e.Label == label.Name))
-            ThrowCompilationError(label, CompilationMessages.Error_LoopLabelAlreadyUsed);
-
-        frame.CurrentLoops.Push(loopCtx);
-        frame.CurrentScopes.Push(loopCtx);
-        return loopCtx;
-    }
-
-    private static SwitchContext EnterSwitch(AdhocCodeFrame frame, SwitchStatement node)
-    {
-        var scope = new SwitchContext(node);
-        frame.CurrentScopes.Push(scope);
-        return scope;
-    }
+    #region Scope Handling
 
     /// <summary>
     /// Enters a new scope.
@@ -3324,42 +3415,19 @@ public class AdhocScriptCompiler
     /// <param name="frame"></param>
     /// <param name="node"></param>
     /// <returns></returns>
-    private static ScopeContext EnterScope(AdhocCodeFrame frame, Node node)
+    private ScopeContext EnterScope(bool shouldCleanupOnExit = false)
     {
-        var scope = new ScopeContext(node);
-        frame.CurrentScopes.Push(scope);
+        var lastScope = CurrentLocalScope;
+
+        var scope = new ScopeContext()
+        {
+            CleanupOnExit = shouldCleanupOnExit,
+            NumLocals = lastScope.NumLocals,
+            StackCounter = lastScope.StackCounter,
+        };
+
+        Scopes.Add(scope);
         return scope;
-    }
-
-    /// <summary>
-    /// Enters and defines new module/class.
-    /// </summary>
-    /// <param name="frame"></param>
-    /// <param name="node"></param>
-    /// <returns></returns>
-    private AdhocModule EnterModuleOrClass(AdhocCodeFrame frame, Node node)
-    {
-        var scope = new ScopeContext(node);
-        frame.CurrentScopes.Push(scope);
-        ModuleOrClassScopes.Push(scope);
-
-        AdhocModule newModule = new AdhocModule();
-        newModule.ParentModule = CurrentModule;
-        Modules.Push(newModule);
-
-        frame.Modules.Push(CurrentModule);
-
-        return newModule;
-    }
-
-    /// <summary>
-    /// Leaves a loop scope for the frame.
-    /// </summary>
-    /// <param name="frame"></param>
-    private static void LeaveLoop(AdhocCodeFrame frame)
-    {
-        frame.CurrentLoops.Pop();
-        LeaveScope(frame);
     }
 
     /// <summary>
@@ -3368,63 +3436,88 @@ public class AdhocScriptCompiler
     /// <param name="frame"></param>
     /// <param name="insertLeaveInstruction"></param>
     /// <param name="isModuleLeave"></param>
-    private static void LeaveScope(AdhocCodeFrame frame, 
-        bool insertLeaveInstruction = true, 
-        bool isModuleLeave = false, 
-        bool isModuleExitFromSubroutine = false)
+    // GT7 1.00: 30D8FC0 (mCompiler::LeaveScope)
+    private int LeaveScope()
     {
-        var lastScope = frame.CurrentScopes.Pop();
+        var scope = Scopes[^1];
+        Scopes.Remove(scope);
 
-        // Module leaves don't actually reset the max.
-        // For earlier versions it doesn't matter
-        if (!isModuleLeave || frame.Version.ShouldAlwaysClearLocalsOnScopeLeave()) 
+        if (scope.CleanupOnExit)
         {
-            // Clear up/rewind
-            foreach (var variable in lastScope.LocalScopeVariables)
-                frame.FreeLocalVariable(variable.Value);
-        }
-        
-        if (isModuleLeave)
-        {
-            foreach (var variable in lastScope.StaticScopeVariables)
-            {
-                frame.FreeStaticVariable(variable.Value);
-            }
+            // We return the index of the instruction before the leave.
+            int instructionIndex = CurrentFrame.GetInstructionCount();
+
+            var insLeave = new InsLeaveScope();
+            insLeave.VariableStorageRewindIndex = CurrentLocalScope.NumLocals;
+            insLeave.ModuleOrClassDepthRewindIndex = DepthPerFrame.Last.Value;
+            AddInstruction(insLeave, 0);
+
+            return instructionIndex;
         }
 
-        if (insertLeaveInstruction && frame.Version.HasLeaveSupport())
-        {
-            InsLeaveScope leave = new InsLeaveScope();
-
-            // Top level is a special "module" frame where it can rewind some variables based on depth
-            // GT5 uses this and every leave in the top level requires this, GT6 and above ignores this altogether.
-
-            leave.ModuleOrClassDepthRewindIndex = frame.Modules.Count;
-
-            if (isModuleLeave)
-            {
-                if (isModuleExitFromSubroutine)
-                    leave.VariableStorageRewindIndex = frame.Stack.GetLastLocalVariableIndex();
-                else
-                    leave.VariableStorageRewindIndex = 1;
-            }
-            else
-            {
-                leave.VariableStorageRewindIndex = frame.Stack.GetLastLocalVariableIndex();
-            }
-
-            frame.AddInstruction(leave, 0);
-        }
+        return CurrentFrame.GetInstructionCount();
     }
 
-    private void LeaveModuleOrClass(AdhocCodeFrame frame, bool fromSubroutine = false)
+    /// <summary>
+    /// Setups the compiler's version and the stack along with it.
+    /// </summary>
+    /// <param name="version"></param>
+    // GT7 1.00: 30D95A0 (mCompiler::CreateCodeFrame)
+    private void EnterCodeFrame()
     {
-        LeaveScope(frame, insertLeaveInstruction: false, isModuleLeave: true, isModuleExitFromSubroutine: fromSubroutine);
+        var frame = new AdhocCodeFrame(new AdhocVersion(12));
+        Frames.Add(frame);
 
-        ModuleOrClassScopes.Pop();
-        Modules.Pop();
-        frame.Modules.Pop();
+        var scope = new ScopeContext() { Type = AdhocScopeType.TopLevel };
+        Scopes.Add(scope);
+        ModuleOrClassScopes.Add(scope);
+        DepthPerFrame.AddLast(0);
+
+        if (CurrentFrame.Version.ShouldAllocateVariableForSelf())
+            DefineVariableInCurrentScope(SymbolMap.RegisterSymbol(AdhocConstants.SELF), AdhocVariableType.LocalVariable);
+
+        RegisterLoopLabelForBreak(AdhocConstants.FUNCTION);
+        RegisterLoopLabelForContinue(AdhocConstants.FUNCTION);
     }
+
+    private AdhocCodeFrame LeaveCodeFrame()
+    {
+        ProcessContinues(0);
+        ProcessBreaks(0);
+
+        var frame = Frames[^1];
+        DepthPerFrame.RemoveLast();
+        Scopes.Remove(CurrentLocalScope);
+        ModuleOrClassScopes.Remove(CurrentModuleOrClassScope);
+        Frames.Remove(frame);
+
+        return frame;
+    }
+
+    // GT7 1.00: 30D9340 (mCompiler::EnterModuleOrClass)
+    private void EnterModuleOrClassScope()
+    {
+        var lastScope = CurrentLocalScope;
+
+        var scope = new ScopeContext()
+        {
+            Type = AdhocScopeType.ModuleOrClass,
+            NumLocals = lastScope.NumLocals,
+            StackCounter = lastScope.StackCounter,
+        };
+
+        Scopes.Add(scope);
+        ModuleOrClassScopes.Add(scope);
+        DepthPerFrame.Last.ValueRef++;
+    }
+
+    private void LeaveModuleOrClassScope()
+    {
+        LeaveScope();
+        ModuleOrClassScopes.Remove(ModuleOrClassScopes[^1]);
+        DepthPerFrame.Last.ValueRef--;
+    }
+
     #endregion
 
     /// <summary>
@@ -3432,25 +3525,11 @@ public class AdhocScriptCompiler
     /// </summary>
     /// <param name="frame"></param>
     /// <param name="statement"></param>
-    private void CompileStatementWithScope(AdhocCodeFrame frame, Statement statement)
+    private void CompileStatementWithScope(Statement statement)
     {
-        if (statement is BlockStatement blockStatement)
-        {
-            CompileBlockStatement(frame, blockStatement);
-        }
-        else if (statement is ContinueStatement
-            || statement is BreakStatement
-            || statement is EmptyStatement)
-        {
-            // continues/breaks are not a scope, neither are empty statements
-            CompileStatement(frame, statement);
-        }
-        else
-        {
-            EnterScope(frame, statement);
-            CompileStatement(frame, statement);
-            LeaveScope(frame);
-        }
+        EnterScope(false);
+        CompileStatement(statement);
+        LeaveScope();
     }
 
 
@@ -3461,21 +3540,21 @@ public class AdhocScriptCompiler
     /// <param name="frame"></param>
     /// <param name="identifier"></param>
     /// <returns></returns>
-    private AdhocSymbol InsertAttributeEval(AdhocCodeFrame frame, Identifier identifier)
+    private AdhocSymbol InsertAttributeEval(Identifier identifier)
     {
         AdhocSymbol symb = SymbolMap.RegisterSymbol(identifier.Name);
-        if (frame.Version.HasAttributeEvalSupport())
+        if (CurrentFrame.Version.HasAttributeEvalSupport())
         {
             var attrEval = new InsAttributeEvaluation();
             attrEval.AttributeSymbols.Add(symb); // Only one
-            frame.AddInstruction(attrEval, identifier.Location.Start.Line);
+            AddInstruction(attrEval, identifier.Location.Start.Line);
         }
         else
         {
             var attrPush = new InsAttributePush();
             attrPush.AttributeSymbols.Add(symb); // Only one
-            frame.AddInstruction(attrPush, identifier.Location.Start.Line);
-            frame.AddInstruction(new InsEval(), identifier.Location.Start.Line);
+            AddInstruction(attrPush, identifier.Location.Start.Line);
+            AddInstruction(new InsEval(), identifier.Location.Start.Line);
         }
 
         return symb;
@@ -3487,122 +3566,27 @@ public class AdhocScriptCompiler
     /// <param name="frame"></param>
     /// <param name="identifier"></param>
     /// <returns></returns>
-    private void InsertVariableEval(AdhocCodeFrame frame, Identifier identifier, bool forceStatic = false)
+    private void InsertVariableEval(Identifier identifier, bool forceStatic = false)
     {
         AdhocSymbol symb = SymbolMap.RegisterSymbol(identifier.Name);
-        Variable variable = frame.AddScopeVariable(symb, isAssignment: false);
 
         InstructionBase ins;
-        if (frame.Version.HasVariableEvalSupport())
+        if (CurrentFrame.Version.HasVariableEvalSupport())
         {
-            ins = new InsVariableEvaluation(variable.StackIndex);
+            ins = new InsVariableEvaluation();
 
             var varEval = ins as InsVariableEvaluation;
             varEval.VariableSymbols.Add(symb); // Only one
-            frame.AddInstruction(varEval, identifier.Location.Start.Line);
+            AddInstruction(varEval, identifier.Location.Start.Line);
         }
         else
         {
             ins = new InsVariablePush();
 
             var varPush = ins as InsVariablePush;
-            varPush.VariableStorageIndex = variable.StackIndex;
             varPush.VariableSymbols.Add(symb); // Only one
-            frame.AddInstruction(varPush, identifier.Location.Start.Line);
-            frame.AddInstruction(new InsEval(), identifier.Location.Start.Line);
-        }
-
-
-        // Static references or pushes always have double their own symbol (basically creating a module 'path' with each component, and the full path at the end.)
-        // If its a static reference, do not add it as a declared variable within this scope
-        if (forceStatic || frame.IsStaticVariable(symb, CurrentModule))
-        {
-            // Static, two symbols
-            if (frame.Version.HasVariableEvalSupport())
-                (ins as InsVariableEvaluation).VariableSymbols.Add(symb);
-            else
-                (ins as InsVariablePush).VariableSymbols.Add(symb);
-
-            /* HACK/FIXME!: Register identifier accesses at the very top level inside modules as new statics so that they can be cleared later. 
-             * This is somewhat of a hack-fix maybe? - spotted for GT4O. This hopefully won't break anything for later versions.
-               
-               Example code (pretend this is at the very top level)
-               
-               /////////////////////////////
-               module MyModule
-               {
-                   for (var i = 0; i < 10; i++)
-                   {
-                        var value = someStatic[0];
-                   }
-               }
-               ////////////////////////////
-               The compiler would treat 'someStatic' as a static not part of the module, thus not be cleaned
-               Reuses of someStatic in other modules would be errornous especially in modules defining that stuff through widgets
-             */
-
-            if (ModuleOrClassScopes.Count > 0) // Is in a module?
-            {
-                var moduleScope = ModuleOrClassScopes.Peek();
-                if (frame.ParentFrame is null && !moduleScope.StaticScopeVariables.ContainsKey(symb.Name))
-                    moduleScope.StaticScopeVariables.Add(symb.Name, new StaticVariable() { Symbol = symb }); // Won't have a stack index, which is fine.
-            }
-        }
-    }
-
-    /// <summary>
-    /// Inserts a new variable.
-    /// </summary>
-    /// <param name="frame"></param>
-    /// <param name="variable"></param>
-    /// <param name="location"></param>
-    /// <returns></returns>
-    // Mostly used for temp variables produced by the compiler
-    private AdhocSymbol InsertNewLocalVariable(AdhocCodeFrame frame, Expression exprValue, string variable, Location location = default)
-    {
-        if (frame.Version.ExpressionBeforeEvalOrPush())
-        {
-            if (exprValue is not null)
-                CompileExpression(frame, exprValue);
-
-            AdhocSymbol symb = InsertVariablePush(frame, new Identifier(variable) { Location = location }, true);
-            InsertAssignPop(frame);
-            return symb;
-        }
-        else
-        {
-            AdhocSymbol symb = InsertVariablePush(frame, new Identifier(variable) { Location = location }, true);
-            CompileExpression(frame, exprValue);
-            InsertAssignPop(frame);
-            return symb;
-        }
-    }
-
-    /// <summary>
-    /// Inserts a new variable eval from a symbol.
-    /// </summary>
-    /// <param name="frame"></param>
-    /// <param name="symbol"></param>
-    /// <returns></returns>
-    // Mostly used for temp variables produced by the compiler
-    private static void InsertVariableEvalFromSymbol(AdhocCodeFrame frame, AdhocSymbol symbol, Location location = default)
-    {
-        LocalVariable taskVariable = frame.Stack.GetLocalVariableBySymbol(symbol);
-
-        if (frame.Version.HasVariableEvalSupport())
-        {
-            var insVarEval = new InsVariableEvaluation();
-            insVarEval.VariableSymbols.Add(symbol);
-            insVarEval.VariableStorageIndex = taskVariable.StackIndex;
-            frame.AddInstruction(insVarEval, location.Start.Line);
-        }
-        else
-        {
-            var insVarPush = new InsVariablePush();
-            insVarPush.VariableSymbols.Add(symbol);
-            insVarPush.VariableStorageIndex = taskVariable.StackIndex;
-            frame.AddInstruction(insVarPush, location.Start.Line);
-            frame.AddInstruction(new InsEval(), location.Start.Line);
+            AddInstruction(varPush, identifier.Location.Start.Line);
+            AddInstruction(new InsEval(), identifier.Location.Start.Line);
         }
     }
 
@@ -3610,73 +3594,73 @@ public class AdhocScriptCompiler
     /// Inserts a version-aware assign pop
     /// </summary>
     /// <param name="frame"></param>
-    private static void InsertAssignPop(AdhocCodeFrame frame)
+    private void InsertAssignPop()
     {
-        if (frame.Version.HasAssignPopSupport())
+        if (CurrentFrame.Version.HasAssignPopSupport())
         {
-            frame.AddInstruction(InsAssignPop.Default, 0);
+            AddInstruction(InsAssignPop.Default, 0);
         }
         else
         {
-            InsertAssign(frame);
-            InsertPop(frame);
+            InsertAssign();
+            InsertPop();
         }
     }
 
-    private static void InsertAssign(AdhocCodeFrame frame)
+    private void InsertAssign()
     {
-        if (frame.Version.HasNewAssignSupport())
-            frame.AddInstruction(InsAssign.Default, 0);
+        if (CurrentFrame.Version.HasNewAssignSupport())
+            AddInstruction(InsAssign.Default, 0);
         else // Assume under 10 that its the traditional assign + pop old
-            frame.AddInstruction(InsAssignOld.Default, 0);
+            AddInstruction(InsAssignOld.Default, 0);
     }
 
     /// <summary>
     /// Inserts a version-aware list_assign
     /// </summary>
     /// <param name="frame"></param>
-    private static void InsertListAssign(AdhocCodeFrame frame, int numElements, bool restElement, int lineNumber)
+    private void InsertListAssign(int numElements, bool restElement, int lineNumber)
     {
-        if (frame.Version.HasNewListAssignSupport())
-            frame.AddInstruction(new InsListAssign() { VariableCount = numElements, }, lineNumber);
+        if (CurrentFrame.Version.HasNewListAssignSupport())
+            AddInstruction(new InsListAssign() { VariableCount = numElements, HasRestElement = restElement }, lineNumber);
         else
-            frame.AddInstruction(new InsListAssignOld() { VariableCount = numElements }, lineNumber);
+            AddInstruction(new InsListAssignOld() { VariableCount = numElements }, lineNumber);
     }
 
     /// <summary>
     /// Inserts a version-aware pop
     /// </summary>
     /// <param name="frame"></param>
-    private static void InsertPop(AdhocCodeFrame frame)
+    private void InsertPop()
     {
-        if (frame.Version.HasNewPopSupport())
-            frame.AddInstruction(InsPop.Default, 0);
+        if (CurrentFrame.Version.HasNewPopSupport())
+            AddInstruction(InsPop.Default, 0);
         else // Assume under 10 that its the traditional assign + pop old
-            frame.AddInstruction(InsPopOld.Default, 0);
+            AddInstruction(InsPopOld.Default, 0);
     }
 
     /// <summary>
     /// Inserts a version-aware set state
     /// </summary>
     /// <param name="frame"></param>
-    private static void InsertSetState(AdhocCodeFrame frame, AdhocRunState state)
+    private void InsertSetState(AdhocRunState state)
     {
-        if (frame.Version.HasNewSetStateSupport())
-            frame.AddInstruction(new InsSetState(state), 0);
+        if (CurrentFrame.Version.HasNewSetStateSupport())
+            AddInstruction(new InsSetState(state), 0);
         else
-            frame.AddInstruction(new InsSetStateOld(state), 0);
+            AddInstruction(new InsSetStateOld(state), 0);
     }
 
     /// <summary>
     /// Inserts a version-aware void
     /// </summary>
     /// <param name="frame"></param>
-    private static void InsertVoid(AdhocCodeFrame frame)
+    private void InsertVoid()
     {
-        if (frame.Version.UseVoidInsteadOfNop())
-            frame.AddInstruction(new InsVoidConst(), 0);
+        if (CurrentFrame.Version.UseVoidInsteadOfNop())
+            AddInstruction(new InsVoidConst(), 0);
         else
-            frame.AddInstruction(new InsNop(), 0);
+            AddInstruction(new InsNop(), 0);
     }
 
     /// <summary>
@@ -3687,24 +3671,24 @@ public class AdhocScriptCompiler
     /// <param name="assignOperator"></param>
     /// <param name="lineNumber"></param>
     /// <returns></returns>
-    private AdhocSymbol InsertBinaryAssignOperator(AdhocCodeFrame frame, Node parentNode, AssignmentOperator assignOperator, int lineNumber)
+    private AdhocSymbol InsertBinaryAssignOperator(Node parentNode, AssignmentOperator assignOperator, int lineNumber)
     {
         string opStr = AssignOperatorToString(assignOperator);
         if (string.IsNullOrEmpty(opStr))
             ThrowCompilationError(parentNode, $"Unrecognized operator '{opStr}'");
 
-        bool opToSymbol = frame.Version.ShouldUseInternalOperatorNames();
+        bool opToSymbol = CurrentFrame.Version.ShouldUseInternalOperatorNames();
         var symb = SymbolMap.RegisterSymbol(opStr, opToSymbol);
 
-        if (frame.Version.HasBinaryAssignSupport())
+        if (CurrentFrame.Version.HasBinaryAssignSupport())
         {
-            frame.AddInstruction(new InsBinaryAssignOperator(symb), lineNumber);
+            AddInstruction(new InsBinaryAssignOperator(symb), lineNumber);
         }
         else
         {
             // FIXME: Not sure about this, and the version
-            frame.AddInstruction(new InsBinaryOperator(symb), lineNumber);
-            frame.AddInstruction(new InsAssign(), lineNumber);
+            AddInstruction(new InsBinaryOperator(symb), lineNumber);
+            AddInstruction(new InsAssign(), lineNumber);
         }
 
 
@@ -3715,27 +3699,27 @@ public class AdhocScriptCompiler
     /// Inserts an empty return instruction if the frame wasn't explicitly exited with a return statement.
     /// </summary>
     /// <param name="frame"></param>
-    private void InsertFrameExitIfNeeded(AdhocCodeFrame frame, Node bodyNode)
+    private void InsertFrameExitIfNeeded(Node bodyNode)
     {
         // Older versions's compilers don't check if a return at the top level with an argument was already specified
         // A return instruction is added anyway
-        if (frame.Version.ShouldAlwaysEmitSetStateInFunctions())
+        if (CurrentFrame.Version.ShouldAlwaysEmitSetStateInFunctions())
         {
-            InsertSetState(frame, AdhocRunState.RETURN);
+            InsertSetState(AdhocRunState.RETURN);
             return;
         }
 
         // Check whether the frame was terminated with an explicit return, if not, insert one
         if (bodyNode is BlockStatement blockStatement && (blockStatement.ChildNodes.Count == 0 || blockStatement.ChildNodes[^1].Type != Nodes.ReturnStatement))
         {
-            if (frame.Version.ShouldReturnVoidForEmptyFunctionReturn())
+            if (CurrentFrame.Version.ShouldReturnVoidForEmptyFunctionReturn())
             {
                 // All functions return a value internally in newer adhoc, even if they don't in the code.
                 // So, add one.
-                InsertVoid(frame);
+                InsertVoid();
             }
 
-            InsertSetState(frame, AdhocRunState.RETURN);
+            InsertSetState(AdhocRunState.RETURN);
         }
     }
 
@@ -3744,7 +3728,7 @@ public class AdhocScriptCompiler
     /// </summary>
     /// <param name="frame"></param>
     /// <param name="bodyNode"></param>
-    private static void InsertNop(AdhocCodeFrame frame, int line)
+    private void InsertNop(int line)
     {
         // This was used for debugging on their end (breakpoint on scope tokens with an adhoc debugger)
         // Older versions (< 7) and release scripts just had it not stripped
@@ -3754,8 +3738,8 @@ public class AdhocScriptCompiler
         // TODO: Have some sort of system to compile as DEBUG, which would emit these anyway
         // It'd then be useful to make a debugger
 
-        if (frame.Version.IsNopAlwaysEmitted())
-            frame.AddInstruction(new InsNop(), line);
+        if (CurrentFrame.Version.IsNopAlwaysEmitted())
+            AddInstruction(new InsNop(), line);
     }
 
     #endregion
@@ -3907,5 +3891,805 @@ public class AdhocScriptCompiler
     {
         return $"{message} at {node.Location.Source}:{node.Location.Start.Line}";
     }
+
+    /// <summary>
+    /// Gets or define a new attribute within a module.
+    /// </summary>
+    /// <param name="module"></param>
+    /// <param name="attributeName"></param>
+    /// <param name="newVariableType"></param>
+    /// <returns></returns>
+    // GT7 1.00: 305CB40 (hParser::GetOrDefineModuleAttribute)
+    private DeclValue GetOrDefineModuleAttribute(DeclModule module, string attributeName, AdhocVariableType newVariableType)
+    {
+        if (module.Variables.TryGetValue(attributeName, out DeclValue value))
+        {
+            // Found something.
+
+            // If our expected type, or the value type is unknown, it is removed
+            if (newVariableType == AdhocVariableType.Unknown || value.Type == AdhocVariableType.Unknown)
+                module.Variables.Remove(attributeName); // Undef, just to make sure.
+            else
+                return value; // This will be returned regardless of expected type
+        }
+
+        // Define new one
+        DeclValue newModule;
+        if (newVariableType == AdhocVariableType.Module || newVariableType == AdhocVariableType.Class)
+            newModule = new DeclModule(parent: module, attributeName, newVariableType);
+        else
+            newModule = new DeclValue(parent: module, attributeName, newVariableType);
+
+        module.AddVariable(attributeName, newModule);
+        return newModule;
+    }
+
+    /// <summary>
+    /// Returns the last module value from a path.
+    /// </summary>
+    /// <param name="path"></param>
+    /// <returns></returns>
+    /// <exception cref="Exception"></exception>
+    // GT7 1.00: 305C090 (hParser::GetLastModuleFromPath)
+    private DeclValue? GetLastModuleFromPath(List<AdhocSymbol> path)
+    {
+        // Determine root.
+        DeclValue? targetModuleValue = null;
+
+        var pathStart = path[0];
+        if (path.Count == 0)
+        {
+            if (TopLevel is not null)
+                targetModuleValue = TopLevel;
+            else
+                targetModuleValue = CurrentModule;
+        }
+        else if (pathStart.Name == "__toplevel__")
+        {
+            targetModuleValue = TopLevel;
+        }
+        else if (pathStart.Name == "__module__")
+        {
+            targetModuleValue = CurrentModule;
+        }
+        else
+        {
+            // Climb current module to top level for potential module start matches
+            for (var module = CurrentModule; module != null; module = module.ParentModule)
+            {
+                if (module.Variables.TryGetValue(pathStart.Name, out DeclValue moduleValue))
+                {
+                    targetModuleValue = moduleValue;
+                    break;
+                }
+            }
+        }
+
+        // No valid root found in existing scopes.
+        if (targetModuleValue is null)
+            return null;
+
+        // Navigate from base module to specific module.
+        for (int i = 1; i < path.Count - 1; i++)
+        {
+            if (targetModuleValue.Type == AdhocVariableType.Unknown)
+                break;
+
+            if (targetModuleValue is DeclModule module)
+            {
+                if (module.Variables.TryGetValue(path[i].Name, out DeclValue moduleValue))
+                    targetModuleValue = moduleValue;
+                else
+                    return null; // Sub-module not found.
+            }
+            else
+                throw new Exception($"{targetModuleValue.Name} is not a module name. (in {path[^1].Name})");
+        }
+
+        return targetModuleValue;
+    }
+
+    // GT7 1.00: 30D76D0 (mCompiler::DefineScopeVariablesFromImport)
+    private void DefineScopeVariablesFromImport(List<AdhocSymbol> path, AdhocSymbol target, AdhocSymbol? alias = null)
+    {
+        alias ??= target;
+
+        DeclValue? moduleValue = GetLastModuleFromPath(path);
+        if (moduleValue is not null)
+        {
+            if (moduleValue is DeclModule module)
+            {
+                if (target.Name == "__mul__")
+                {
+                    foreach (var variable in module.Variables)
+                        DefineVariableInCurrentScope(SymbolMap.RegisterSymbol(variable.Value.Name), variable.Value.Type);
+                }
+                else
+                {
+                    if (module.Variables.TryGetValue(target.Name, out DeclValue targetValue))
+                        DefineVariableInCurrentScope(alias, targetValue.Type);
+                    else
+                        DefineVariableInCurrentScope(alias, AdhocVariableType.Unknown);
+                }
+            }
+        }
+        else if (target.Name != "__mul__")
+        {
+            DefineVariableInCurrentScope(alias, AdhocVariableType.Unknown);
+        }
+    }
+
+    // GT7 1.00: 305F0C0 (mParser::AddModuleVariablesFromImport)
+    public void AddModuleVariablesFromImport(List<AdhocSymbol> path, AdhocSymbol target, AdhocSymbol? alias = null)
+    {
+        alias ??= target;
+
+        DeclValue? moduleValue = GetLastModuleFromPath(path);
+        if (moduleValue is not null)
+        {
+            if (moduleValue is DeclModule module)
+            {
+                if (target.Name == "__mul__")
+                {
+                    foreach (var variable in module.Variables)
+                    {
+                        CurrentModule.AddVariable(variable.Key, variable.Value);
+                    }
+                }
+                else
+                {
+                    if (module.Variables.TryGetValue(alias.Name, out DeclValue targetValue))
+                        CurrentModule.AddVariable(alias.Name, targetValue);
+                    else
+                    {
+                        if (false)
+                        {
+                            // TODO: Strict mode
+                            // StrictCheckError - undefined variable %s::%s.
+                        }
+                    }
+                }
+            }
+            else
+            {
+                if (false)
+                {
+                    // TODO: Strict mode
+                    // StrictCheckError - %s is not a module name. (in %s).
+                }
+            }
+        }
+        else
+        {
+            if (false)
+            {
+                // TODO: Strict mode
+                // StrictCheckError - undefined module variable '%s'.
+            }
+        }
+    }
+
+    /// <summary>
+    /// Sets the current module to the specified path.
+    /// </summary>
+    /// <param name="path"></param>
+    /// <param name="variableType"></param>
+    /// <exception cref="Exception"></exception>
+    // GT7 1.00: 305D320 (hParser::SetCurrentModule)
+    private void SetCurrentModulePath(List<string> path, AdhocVariableType variableType)
+    {
+        // Try finding an existing starting scope path based on our input path
+        DeclValue baseModule = null;
+        if (path[0] == "__toplevel__")
+        {
+            baseModule = TopLevel;
+        }
+        else if (path[0] == "__module__")
+        {
+            baseModule = CurrentModule;
+        }
+        else
+        {
+            // Go up in module scopes until we find a matching starting path
+            for (var currentModule = CurrentModule; currentModule != null; currentModule = currentModule.ParentModule)
+            {
+                if (currentModule.Variables.TryGetValue(path[0], out DeclValue moduleVariable))
+                {
+                    // Found a module scope that starts with what we expect
+                    if (moduleVariable.Type != AdhocVariableType.Unknown)
+                        baseModule = moduleVariable;
+                    else
+                        baseModule = (DeclModule)GetOrDefineModuleAttribute(currentModule, path[0], variableType); // Redefine if there's any ambiguity.
+                    break;
+                }
+
+                if (path.Count <= 1)
+                    break;
+            }
+        }
+
+        // Did we find a matching starting module that matches our path?
+        if (baseModule is null)
+        {
+            // Nope, so declare the path entirely.
+            baseModule = CurrentModule;
+            for (int i = 0; i < Math.Max(path.Count - 1, 1); i++)
+            {
+                baseModule = GetOrDefineModuleAttribute(baseModule as DeclModule, path[i], variableType);
+            }
+        }
+        else
+        {
+            // We did, so simply define the path starting from the starting module.
+            for (int i = 1; i < path.Count - 1; i++)
+            {
+                if (baseModule is not DeclModule declModule)
+                    throw new Exception($"[NameError] '{baseModule.Name}' is not a module name (in {path[^1]}"); // [NameError] '%s' is not a module name. (in %s)
+
+                if (declModule.Variables.TryGetValue(path[i], out DeclValue moduleVariable))
+                {
+                    if (moduleVariable.Type != AdhocVariableType.Unknown)
+                        baseModule = moduleVariable;
+                    else
+                        baseModule = GetOrDefineModuleAttribute(baseModule as DeclModule, path[i], variableType); // Redefine if there's any ambiguity.
+                }
+                else
+                {
+                    baseModule = GetOrDefineModuleAttribute(baseModule as DeclModule, path[i], variableType);
+                }
+            }
+        }
+
+        if (baseModule is not null)
+        {
+            CurrentModule = (DeclModule)baseModule;
+        }
+        else
+            throw new Exception($"NameError: cannot set current module {path[^1]}"); // NameError: cannot set current module %s
+    }
+
+    /// <summary>
+    /// Defines a variable within the current scope.
+    /// </summary>
+    /// <param name="name"></param>
+    /// <param name="variableType"></param>
+    /// <param name="location"></param>
+    // GT7 1.00: 30D5320 (mCompiler::TryDefineVariable)
+    private void DefineVariableInCurrentScope(AdhocSymbol name, AdhocVariableType variableType, Location? location = null)
+    {
+        if (variableType == AdhocVariableType.Undef)
+        {
+            // TODO
+            return;
+        }
+
+        // TODO strict mode
+
+        switch (variableType)
+        {
+            case AdhocVariableType.LocalVariable:
+                if (!CurrentLocalScope.Variables.TryGetValue(name, out var varEntry))
+                {
+                    DefineLocalVariable(name, location);
+                    return;
+                }
+                break;
+
+            default:
+                if (!CurrentModuleOrClassScope.Variables.TryGetValue(name, out var _))
+                {
+                    DefineStaticVariable(variableType, name, location);
+                    return;
+                }
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Defines a static variable within the current scope.
+    /// </summary>
+    /// <param name="type"></param>
+    /// <param name="name"></param>
+    /// <param name="location"></param>
+    /// <returns></returns>
+    private int DefineStaticVariable(AdhocVariableType type, AdhocSymbol name, Location? location)
+    {
+        if (CurrentModuleOrClassScope.Variables.TryGetValue(name, out Variable definedVariable))
+        {
+            return definedVariable.StackIndex;
+        }
+        else
+        {
+            int staticIndex = CurrentFrame.MaxStaticIndex++;
+            CurrentModuleOrClassScope.Variables.Add(name, new Variable(name, type, staticIndex, location));
+            return staticIndex;
+        }
+    }
+
+    /// <summary>
+    /// Defines a local variable within the current scope.
+    /// </summary>
+    /// <param name="name"></param>
+    /// <param name="location"></param>
+    /// <returns></returns>
+    // GT7 1.00: 30D5DC0 (mCompiler::DefineLocalVariable)
+    private int DefineLocalVariable(AdhocSymbol name, Location? location = null)
+    {
+        if (CurrentLocalScope.Variables.TryGetValue(name, out Variable definedVariable))
+        {
+            return definedVariable.StackIndex;
+        }
+
+
+        int localIndex = CurrentLocalScope.NumLocals;
+        CurrentLocalScope.NumLocals++;
+        if (CurrentLocalScope.NumLocals > CurrentFrame.MaxLocalIndex)
+            CurrentFrame.MaxLocalIndex = CurrentLocalScope.NumLocals;
+
+        CurrentLocalScope.CleanupOnExit = true;
+
+        CurrentLocalScope.Variables.Add(name, new Variable(name, AdhocVariableType.LocalVariable, localIndex, location));
+        return localIndex;
+    }
+
+    private void AddInstruction(InstructionBase instruction, int lineNumber)
+    {
+        // Set up some stack utilities
+        void IncrementStackCounter()
+        {
+            CurrentLocalScope.StackCounter++;
+            if (CurrentLocalScope.StackCounter > CurrentFrame.MaxStackIndex)
+                CurrentFrame.MaxStackIndex = CurrentLocalScope.StackCounter;
+        }
+
+        void DecrementStackCounter()
+        {
+            CurrentLocalScope.StackCounter--;
+        }
+
+        void DecreaseStackCounter(int count)
+        {
+            CurrentLocalScope.StackCounter -= count;
+        }
+
+        instruction.LineNumber = (uint)lineNumber;
+
+        var instType = instruction.InstructionType;
+        switch (instType)
+        {
+            case AdhocInstructionType.ARRAY_CONST_OLD:
+                {
+                    var arrayConstOld = instruction as InsArrayConstOld;
+                    DecreaseStackCounter(arrayConstOld.ArraySize);
+                    IncrementStackCounter(); // Return Array
+
+                    CurrentLocalScope.CleanupOnExit = true;
+                }
+                break;
+            case AdhocInstructionType.PRINT:
+                {
+                    var print = instruction as InsPrint;
+                    DecreaseStackCounter(print.ArgCount);
+                    IncrementStackCounter(); // Return
+                }
+                break;
+            case AdhocInstructionType.STRING_PUSH:
+                {
+                    InsStringPush push = instruction as InsStringPush;
+                    DecreaseStackCounter(push.StringCount);
+                    IncrementStackCounter(); // Return concatenation
+                    break;
+                }
+            case AdhocInstructionType.VA_CALL:
+                {
+                    InsVaCall vaCall = instruction as InsVaCall;
+                    DecreaseStackCounter(vaCall.PopObjectCount);
+                    IncrementStackCounter(); // Return vacall value
+                    break;
+                }
+
+            case AdhocInstructionType.ASSIGN_OLD:
+                DecrementStackCounter();
+                break;
+            case AdhocInstructionType.ATTRIBUTE_DEFINE:
+                if (CurrentFrame.Version.HasSupportForAttributeDefinitionDefaultValues())
+                    DecrementStackCounter();
+                break;
+            case AdhocInstructionType.BINARY_ASSIGN_OPERATOR:
+                DecrementStackCounter();
+                break;
+            case AdhocInstructionType.BINARY_OPERATOR:
+                DecrementStackCounter();
+                break;
+            case AdhocInstructionType.JUMP_IF_TRUE:
+                DecrementStackCounter();
+                break;
+            case AdhocInstructionType.JUMP_IF_FALSE:
+                DecrementStackCounter();
+                break;
+            case AdhocInstructionType.POP_OLD:
+                DecrementStackCounter();
+                break;
+            case AdhocInstructionType.REQUIRE:
+                DecrementStackCounter();
+                break;
+            case AdhocInstructionType.THROW:
+                DecrementStackCounter();
+                break;
+            case AdhocInstructionType.ASSIGN:
+                DecrementStackCounter();
+                break;
+            case AdhocInstructionType.ARRAY_PUSH:
+                DecrementStackCounter();
+                break;
+            case AdhocInstructionType.POP:
+                DecrementStackCounter();
+                break;
+            case AdhocInstructionType.ELEMENT_PUSH:
+                DecrementStackCounter();
+                break;
+            case AdhocInstructionType.ELEMENT_EVAL:
+                DecrementStackCounter();
+                break;
+            case AdhocInstructionType.LOGICAL_AND:
+                DecrementStackCounter();
+                break;
+            case AdhocInstructionType.LOGICAL_OR:
+                DecrementStackCounter();
+                break;
+            case AdhocInstructionType.MODULE_CONSTRUCTOR:
+                DecrementStackCounter();
+                break;
+            case AdhocInstructionType.JUMP_IF_NIL:
+                DecrementStackCounter();
+                break;
+
+            case AdhocInstructionType.ATTRIBUTE_PUSH:
+            case AdhocInstructionType.CLASS_DEFINE:
+            case AdhocInstructionType.EVAL:
+            case AdhocInstructionType.IMPORT:
+            case AdhocInstructionType.JUMP:
+            case AdhocInstructionType.LOGICAL_AND_OLD:
+            case AdhocInstructionType.LOGICAL_OR_OLD:
+            case AdhocInstructionType.MODULE_DEFINE:
+            case AdhocInstructionType.NOP:
+            case AdhocInstructionType.STATIC_DEFINE:
+            case AdhocInstructionType.TRY_CATCH:
+            case AdhocInstructionType.UNARY_ASSIGN_OPERATOR:
+            case AdhocInstructionType.UNARY_OPERATOR:
+            case AdhocInstructionType.ATTRIBUTE_EVAL:
+            case AdhocInstructionType.SOURCE_FILE:
+            case AdhocInstructionType.LEAVE:
+            case AdhocInstructionType.CODE_EVAL:
+            case AdhocInstructionType.DELEGATE_DEFINE:
+            case AdhocInstructionType.LOGICAL_OPTIONAL:
+                break;
+
+            case AdhocInstructionType.CALL:
+                {
+                    InsCall call = instruction as InsCall;
+                    DecreaseStackCounter(call.ArgumentCount);
+
+                    if (call.ArgumentCount > 0)
+                        CurrentLocalScope.CleanupOnExit = true;
+                }
+                break;
+            case AdhocInstructionType.LIST_ASSIGN_OLD:
+                {
+                    var listAssignOld = instruction as InsListAssignOld;
+                    DecreaseStackCounter(listAssignOld.VariableCount);
+
+                    if (listAssignOld.VariableCount > 0)
+                        CurrentLocalScope.CleanupOnExit = true;
+                }
+                break;
+            case AdhocInstructionType.LIST_ASSIGN:
+                {
+                    var listAssign = instruction as InsListAssign;
+                    DecreaseStackCounter(listAssign.VariableCount);
+
+                    if (listAssign.VariableCount > 0)
+                        CurrentLocalScope.CleanupOnExit = true;
+                }
+                break;
+            case AdhocInstructionType.CALL_OLD:
+                {
+                    InsCallOld callOld = instruction as InsCallOld;
+                    DecreaseStackCounter(callOld.ArgumentCount);
+
+                    if (callOld.ArgumentCount > 0)
+                        CurrentLocalScope.CleanupOnExit = true;
+                }
+                break;
+
+            case AdhocInstructionType.FLOAT_CONST:
+            case AdhocInstructionType.INT_CONST:
+            case AdhocInstructionType.NIL_CONST:
+            case AdhocInstructionType.STRING_CONST:
+            case AdhocInstructionType.LONG_CONST:
+            case AdhocInstructionType.ARRAY_CONST:
+            case AdhocInstructionType.MAP_CONST:
+            case AdhocInstructionType.VOID_CONST:
+            case AdhocInstructionType.U_INT_CONST:
+            case AdhocInstructionType.U_LONG_CONST:
+            case AdhocInstructionType.DOUBLE_CONST:
+            case AdhocInstructionType.BOOL_CONST:
+            case AdhocInstructionType.BYTE_CONST:
+            case AdhocInstructionType.U_BYTE_CONST:
+            case AdhocInstructionType.SHORT_CONST:
+            case AdhocInstructionType.U_SHORT_CONST:
+                IncrementStackCounter();
+                CurrentLocalScope.CleanupOnExit = true;
+                break;
+
+            case AdhocInstructionType.FUNCTION_DEFINE:
+                {
+                    InsFunctionDefine functionDefine = instruction as InsFunctionDefine;
+
+                    int popCount = 0;
+                    if (CurrentFrame.Version.HasSupportForFunctionParametersDefaultValues())
+                    {
+                        DecreaseStackCounter(functionDefine.CodeFrame.FunctionParameters.Count);
+                        popCount += functionDefine.CodeFrame.FunctionParameters.Count;
+                    }
+
+                    if (CurrentFrame.Version.VersionNumber >= 8)
+                    {
+                        DecreaseStackCounter(functionDefine.CodeFrame.CapturedCallbackVariables.Count);
+                        popCount += functionDefine.CodeFrame.CapturedCallbackVariables.Count;
+                    }
+
+                    if (popCount > 0)
+                        CurrentLocalScope.CleanupOnExit = true;
+                }
+                break;
+            case AdhocInstructionType.METHOD_DEFINE:
+                {
+                    InsMethodDefine methodDefine = instruction as InsMethodDefine;
+                    int popCount = 0;
+                    if (CurrentFrame.Version.HasSupportForFunctionParametersDefaultValues())
+                    {
+                        DecreaseStackCounter(methodDefine.CodeFrame.FunctionParameters.Count);
+                        popCount += methodDefine.CodeFrame.FunctionParameters.Count;
+                    }
+
+                    if (CurrentFrame.Version.VersionNumber >= 8)
+                    {
+                        DecreaseStackCounter(methodDefine.CodeFrame.CapturedCallbackVariables.Count);
+                        popCount += methodDefine.CodeFrame.CapturedCallbackVariables.Count;
+                    }
+
+                    if (popCount > 0)
+                        CurrentLocalScope.CleanupOnExit = true;
+                }
+                break;
+
+            case AdhocInstructionType.UNDEF:
+                // TODO
+                break;
+
+            // Conversion to static paths is handled here at the instruction level.
+            case AdhocInstructionType.VARIABLE_EVAL:
+                {
+                    IncrementStackCounter();
+
+                    var variableEval = (InsVariableEvaluation)instruction;
+                    variableEval.VariableStorageIndex = GetVariableIndex(variableEval.VariableSymbols, isOnlyEval: true);
+
+                    CurrentLocalScope.CleanupOnExit = true;
+                }
+                break;
+            case AdhocInstructionType.VARIABLE_PUSH:
+                {
+                    IncrementStackCounter();
+
+                    var variablePush = (InsVariablePush)instruction;
+                    variablePush.VariableStorageIndex = GetVariableIndex(variablePush.VariableSymbols, isOnlyEval: false);
+
+                    CurrentLocalScope.CleanupOnExit = true;
+                }
+                break;
+
+            case AdhocInstructionType.FUNCTION_CONST:
+                {
+                    InsFunctionConst functionConst = instruction as InsFunctionConst;
+                    if (CurrentFrame.Version.VersionNumber >= 8)
+                        DecreaseStackCounter(functionConst.CodeFrame.FunctionParameters.Count); // Ver > 8
+
+                    if (CurrentFrame.Version.VersionNumber >= 8)
+                        DecreaseStackCounter(functionConst.CodeFrame.CapturedCallbackVariables.Count);
+
+                    IncrementStackCounter(); // New function return
+
+                    if (functionConst.CodeFrame.FunctionParameters.Count + functionConst.CodeFrame.CapturedCallbackVariables.Count > 0)
+                        CurrentLocalScope.CleanupOnExit = true;
+                }
+                break;
+            case AdhocInstructionType.METHOD_CONST:
+                {
+                    InsMethodConst methodConst = instruction as InsMethodConst;
+                    if (CurrentFrame.Version.VersionNumber >= 8)
+                        DecreaseStackCounter(methodConst.CodeFrame.FunctionParameters.Count); // Ver > 8
+
+                    if (CurrentFrame.Version.VersionNumber >= 8)
+                        DecreaseStackCounter(methodConst.CodeFrame.CapturedCallbackVariables.Count);
+
+                    IncrementStackCounter(); // New method return
+
+                    if (methodConst.CodeFrame.FunctionParameters.Count + methodConst.CodeFrame.CapturedCallbackVariables.Count > 0)
+                        CurrentLocalScope.CleanupOnExit = true;
+                }
+                break;
+
+            case AdhocInstructionType.MAP_CONST_OLD:
+                {
+                    var mapConstOld = instruction as InsMapConstOld;
+                    DecreaseStackCounter(mapConstOld.Value * 2);
+                    IncrementStackCounter(); // returned map
+
+                    if (mapConstOld.Value > 0)
+                        CurrentLocalScope.CleanupOnExit = true;
+                }
+                break;
+
+            case AdhocInstructionType.ASSIGN_POP:
+            case AdhocInstructionType.MAP_INSERT:
+                DecreaseStackCounter(2);
+                break;
+
+            case AdhocInstructionType.SET_STATE:
+                {
+                    InsSetState state = instruction as InsSetState;
+                    if (state.State == AdhocRunState.RETURN || state.State == AdhocRunState.YIELD || state.State == AdhocRunState.CALL)
+                        DecrementStackCounter();
+                }
+                break;
+        }
+
+        CurrentFrame.Instructions.Add(instruction);
+    }
+
+    private void RegisterLoopLabelForContinue(string symbol)
+    {
+        Continues.Add((symbol, []));
+    }
+
+    private void RegisterLoopLabelForBreak(string symbol)
+    {
+        Breaks.Add((symbol, []));
+    }
+
+    // GT7 1.00: 30DAB90 (mCompiler::ProcessContinues)
+    private void ProcessContinues(int index)
+    {
+        var list = Continues[^1];
+        for (int i = 0; i < list.Jumps.Count; i++)
+        {
+            var prevJump = (InsJump)CurrentFrame.Instructions[list.Jumps[i]];
+            prevJump.JumpInstructionIndex = index;
+        }
+
+        Continues.Remove(list);
+    }
+
+    private void ProcessBreaks(int index)
+    {
+        var list = Breaks[^1];
+        for (int i = 0; i < list.Jumps.Count; i++)
+        {
+            var prevJump = (InsJump)CurrentFrame.Instructions[list.Jumps[i]];
+            prevJump.JumpInstructionIndex = index;
+        }
+
+        Breaks.Remove(list);
+    }
+
+    /// <summary>
+    /// Gets the stack/local index of the specified variable path.<br/>
+    /// If it does not already exist, it may be created.<br/>
+    /// <br/>
+    /// <b>The specified path may be amended to form a static path, if a local variable is not found within any scope.</b>
+    /// </summary>
+    /// <param name="pathParts"></param>
+    /// <param name="isOnlyEval"></param>
+    /// <param name="location"></param>
+    /// <returns></returns>
+    /// <exception cref="Exception"></exception>
+    // GT7 1.00: 30D7CA0 (mCompiler::GetVariableIndex)
+    private int GetVariableIndex(List<AdhocSymbol> pathParts, bool isOnlyEval, Location? location = null)
+    {
+        AdhocSymbol fullSymbolPath = pathParts[^1];
+
+        bool canCaptureVariable = false;
+        bool flag2 = false;
+        for (int i = Scopes.Count - 1; i >= 0; i--) // Iterate from current scope to top level
+        {
+            if (Scopes[i].Variables.TryGetValue(fullSymbolPath, out Variable variable)) // Is there a variable with that name in this scope?
+            {
+                if (pathParts.Count > 1) // Static path
+                {
+                    if (canCaptureVariable) // Is top level?
+                    {
+                        return DefineStaticVariable(AdhocVariableType.Unknown, fullSymbolPath, location);
+                    }
+                    else if (variable.Type != AdhocVariableType.LocalVariable)
+                    {
+                        return variable.StackIndex;
+                    }
+                    else
+                    {
+                        // [NameError] "'%s' is already used as a local variable at %s:%d."
+                        throw new Exception($"'{fullSymbolPath}' is already used as a local variable at {variable.DeclarationSourceFileName}:{variable.DeclarationLineNumber}.");
+                    }
+                }
+                else // Local path aka local variable
+                {
+                    if (!canCaptureVariable)
+                    {
+                        if (variable.Type != AdhocVariableType.LocalVariable)
+                        {
+                            if (pathParts.Count == 1)
+                                pathParts.Add(pathParts[0]); // Add again for static resolution
+
+                            if (flag2)
+                                return DefineStaticVariable(AdhocVariableType.Unknown, fullSymbolPath, location);
+                        }
+
+                        return variable.StackIndex;
+                    }
+
+                    if (variable.Type != AdhocVariableType.LocalVariable)
+                    {
+                        if (pathParts.Count == 1)
+                            pathParts.Add(pathParts[0]); // Add again for static resolution
+
+                        return DefineStaticVariable(AdhocVariableType.Unknown, fullSymbolPath, location);
+                    }
+
+                    // Captured variable from other frame.
+                    int stackIndex = -(CurrentFrame.CapturedCallbackVariables.Count + 1);
+                    CurrentFrame.CapturedCallbackVariables.Add((stackIndex, fullSymbolPath));
+
+                    var capturedVariable = new Variable(fullSymbolPath, AdhocVariableType.LocalVariable, stackIndex, variable.DeclarationLineNumber, variable.DeclarationSourceFileName);
+                    CurrentLocalScope.Variables.TryAdd(fullSymbolPath, capturedVariable);
+
+                    return stackIndex;
+                }
+            }
+
+            if (Scopes[i].Type == AdhocScopeType.TopLevel)
+                canCaptureVariable = i != 0;
+            if (Scopes[i].Type == AdhocScopeType.ModuleOrClass)
+                flag2 = i != 0;
+        }
+
+        // Did not find anything.
+        if (pathParts.Count == 1 && isOnlyEval) // Are we evaluating a static (with only one part?)
+        {
+            // Yes. Define as static and make a path.
+            pathParts.Add(pathParts[0]);
+        }
+
+        // TODO strict mode. we shouldn't be allowed to define anything that's not yet defined.
+        var varType = pathParts.Count > 1 ? AdhocVariableType.Unknown : AdhocVariableType.LocalVariable;
+        if (false /* strict mode */)
+        {
+            // TODO: Throw error
+        }
+        else
+        {
+            if (varType == AdhocVariableType.LocalVariable)
+                return DefineLocalVariable(fullSymbolPath, location);
+            else
+                return DefineStaticVariable(varType, fullSymbolPath, location);
+        }
+    }
+
+    // GT7 1.00: 305D2C0 hParser::DefineAttributeForCurrentModule
+    private void DefineAttributeForCurrentModule(string name, AdhocVariableType type)
+    {
+        GetOrDefineModuleAttribute(CurrentModule, name, type);
+    }
+
     #endregion
 }
