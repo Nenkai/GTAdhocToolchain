@@ -12,6 +12,9 @@ public class DeclValue
     public string Name { get; set; }
     public AdhocVariableType Type { get; set; }
 
+    public int LineNumber { get; set; }
+    public string SourceFileName { get; set; }
+
     public DeclValue(DeclModule parent, string name, AdhocVariableType type)
     {
         ParentModule = parent;

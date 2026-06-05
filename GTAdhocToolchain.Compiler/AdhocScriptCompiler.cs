@@ -1155,9 +1155,6 @@ public class AdhocScriptCompiler
         // Write switch table jumps
         for (int i = 0; i < switchStatement.Cases.Count; i++)
         {
-            if (switchStatement.Cases.Count == 6)
-                ;
-
             SwitchCase swCase = switchStatement.Cases[i];
             if (swCase.Test is not null) // Actual case
             {
@@ -3225,7 +3222,6 @@ public class AdhocScriptCompiler
                     ThrowCompilationError(unaryExp, "Invalid operator");
                     return;
             }
-            ;
 
             bool opToSymbol = CurrentFrame.Version.ShouldUseInternalOperatorNames();
             AdhocSymbol symb = SymbolMap.RegisterSymbol(op, opToSymbol);
@@ -4039,33 +4035,26 @@ public class AdhocScriptCompiler
                 else
                 {
                     if (module.Variables.TryGetValue(alias.Name, out DeclValue targetValue))
+                    {
                         CurrentModule.AddVariable(alias.Name, targetValue);
+                    }
                     else
                     {
-                        if (false)
-                        {
-                            // TODO: Strict mode
-                            // StrictCheckError - undefined variable %s::%s.
-                        }
+                        if (false /* TODO: Strict mode */)
+                            ThrowStrictCheckError($"undefined variable {path[^1].Name}::{target.Name}.");
                     }
                 }
             }
             else
             {
-                if (false)
-                {
-                    // TODO: Strict mode
-                    // StrictCheckError - %s is not a module name. (in %s).
-                }
+                if (false /* TODO: Strict mode */)
+                    ThrowStrictCheckError($"{moduleValue.Name} is not a module name. (in {path[^1].Name}).");
             }
         }
         else
         {
-            if (false)
-            {
-                // TODO: Strict mode
-                // StrictCheckError - undefined module variable '%s'.
-            }
+            if (false /* TODO: Strict mode */)
+                ThrowStrictCheckError($"undefined module variable '{path[^1]}'.");
         }
     }
 
@@ -4154,7 +4143,7 @@ public class AdhocScriptCompiler
     /// <param name="name"></param>
     /// <param name="variableType"></param>
     /// <param name="location"></param>
-    // GT7 1.00: 30D5320 (mCompiler::TryDefineVariable)
+    // GT7 1.00: 30D5320 (mCompiler::DefineVariableInCurrentScope)
     private void DefineVariableInCurrentScope(AdhocSymbol name, AdhocVariableType variableType, Location? location = null)
     {
         if (variableType == AdhocVariableType.Undef)
@@ -4164,6 +4153,33 @@ public class AdhocScriptCompiler
         }
 
         // TODO strict mode
+
+        if (false /* TODO strict mode */ && variableType <= AdhocVariableType.Static)
+        {
+            if (variableType != AdhocVariableType.LocalVariable)
+            {
+                // Look up the symbol in the parser's declaration table
+                DeclValue value = null;
+
+                if (value is not null)
+                {
+                    if (value.Type == AdhocVariableType.Delegate || value.Type == variableType)
+                    {
+                        //value->byte54 = 1;
+                        value.SourceFileName = location.Value.Source;
+                        value.LineNumber = location.Value.Start.Line;
+                    }
+                    else
+                    {
+                        ThrowStrictCheckError($"{variableType} '{value.Name}' is already defined as {value.Type} at {value.SourceFileName}:{value.LineNumber}.");
+                    }
+                }
+                else
+                {
+                    ThrowStrictCheckError($"'{name.Name}' is not declared in this scope.");
+                }
+            }
+        }
 
         switch (variableType)
         {
@@ -4672,9 +4688,20 @@ public class AdhocScriptCompiler
 
         // TODO strict mode. we shouldn't be allowed to define anything that's not yet defined.
         var varType = pathParts.Count > 1 ? AdhocVariableType.Unknown : AdhocVariableType.LocalVariable;
-        if (false /* strict mode */)
+        if (false /* TODO: strict mode */)
         {
-            // TODO: Throw error
+            if (pathParts.Count > 1)
+            {
+                DeclValue moduleValue = GetLastModuleFromPath(pathParts);
+                if (moduleValue is not null)
+                {
+                    varType = moduleValue.Type;
+                }
+                else
+                    ThrowStrictCheckError($"undefined variable '{pathParts[^1].Name}'.");
+            }
+            else
+                ThrowStrictCheckError($"undefined variable '%s'.");
         }
         else
         {
@@ -4685,10 +4712,21 @@ public class AdhocScriptCompiler
         }
     }
 
+    private void ThrowStrictCheckError(string message)
+    {
+        throw new StrictCheckException(message);
+    }
+
     // GT7 1.00: 305D2C0 hParser::DefineAttributeForCurrentModule
     private void DefineAttributeForCurrentModule(string name, AdhocVariableType type)
     {
         GetOrDefineModuleAttribute(CurrentModule, name, type);
+    }
+
+    public class StrictCheckException : Exception 
+    {
+        public StrictCheckException(string message)
+            : base(message) { }
     }
 
     #endregion
