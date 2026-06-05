@@ -509,7 +509,9 @@ static a = 5;
 [Core.Hooking] <Info> gt7_hooks.cpp:171 DumpSubroutine: ASSIGN_POP
 [Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
 
-// Attribute
+////////////////////////////////////////////////////////////////////////
+// Attributes
+////////////////////////////////////////////////////////////////////////
 attribute a;
 [Core.Hooking] <Info> gt7_hooks.cpp:176 DumpSubroutine: NIL_CONST
 [Core.Hooking] <Info> gt7_hooks.cpp:162 DumpSubroutine: ATTRIBUTE_DEFINE: a
@@ -519,6 +521,39 @@ attribute a = 5;
 [Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 5
 [Core.Hooking] <Info> gt7_hooks.cpp:162 DumpSubroutine: ATTRIBUTE_DEFINE: a
 [Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+
+// This one is to check if gt7's compiler emits these variable evals as non-static accesses
+// Because GT6's gtmode->GTModeProjectComponent::ButtonHelp::ButtonHelpGT6's clear method accesses an attribute defined after the method, but still accessed as a local
+
+module myModule
+{
+        attribute before_method_attr;
+
+        method test_attribute_access_scope()
+        {
+                var before = before_method_attr;
+                var after = after_method_attr;
+        }
+
+        attribute after_method_attr;
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:179 DumpSubroutine: MODULE_DEFINE: myModule
+[Core.Hooking] <Info> gt7_hooks.cpp:252 DumpSubroutine: NIL_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:209 DumpSubroutine: ATTRIBUTE_DEFINE: before_method_attr
+[Core.Hooking] <Info> gt7_hooks.cpp:231 DumpSubroutine: METHOD_DEFINE - test_attribute_access_scope
+  [Core.Hooking] <Info> gt7_hooks.cpp:105 DumpSubroutine: VARIABLE_EVAL: before_method_attr,before_method_attr, Local: 0
+  [Core.Hooking] <Info> gt7_hooks.cpp:110 DumpSubroutine: VARIABLE_PUSH: before, Local: 1
+  [Core.Hooking] <Info> gt7_hooks.cpp:252 DumpSubroutine: ASSIGN_POP
+  [Core.Hooking] <Info> gt7_hooks.cpp:105 DumpSubroutine: VARIABLE_EVAL: after_method_attr,after_method_attr, Local: 1
+  [Core.Hooking] <Info> gt7_hooks.cpp:110 DumpSubroutine: VARIABLE_PUSH: after, Local: 2
+  [Core.Hooking] <Info> gt7_hooks.cpp:252 DumpSubroutine: ASSIGN_POP
+  [Core.Hooking] <Info> gt7_hooks.cpp:252 DumpSubroutine: VOID_CONST
+  [Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:252 DumpSubroutine: NIL_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:209 DumpSubroutine: ATTRIBUTE_DEFINE: after_method_attr
+[Core.Hooking] <Info> gt7_hooks.cpp:245 DumpSubroutine: LEAVE: Depth:1, RewindLocalsStorageTo:1
+[Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: SET_STATE: EXIT
+[Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: SET_STATE: EXIT
 
 ////////////////////////////////////////////////////////////////////////
 // Map const
