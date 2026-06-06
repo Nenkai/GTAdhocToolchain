@@ -1506,7 +1506,22 @@ public class AdhocScriptCompiler
             Expression? initValue = declarator.Init;
             Expression id = declarator.Id;
 
-            // In later versions, we first compile the call
+            if (id is null)
+                ThrowCompilationError(varDeclaration, CompilationMessages.Error_VariableDeclarationIsNull);
+
+            // Declare the identifier before anything
+            Identifier? idIdentifier = id as Identifier;
+            if (idIdentifier is null)
+                ThrowCompilationError(varDeclaration, "Variable declaration for id is not an identifier.");
+            
+            if (idIdentifier.Name == "nil")
+                ThrowCompilationError(varDeclaration, CompilationMessages.Error_NilNotValidVarialbleName);
+
+            AdhocSymbol varSymb = SymbolMap.RegisterSymbol(idIdentifier.Name!);
+            DefineVariableInCurrentScope(varSymb, AdhocVariableType.LocalVariable);
+            
+            // Then, we actually compile what they are.
+            // In later versions, we first compile the RHS
             if (CurrentFrame.Version.ExpressionBeforeEvalOrPush())
             {
                 if (initValue is not null)
@@ -1529,55 +1544,26 @@ public class AdhocScriptCompiler
                     }
                 }
 
-
-                // Now write the id
-                if (id is null)
-                    ThrowCompilationError(varDeclaration, CompilationMessages.Error_VariableDeclarationIsNull);
-
-                if (id is Identifier idIdentifier) // var hello [= world];
+                // Set variable value if any
+                if (initValue is not null || pushWhenNoInit)
                 {
-                    if (idIdentifier.Name == "nil")
-                        ThrowCompilationError(varDeclaration, CompilationMessages.Error_NilNotValidVarialbleName);
+                    // Variable is being defined with a value.
+                    InsertLocalVariablePush(idIdentifier.Name!, idIdentifier.Location.Start.Line);
 
-                    AdhocSymbol varSymb = SymbolMap.RegisterSymbol(idIdentifier.Name!);
-                    DefineVariableInCurrentScope(varSymb, AdhocVariableType.LocalVariable);
-
-                    if (initValue is not null || pushWhenNoInit)
-                    {
-                        // Variable is being defined with a value.
-                        InsertLocalVariablePush(idIdentifier.Name!, idIdentifier.Location.Start.Line);
-
-                        // Perform assignment
-                        InsertAssignPop();
-                    }
+                    // Perform assignment
+                    InsertAssignPop();
                 }
-                else
-                {
-                    ThrowCompilationError(varDeclaration, "Variable declaration for id is not an identifier.");
-                }
+                
             }
             else
             {
-                if (id.Type == Nodes.Identifier) // var hello [= world];
+                // Set variable value if any
+                if (initValue is not null || pushWhenNoInit)
                 {
-                    var idIdentifier = id.As<Identifier>();
-                    if (idIdentifier.Name == "nil")
-                        ThrowCompilationError(varDeclaration, CompilationMessages.Error_NilNotValidVarialbleName);
-
-                    AdhocSymbol varSymb = SymbolMap.RegisterSymbol(idIdentifier.Name!);
-                    DefineVariableInCurrentScope(varSymb, AdhocVariableType.LocalVariable);
-
-                    if (initValue is not null || pushWhenNoInit)
-                    {
-                        // Variable is being defined with a value.
-                        InsertLocalVariablePush(varSymb.Name, idIdentifier.Location.Start.Line);
-                    }
-                }
-                else
-                {
-                    ThrowCompilationError(varDeclaration, "Variable declaration for id is not an identifier.");
+                    InsertLocalVariablePush(varSymb.Name, idIdentifier.Location.Start.Line);
                 }
 
+                // THEN Compile RHS
                 if (initValue is not null)
                 {
                     if (initValue.Type == Nodes.UpdateExpression)
@@ -1921,6 +1907,9 @@ public class AdhocScriptCompiler
 
     private void CompileAwait(AwaitExpression awaitExpr)
     {
+        AdhocSymbol taskSymbol = SymbolMap.RegisterSymbol($"task#{SymbolMap.TempVariableCounter++}");
+        DefineVariableInCurrentScope(taskSymbol, AdhocVariableType.LocalVariable, awaitExpr.Location);
+
         // Awaiting bare call?
         if (awaitExpr.Argument is CallExpression call)
         {
@@ -1931,15 +1920,15 @@ public class AdhocScriptCompiler
             if (!isAwaitTask)
             {
                 // Wrap it into a subroutine (maybe move this to an util at the bottom) 
-                var subroutine = new FunctionDeclaration(null,
+                var subroutine = new FunctionExpression(null,
                     new NodeList<Expression>(), // No parameters
-                    new BlockStatement(NodeList.Create(new Statement[] { new ExpressionStatement(call) })),
+                    new BlockStatement(NodeList.Create(new Statement[] { new ReturnStatement(call) })),
                     generator: false,
                     strict: true,
                     async: false);
                 subroutine.Location = new Location(call.Location.Start, call.Location.End, call.Location.Source);
 
-                CompileSubroutine(subroutine, call, null, new NodeList<Expression>());
+                CompileFunctionExpression(subroutine);
             }
             else
             {
@@ -1962,14 +1951,13 @@ public class AdhocScriptCompiler
 
         // Get task - <task> = System::AwaitTaskStart(<func>);
         AddInstruction(new InsCall(1), 0);
-        string tmpTaskVariable = $"task#{SymbolMap.TempVariableCounter++}";
-        AdhocSymbol taskSymb = InsertLocalVariablePush(tmpTaskVariable, 0);
+        AddInstruction(new InsVariablePush() { VariableSymbols = [taskSymbol] }, awaitExpr.Location.Start.Line);
         AddInstruction(InsAssignPop.Default, 0);
 
         // Get result of task - <result> = System::AwaitTaskResult(<task>);
         var awaitResult = new StaticMemberExpression(new Identifier(AdhocConstants.SYSTEM), new Identifier("AwaitTaskResult"), false);
         CompileExpression(awaitResult);
-        AddInstruction(new InsVariableEvaluation() { VariableSymbols = [taskSymb] }, 0);
+        AddInstruction(new InsVariableEvaluation() { VariableSymbols = [taskSymbol] }, 0);
         AddInstruction(new InsCall(1), 0);
 
         AddPostCompilationWarning(CompilationMessages.Warning_UsingAwait_Code);
