@@ -5,6 +5,7 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <AnalysisLevel>latest</AnalysisLevel>
+	<Nullable>enable</Nullable>
   </PropertyGroup>
 
   <ItemGroup>

@@ -29,7 +29,7 @@ public class Variable
         }
     }
 
-    public Variable(AdhocSymbol symbol, AdhocVariableType variableType, int stackIndex, int sourceLineNumber, string sourceFileName)
+    public Variable(AdhocSymbol symbol, AdhocVariableType variableType, int stackIndex, int sourceLineNumber, string? sourceFileName)
     {
         Symbol = symbol;
         Type = variableType;

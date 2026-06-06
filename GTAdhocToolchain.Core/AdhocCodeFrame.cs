@@ -1,5 +1,4 @@
 ﻿using GTAdhocToolchain.Core.Instructions;
-using GTAdhocToolchain.Core.Stack;
 using GTAdhocToolchain.Core.Variables;
 
 using Syroot.BinaryData;
@@ -60,15 +59,6 @@ public class AdhocCodeFrame
     public AdhocCodeFrame(AdhocVersion version)
     {
         Version = version;
-        CreateStack();
-    }
-
-    /// <summary>
-    /// Creates the stack (depending on the adhoc version).
-    /// </summary>
-    private void CreateStack()
-    {
-
     }
 
     public void SetSourcePath(AdhocSymbol symbol)

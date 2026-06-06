@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Esprima;
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -16,8 +18,8 @@ public class DeclModule : DeclValue
     /// </summary>
     public Dictionary<string, DeclValue> Variables { get; set; } = [];
 
-    public DeclModule(DeclModule parent, string name, AdhocVariableType varType)
-        : base(parent, name, varType)
+    public DeclModule(DeclModule? parent, string name, AdhocVariableType varType, Location? location)
+        : base(parent, name, varType, location)
     {
         Name = name;
     }
