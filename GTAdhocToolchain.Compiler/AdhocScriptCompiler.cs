@@ -1905,7 +1905,7 @@ public class AdhocScriptCompiler
         InsertSetState(AdhocRunState.YIELD);
     }
 
-    private void CompileAwait(AwaitExpression awaitExpr)
+    private void CompileAwait(AwaitExpression awaitExpr, bool isReturning = true)
     {
         AdhocSymbol taskSymbol = SymbolMap.RegisterSymbol($"task#{SymbolMap.TempVariableCounter++}");
         DefineVariableInCurrentScope(taskSymbol, AdhocVariableType.LocalVariable, awaitExpr.Location);
@@ -1922,7 +1922,7 @@ public class AdhocScriptCompiler
                 // Wrap it into a subroutine (maybe move this to an util at the bottom) 
                 var subroutine = new FunctionExpression(null,
                     new NodeList<Expression>(), // No parameters
-                    new BlockStatement(NodeList.Create(new Statement[] { new ReturnStatement(call) })),
+                    new BlockStatement(NodeList.Create(new Statement[] { isReturning ? new ReturnStatement(call) : new ExpressionStatement(call) })),
                     generator: false,
                     strict: true,
                     async: false);
@@ -2146,7 +2146,10 @@ public class AdhocScriptCompiler
     /// <param name="expStatement"></param>
     private void CompileExpressionStatement(ExpressionStatement expStatement)
     {
-        CompileExpression(expStatement.Expression);
+        if (expStatement.Expression.Type == Nodes.AwaitExpression)
+            CompileAwait(expStatement.Expression.As<AwaitExpression>(), isReturning: false);
+        else
+            CompileExpression(expStatement.Expression);
 
         if (expStatement.Expression.Type != Nodes.AssignmentExpression
             && expStatement.Expression.Type != Nodes.StaticDeclaration
