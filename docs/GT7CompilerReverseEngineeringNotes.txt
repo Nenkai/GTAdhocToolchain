@@ -894,6 +894,12 @@ return 0.0;
 return 0.0f
 [Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] syntax error, unexpected tIDENT, expecting ';' (near token 'f')
 
+return -1L;
+[Core.Hooking] <Info> gt7_hooks.cpp:252 DumpSubroutine: LONG_CONST: -1L
+[Core.Hooking] <Info> gt7_hooks.cpp:252 DumpSubroutine: UNARY_OPERATOR
+[Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: SET_STATE: EXIT
+
 return 0x123
 [Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 291
 [Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: RETURN
@@ -961,6 +967,11 @@ return UInt(1);
 [Core.Hooking] <Info> gt7_hooks.cpp:101 DumpSubroutine: U_INT_CONST: 1
 [Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: RETURN
 [Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+
+return Long(-1);
+[Core.Hooking] <Info> gt7_hooks.cpp:252 DumpSubroutine: LONG_CONST: -1L
+[Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: SET_STATE: EXIT
 
 return Float(1);
 [Core.Hooking] <Info> gt7_hooks.cpp:105 DumpSubroutine: FLOAT_CONST: 1
