@@ -739,7 +739,7 @@ public class AdhocScriptCompiler
             modulePathSymbols.Add(SymbolMap.RegisterSymbol(str));
 
         var moduleDefine = new InsModuleDefine(modulePathSymbols);
-        AddInstruction(moduleDefine, moduleDecl.Location.End.Line);
+        AddInstruction(moduleDefine, moduleDecl.Location.Start.Line);
 
         ParentModules.Add(CurrentModule);
         SetCurrentModulePath(modulePath, AdhocVariableType.Module);
@@ -2497,6 +2497,11 @@ public class AdhocScriptCompiler
             Identifier id = expression.As<Identifier>();
             InsertLocalVariablePush(id.Name!, id.Location.Start.Line);
         }
+        else if (expression.Type == Nodes.StaticIdentifier)
+        {
+            StaticIdentifier staticIdentifier = expression.As<StaticIdentifier>();
+            CompileStaticIdentifierPush(staticIdentifier);
+        }
         else if (expression.Type == Nodes.MemberExpression)
         {
             if (expression is AttributeMemberExpression attrMember) // Pushing into an object i.e hello.world = "!"
@@ -2517,7 +2522,6 @@ public class AdhocScriptCompiler
             }
             else
                 ThrowCompilationError(expression, $"Unimplemented member expression assignment type: '{expression.Type}'");
-
         }
         else if (expression is UnaryExpression unaryExp && unaryExp.Operator == UnaryOperator.Indirection) // (*/&)hello = world
         {
@@ -2538,6 +2542,17 @@ public class AdhocScriptCompiler
             InsertAssignPop();
         else
             InsertAssign();
+    }
+
+    // TODO: Maybe remove this. StaticIdentifier doesn't feel right as an expression, it should be unary probably
+    private void CompileStaticIdentifierPush(StaticIdentifier staticIdentifier)
+    {
+        AdhocSymbol varSymb = SymbolMap.RegisterSymbol(staticIdentifier.Id.Name!);
+
+        var varPush = new InsVariablePush();
+        varPush.VariableSymbols.Add(varSymb);
+        varPush.VariableSymbols.Add(varSymb);
+        AddInstruction(varPush, staticIdentifier.Location.Start.Line);
     }
 
     /// <summary>
@@ -4626,15 +4641,15 @@ public class AdhocScriptCompiler
     {
         AdhocSymbol fullSymbolPath = pathParts[^1];
 
-        bool canCaptureVariable = false;
-        bool flag2 = false;
+        bool crossedFunction = false;
+        bool crossedModule = false;
         for (int i = Scopes.Count - 1; i >= 0; i--) // Iterate from current scope to top level
         {
             if (Scopes[i].Variables.TryGetValue(fullSymbolPath, out Variable? variable)) // Is there a variable with that name in this scope?
             {
                 if (pathParts.Count > 1) // Static path
                 {
-                    if (canCaptureVariable) // Is top level?
+                    if (crossedFunction) // Is top level?
                     {
                         return DefineStaticVariable(AdhocVariableType.Unknown, fullSymbolPath, location);
                     }
@@ -4650,14 +4665,14 @@ public class AdhocScriptCompiler
                 }
                 else // Local path aka local variable
                 {
-                    if (!canCaptureVariable)
+                    if (!crossedFunction)
                     {
                         if (variable.Type != AdhocVariableType.LocalVariable)
                         {
                             if (pathParts.Count == 1)
                                 pathParts.Add(pathParts[0]); // Add again for static resolution
 
-                            if (flag2)
+                            if (crossedModule)
                                 return DefineStaticVariable(AdhocVariableType.Unknown, fullSymbolPath, location);
                         }
 
@@ -4684,9 +4699,9 @@ public class AdhocScriptCompiler
             }
 
             if (Scopes[i].Type == AdhocScopeType.TopLevel)
-                canCaptureVariable = i != 0;
+                crossedFunction = i != 0;
             if (Scopes[i].Type == AdhocScopeType.ModuleOrClass)
-                flag2 = i != 0;
+                crossedModule = i != 0;
         }
 
         // Did not find anything.
