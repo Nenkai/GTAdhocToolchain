@@ -758,56 +758,82 @@ public class AdhocScriptCompiler
     {
         CompileTestStatement(ifStatement.Test);
 
-        // Create jump
-        InsJumpIfFalse endOrNextIfJump = new InsJumpIfFalse();
-        AddInstruction(endOrNextIfJump, 0);
-
-        // Apply frame
-        if (ifStatement.Consequent.Type == Nodes.BlockStatement)
+        // If consequent is empty, and the alternate isn't, optimize by skipping the consequent altogether. 
+        if (ifStatement.Consequent.Type == Nodes.EmptyStatement) // [if <empty> else ...] path
         {
-            CompileStatement(ifStatement.Consequent); // if body
-        }
-        else
-        {
-            EnterScope();
-            CompileStatement(ifStatement.Consequent);
-            LeaveScope();
-        }
-
-        endOrNextIfJump.JumpIndex = CurrentFrame.GetInstructionCount();
-
-        // else if's..
-        if (ifStatement.Alternate is not null)
-        {
-            // Jump to skip the else if frame if the if was already taken
-            InsJump skipAlternateJmp = new InsJump();
-            AddInstruction(skipAlternateJmp, 0);
-
-            endOrNextIfJump.JumpIndex = CurrentFrame.GetInstructionCount();
-
-            if (ifStatement.Alternate.Type == Nodes.BlockStatement)
+            if (ifStatement.Alternate is not null && ifStatement.Alternate.Type != Nodes.EmptyStatement)
             {
-                CompileStatement(ifStatement.Alternate); // else (if) body
+                InsJumpIfTrue blockJump = new InsJumpIfTrue();
+                AddInstruction(blockJump, 0);
+
+                if (ifStatement.Consequent.Type == Nodes.BlockStatement)
+                {
+                    CompileStatement(ifStatement.Alternate); // else body
+                }
+                else
+                {
+                    EnterScope();
+                    CompileStatement(ifStatement.Alternate);
+                    LeaveScope();
+                }
+
+                blockJump.JumpIndex = CurrentFrame.GetInstructionCount();
+            }
+
+            AddInstruction(InsPop.Default, 0);
+        }
+        else // [if ... else <.../empty>] path
+        {
+            // Create jump
+            InsJumpIfFalse endOrNextIfJump = new InsJumpIfFalse();
+            AddInstruction(endOrNextIfJump, 0);
+
+            // Apply frame
+            if (ifStatement.Consequent.Type == Nodes.BlockStatement)
+            {
+                CompileStatement(ifStatement.Consequent); // if body
             }
             else
             {
                 EnterScope();
-                CompileStatement(ifStatement.Alternate);
+                CompileStatement(ifStatement.Consequent);
                 LeaveScope();
             }
 
-            skipAlternateJmp.JumpInstructionIndex = CurrentFrame.GetInstructionCount();
-        }
-        else // No else block
-        {
-            if (CurrentFrame.Version.IfConditionAlwaysHasAlternateJump())
+            endOrNextIfJump.JumpIndex = CurrentFrame.GetInstructionCount();
+
+            if (ifStatement.Alternate is not null && ifStatement.Alternate.Type != Nodes.EmptyStatement) // [if ... else ...] path
             {
+                // Jump to skip the else if frame if the if was already taken
                 InsJump skipAlternateJmp = new InsJump();
                 AddInstruction(skipAlternateJmp, 0);
+
+                endOrNextIfJump.JumpIndex = CurrentFrame.GetInstructionCount();
+
+                if (ifStatement.Alternate.Type == Nodes.BlockStatement)
+                {
+                    CompileStatement(ifStatement.Alternate); // else body
+                }
+                else
+                {
+                    EnterScope();
+                    CompileStatement(ifStatement.Alternate);
+                    LeaveScope();
+                }
+
                 skipAlternateJmp.JumpInstructionIndex = CurrentFrame.GetInstructionCount();
             }
+            else // No else block or it is empty
+            {
+                if (CurrentFrame.Version.IfConditionAlwaysHasAlternateJump())
+                {
+                    InsJump skipAlternateJmp = new InsJump();
+                    AddInstruction(skipAlternateJmp, 0);
+                    skipAlternateJmp.JumpInstructionIndex = CurrentFrame.GetInstructionCount();
+                }
 
-            endOrNextIfJump.JumpIndex = CurrentFrame.GetInstructionCount();
+                endOrNextIfJump.JumpIndex = CurrentFrame.GetInstructionCount();
+            }
         }
     }
 
