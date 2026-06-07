@@ -412,20 +412,28 @@ public class AdhocScriptCompiler
 
         // TODO: Redo this
 
-        InsUndef undefIns = new InsUndef();
         var parts = undefStatement.Symbol.Split("::");
-
+        List<AdhocSymbol> path = [];
         if (parts.Length > 1)
         {
             foreach (string part in undefStatement.Symbol.Split(AdhocConstants.OPERATOR_STATIC))
-                undefIns.Symbols.Add(SymbolMap.RegisterSymbol(part));
+                path.Add(SymbolMap.RegisterSymbol(part));
         }
         else
-            undefIns.Symbols.Add(SymbolMap.RegisterSymbol(parts[0]));
+            path.Add(SymbolMap.RegisterSymbol(parts[0]));
+        path.Add(SymbolMap.RegisterSymbol(undefStatement.Symbol)); // full
 
-        undefIns.Symbols.Add(SymbolMap.RegisterSymbol(undefStatement.Symbol)); // full
+        UndefSymbol(path[^1]);
 
+        InsUndef undefIns = new InsUndef();
+        undefIns.Path = path;
         AddInstruction(undefIns, undefStatement.Location.Start.Line);
+    }
+
+    // GT7 1.00: 30D5CB0 (mCompiler::UndefSymbol)
+    private void UndefSymbol(AdhocSymbol symbol)
+    {
+        CurrentModuleOrClassScope.Variables.Remove(symbol);
     }
 
     public void CompileTryStatement(TryStatement tryStatement)
@@ -4195,7 +4203,7 @@ public class AdhocScriptCompiler
     {
         if (variableType == AdhocVariableType.Undef)
         {
-            // TODO
+            UndefSymbol(name);
             return;
         }
 
@@ -4526,7 +4534,10 @@ public class AdhocScriptCompiler
                 break;
 
             case AdhocInstructionType.UNDEF:
-                // TODO
+                {
+                    InsUndef undef = (InsUndef)instruction;
+                    UndefSymbol(undef.Path[^1]);
+                }
                 break;
 
             // Conversion to static paths is handled here at the instruction level.

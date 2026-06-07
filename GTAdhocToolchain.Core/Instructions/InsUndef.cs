@@ -15,16 +15,16 @@ public class InsUndef : InstructionBase
 
     public override string InstructionName => "UNDEF";
 
-    public List<AdhocSymbol> Symbols { get; set; } = [];
+    public List<AdhocSymbol> Path { get; set; } = [];
 
     public override void Serialize(AdhocStream stream)
     {
-        stream.WriteSymbols(Symbols);
+        stream.WriteSymbols(Path);
     }
 
     public override void Deserialize(AdhocStream stream)
     {
-        Symbols = stream.ReadSymbols();
+        Path = stream.ReadSymbols();
     }
 
     public override string ToString()
@@ -33,5 +33,5 @@ public class InsUndef : InstructionBase
     }
 
     public override string Disassemble(bool asCompareMode = false)
-        => $"{InstructionType}: {string.Join(",", Symbols.Select(e => e.Name))}";
+        => $"{InstructionType}: {string.Join(",", Path.Select(e => e.Name))}";
 }
