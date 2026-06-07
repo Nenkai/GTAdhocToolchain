@@ -779,8 +779,11 @@ public class AdhocScriptCompiler
 
                 blockJump.JumpIndex = CurrentFrame.GetInstructionCount();
             }
-
-            AddInstruction(InsPop.Default, 0);
+            else
+            {
+                // [if <empty> else <empty>] path, we don't even need the result so pop it
+                AddInstruction(InsPop.Default, 0);
+            }
         }
         else // [if ... else <.../empty>] path
         {
