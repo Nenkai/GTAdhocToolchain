@@ -410,8 +410,6 @@ public class AdhocScriptCompiler
         // XX/FIXME: Undef may refer to a local variable aswell, it's not supported though
         // GT5 SoundUtil.ad undefs BootInitialize as a local which is a defined user function
 
-        // TODO: Redo this
-
         var parts = undefStatement.Symbol.Split("::");
         List<AdhocSymbol> path = [];
         if (parts.Length > 1)
@@ -436,8 +434,11 @@ public class AdhocScriptCompiler
         CurrentModuleOrClassScope.Variables.Remove(symbol);
     }
 
+    // GT7 1.00: 30F26D0 (mCompiler::CompileTryCatch)
     public void CompileTryStatement(TryStatement tryStatement)
     {
+        DepthPerFrame.Last!.ValueRef++;
+
         InsTryCatch tryCatch = new InsTryCatch();
         AddInstruction(tryCatch, tryStatement.Location.Start.Line);
 
@@ -453,14 +454,14 @@ public class AdhocScriptCompiler
         }
 
         InsertSetState(AdhocRunState.EXIT);
+        DepthPerFrame.Last!.ValueRef--;
 
         InsJump catchClauseSkipper = new InsJump();
         AddInstruction(catchClauseSkipper, 0);
-
         tryCatch.InstructionIndex = CurrentFrame.GetInstructionCount() - 1;
 
-        var catchClause = tryStatement.Handler as CatchClause;
-        if (catchClause is not null)
+        CatchClause? catchClause = tryStatement.Handler;
+        if (catchClause is not null && catchClause.Type != Nodes.EmptyStatement)
         {
             CompileCatchClause(catchClause);
         }
@@ -474,7 +475,7 @@ public class AdhocScriptCompiler
         catchClauseSkipper.JumpInstructionIndex = CurrentFrame.GetInstructionCount();
     }
 
-    // GT7 1.00: mCompiler::CompileCatch
+    // GT7 1.00: 30F2AB0 (mCompiler::CompileCatch)
     public void CompileCatchClause(CatchClause catchClause)
     {
         // TODO: Support case keyword (with isInstanceOf)
@@ -501,10 +502,11 @@ public class AdhocScriptCompiler
         InsertLocalVariablePush(tmpCaseVariable, 0);
         InsertAssignPop();
 
+        // Not actually a block?
+        CompileStatementList(catchClause.Body);
+
         var defaultCaseJump = new InsJump();
         AddInstruction(defaultCaseJump, 0);
-
-        CompileBlockStatement(catchClause.Body);
 
         int index = LeaveScope();
         if (/* noDefault */ true)
@@ -513,7 +515,7 @@ public class AdhocScriptCompiler
         }
         else
         {
-            // Index of default body
+            // TODO: Index of default body
         }
 
         ProcessBreaks(index);
