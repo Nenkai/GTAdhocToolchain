@@ -997,23 +997,42 @@ throw test;
 
 try
 {
+	test = 1;
+}
+
+[Core.Hooking] <Info> gt7_hooks.cpp:249 DumpSubroutine: TRY_CATCH: Jump:6
+[Core.Hooking] <Info> gt7_hooks.cpp:124 DumpSubroutine: INT_CONST: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:110 DumpSubroutine: VARIABLE_PUSH: test, Local: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:252 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:245 DumpSubroutine: LEAVE: Depth:1, RewindLocalsStorageTo:1
+[Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: SET_STATE: EXIT
+[Core.Hooking] <Info> gt7_hooks.cpp:145 DumpSubroutine: JUMP: 9
+[Core.Hooking] <Info> gt7_hooks.cpp:124 DumpSubroutine: INT_CONST: 0
+[Core.Hooking] <Info> gt7_hooks.cpp:252 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: SET_STATE: EXIT
+
+try
+{
 
 }
 catch (e)
 {
-
+    test = false;
 }
-[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: TRY_CATCH
-[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
-[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 10
-[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 0
-[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: e
-[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN
-[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: catch#0
-[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
-[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 9
-[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: LEAVE
-[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+[Core.Hooking] <Info> gt7_hooks.cpp:249 DumpSubroutine: TRY_CATCH: Jump:2
+[Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: SET_STATE: EXIT
+[Core.Hooking] <Info> gt7_hooks.cpp:145 DumpSubroutine: JUMP: 13
+[Core.Hooking] <Info> gt7_hooks.cpp:124 DumpSubroutine: INT_CONST: 0
+[Core.Hooking] <Info> gt7_hooks.cpp:110 DumpSubroutine: VARIABLE_PUSH: e, Local: 2
+[Core.Hooking] <Info> gt7_hooks.cpp:252 DumpSubroutine: ASSIGN
+[Core.Hooking] <Info> gt7_hooks.cpp:110 DumpSubroutine: VARIABLE_PUSH: catch#0, Local: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:252 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:252 DumpSubroutine: BOOL_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:110 DumpSubroutine: VARIABLE_PUSH: test, Local: 3
+[Core.Hooking] <Info> gt7_hooks.cpp:252 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:145 DumpSubroutine: JUMP: 12
+[Core.Hooking] <Info> gt7_hooks.cpp:245 DumpSubroutine: LEAVE: Depth:0, RewindLocalsStorageTo:1
+[Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: SET_STATE: EXIT
 
 try
 {
