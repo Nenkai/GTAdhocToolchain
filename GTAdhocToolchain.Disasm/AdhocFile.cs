@@ -83,8 +83,8 @@ public class AdhocFile
         if (SymbolTable != null)
             sw.WriteLine($"({SymbolTable.Count} strings)");
         sw.WriteLine($"Root Instructions: {TopLevelFrame.Instructions.Count}");
-        sw.Write($"  > Stack Size: {TopLevelFrame.MaxStackIndex} - MaxLocalIndex: {TopLevelFrame.MaxLocalIndex} - " +
-            $"MaxStaticIndex: {(!TopLevelFrame.Version.UsesNewSplitStack() ? "=MaxLocalIndex" : $"{TopLevelFrame.MaxStaticIndex}")}");
+        sw.Write($"  > Stack Size: {TopLevelFrame.MaxStackSize} - LocalCount: {TopLevelFrame.LocalCount} - " +
+            $"StaticCount: {(!TopLevelFrame.Version.UsesNewSplitStack() ? "=LocalCount" : $"{TopLevelFrame.StaticCount}")}");
         sw.WriteLine();
 
         Stack<object> modOrClass = new Stack<object>();

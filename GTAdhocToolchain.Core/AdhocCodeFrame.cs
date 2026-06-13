@@ -39,9 +39,9 @@ public class AdhocCodeFrame
     /// </summary>
     public List<(int StackIndex, AdhocSymbol Symbol)> CapturedCallbackVariables { get; set; } = [];
 
-    public int MaxLocalIndex { get; set; }
-    public int MaxStaticIndex { get; set; }
-    public int MaxStackIndex { get; set; }
+    public int LocalCount { get; set; }
+    public int StaticCount { get; set; }
+    public int MaxStackSize { get; set; }
 
     /// <summary>
     /// Source file for this block.
@@ -113,16 +113,16 @@ public class AdhocCodeFrame
         if (Version.UsesNewSplitStack())
         {
             // Actual stack size
-            stream.WriteInt32(MaxStackIndex);
+            stream.WriteInt32(MaxStackSize);
 
             /* These two are combined to make the size of the storage for variables */
-            stream.WriteInt32(MaxLocalIndex);
-            stream.WriteInt32(MaxStaticIndex);
+            stream.WriteInt32(LocalCount);
+            stream.WriteInt32(StaticCount);
         }
         else
         {
-            stream.WriteInt32(MaxLocalIndex);
-            stream.WriteInt32(MaxStackIndex);
+            stream.WriteInt32(LocalCount);
+            stream.WriteInt32(MaxStackSize);
         }
 
         stream.WriteInt32(Instructions.Count);
@@ -191,14 +191,14 @@ public class AdhocCodeFrame
 
         if (!Version.UsesNewSplitStack())
         {
-            MaxStackIndex = stream.ReadInt32();
-            MaxLocalIndex = stream.ReadInt32();
+            MaxStackSize = stream.ReadInt32();
+            LocalCount = stream.ReadInt32();
         }
         else
         {
-            MaxStackIndex = stream.ReadInt32();
-            MaxLocalIndex = stream.ReadInt32();
-            MaxStackIndex = stream.ReadInt32();
+            MaxStackSize = stream.ReadInt32();
+            LocalCount = stream.ReadInt32();
+            StaticCount = stream.ReadInt32();
         }
 
         InstructionCountOffset = (uint)stream.Position;
@@ -267,7 +267,7 @@ public class AdhocCodeFrame
             sb.Append(" (").Append(InstructionCountOffset.ToString("X2")).Append(')');
         sb.AppendLine();
 
-        sb.Append($"  > Stack Size: {MaxStackIndex} - MaxLocalIndex: {MaxLocalIndex} - MaxStaticIndex: {(!Version.UsesNewSplitStack() ? "=MaxLocalIndex" : $"{MaxStaticIndex}")}");
+        sb.Append($"  > Stack Size: {MaxStackSize} - LocalCount: {LocalCount} - StaticCount: {(!Version.UsesNewSplitStack() ? "=MaxLocalIndex" : $"{StaticCount}")}");
 
         return sb.ToString();
     }

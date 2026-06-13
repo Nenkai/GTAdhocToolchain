@@ -4289,7 +4289,7 @@ public class AdhocScriptCompiler
                 return definedVariable.StackIndex;
             }
             
-            staticIndex = CurrentFrame.MaxStaticIndex++;
+            staticIndex = CurrentFrame.StaticCount++;
 
             CurrentModuleOrClassScope.Variables.Add(name, new Variable(name, type, staticIndex, location));
             return staticIndex;
@@ -4307,7 +4307,7 @@ public class AdhocScriptCompiler
                 return definedVariable.StackIndex;
             }
 
-            staticIndex = CurrentFrame.MaxLocalIndex++;
+            staticIndex = CurrentFrame.LocalCount++;
             CurrentModuleOrClassScope.Variables.Add(name, new Variable(name, type, staticIndex, location));
         }
 
@@ -4334,8 +4334,8 @@ public class AdhocScriptCompiler
 
             localIndex = CurrentLocalScope.NumLocals;
             CurrentLocalScope.NumLocals++;
-            if (CurrentLocalScope.NumLocals > CurrentFrame.MaxLocalIndex)
-                CurrentFrame.MaxLocalIndex = CurrentLocalScope.NumLocals;
+            if (CurrentLocalScope.NumLocals > CurrentFrame.LocalCount)
+                CurrentFrame.LocalCount = CurrentLocalScope.NumLocals;
 
             CurrentLocalScope.CleanupOnExit = true;
             CurrentLocalScope.Variables.Add(name, new Variable(name, AdhocVariableType.LocalVariable, localIndex, location));
@@ -4348,7 +4348,7 @@ public class AdhocScriptCompiler
                 return definedVariable.StackIndex;
             }
 
-            localIndex = CurrentFrame.MaxLocalIndex++;
+            localIndex = CurrentFrame.LocalCount++;
             CurrentLocalScope.Variables.Add(name, new Variable(name, AdhocVariableType.LocalVariable, localIndex, location));
         }
         
@@ -4361,8 +4361,8 @@ public class AdhocScriptCompiler
         void IncrementStackCounter()
         {
             CurrentLocalScope.StackCounter++;
-            if (CurrentLocalScope.StackCounter > CurrentFrame.MaxStackIndex)
-                CurrentFrame.MaxStackIndex = CurrentLocalScope.StackCounter;
+            if (CurrentLocalScope.StackCounter > CurrentFrame.MaxStackSize)
+                CurrentFrame.MaxStackSize = CurrentLocalScope.StackCounter;
         }
 
         void DecrementStackCounter()

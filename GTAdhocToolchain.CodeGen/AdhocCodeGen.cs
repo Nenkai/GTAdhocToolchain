@@ -41,7 +41,7 @@ public class AdhocCodeGen
         Frame.Write(stream);
 
         Logger.Info($"Code generated (Size: {stream.Length} bytes, {Frame.Instructions.Count} main instructions)");
-        Logger.Debug($"[Stack] Stack Size: {Frame.MaxStackIndex} - Locals: {Frame.MaxLocalIndex}");
+        Logger.Debug($"[Stack] Stack Size: {Frame.MaxStackSize} - Locals: {Frame.LocalCount}");
     }
 
     public void SaveTo(string path)
