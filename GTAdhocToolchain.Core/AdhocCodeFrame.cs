@@ -12,8 +12,6 @@ namespace GTAdhocToolchain.Core;
 /// </summary>
 public class AdhocCodeFrame
 {
-    public Dictionary<AdhocSymbol, Variable> Variables { get; set; } = [];
-
     /// <summary>
     /// GT7.
     /// </summary>
