@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Copyright (c) 2026 Nenkai
+// SPDX-License-Identifier: MIT
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -14,7 +17,7 @@ public class MTextIO
 {
     public string FileName { get; set; }
 
-    public StreamReader Stream { get; set; }
+    public StreamReader? Stream { get; set; }
 
     public bool ReadingArray { get; set; }
 
@@ -52,9 +55,7 @@ public class MTextIO
         byte[] magic = new byte[4];
         file.ReadExactly(magic);
         if (Encoding.ASCII.GetString(magic) == "MPRJ")
-        {
             throw new Exception("Attempted to read Binary MPRJ with MTextIO.");
-        }
 
         Stream.BaseStream.Position = 0;
 
@@ -65,15 +66,17 @@ public class MTextIO
         return rootNode;
     }
 
-    public string GetToken()
+    public string? GetToken()
     {
+        EnsureInitialized();
+
         ReadingArray = false;
         _sb.Clear();
 
         bool escapeToken = false;
-        while (!Stream.EndOfStream)
+        while (!Stream!.EndOfStream)
         {
-            var nextChar = Stream.Peek();
+            var nextChar = Stream!.Peek();
             if (nextChar == -1)
                 return null;
 
@@ -160,16 +163,18 @@ public class MTextIO
         return _sb.ToString();
     }
 
-    public string GetNumberToken()
+    public string? GetNumberToken()
     {
+        EnsureInitialized();
+
         bool negated = false;
         bool comma = false;
         bool lastComma = false;
         _sb.Clear();
 
-        while (!Stream.EndOfStream)
+        while (!Stream!.EndOfStream)
         {
-            var nextChar = Stream.Peek();
+            var nextChar = Stream!.Peek();
             if (nextChar == -1)
                 return null;
 
@@ -234,6 +239,9 @@ public class MTextIO
 
     public string GetString()
     {
+        if (Stream is null)
+            throw new InvalidOperationException("Call Read() first.");
+
         _sb.Clear();
 
         bool started = false;
@@ -285,5 +293,15 @@ public class MTextIO
         => char.IsDigit(c) || c == '-' || c == 'E';
 
     private void Advance()
-        => Stream.Read();
+    {
+        EnsureInitialized();
+
+        Stream!.Read();
+    }
+
+    private void EnsureInitialized()
+    {
+        if (Stream is null)
+            throw new InvalidOperationException("Call Read() first.");
+    }
 }

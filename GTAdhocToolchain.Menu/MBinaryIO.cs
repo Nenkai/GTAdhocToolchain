@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Copyright (c) 2026 Nenkai
+// SPDX-License-Identifier: MIT
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -20,14 +23,14 @@ public class MBinaryIO
     public BinaryStream Stream { get; set; }
     public byte Version { get; set; }
 
-    public string CurrentKeyName { get; set; }
+    public string? CurrentKeyName { get; set; }
 
     public MBinaryIO(string fileName)
     {
         FileName = fileName;
     }
 
-    public mNode Read()
+    public mNode? Read()
     {
         using var file = File.Open(FileName, FileMode.Open);
         Stream = new BinaryStream(file, ByteConverter.Big);
@@ -65,8 +68,17 @@ public class MBinaryIO
         return rootPrjNode;
     }
 
-    public mTypeBase ReadNext()
+    public mTypeBase? ReadNext()
         => Read(false);
+
+    public T ReadNext<T>() where T : mTypeBase
+    {
+        mTypeBase? type = Read();
+        if (type is T t)
+            return t;
+        else
+            throw new Exception($"Expected type {typeof(T)}, but got {type?.GetType()}");
+    }
 
     public FieldType PeekType()
     {
@@ -75,7 +87,7 @@ public class MBinaryIO
         return type;
     }
 
-    public mTypeBase Read(bool arrayElement = false)
+    public mTypeBase? Read(bool arrayElement = false)
     {
         if (Version == 0)
             throw new NotSupportedException("Unsupported for MPRJ version 1");
@@ -83,9 +95,9 @@ public class MBinaryIO
             return ReadNew();
     }
 
-    private mTypeBase ReadNew()
+    private mTypeBase? ReadNew()
     {
-        mTypeBase field = null;
+        mTypeBase? field;
         FieldType typeNew = (FieldType)Stream.DecodeBitsAndAdvance();
 
         field = typeNew switch
@@ -109,7 +121,7 @@ public class MBinaryIO
         };
 
         if (typeNew != FieldType.ScopeEnd)
-            field.Read(this);
+            field!.Read(this);
 
         return field;
     }

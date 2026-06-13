@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Copyright (c) 2026 Nenkai
+// SPDX-License-Identifier: MIT
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -29,7 +32,7 @@ public class mInt : mTypeBase
         else
             throw new UISyntaxError($"Unexpected int token for mInt. Got {numbToken}.");
 
-        string end = io.GetToken();
+        string? end = io.GetToken();
         if (end != MTextIO.SCOPE_END.ToString())
             throw new UISyntaxError($"Expected mInt scope end ({MTextIO.SCOPE_END}), got {end}");
     }

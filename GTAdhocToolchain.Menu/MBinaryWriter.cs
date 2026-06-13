@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Copyright (c) 2026 Nenkai
+// SPDX-License-Identifier: MIT
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -30,17 +33,18 @@ public class MBinaryWriter : IDisposable
     public void WriteNode(mNode node)
     {
         using var fs = new FileStream(OutputFileName, FileMode.Create);
-
         Stream = new BinaryStream(fs, ByteConverter.Big);
+
         Stream.WriteString("MPRJ", StringCoding.Raw);
-        Stream.WriteVarInt(Version);
+        Stream.WriteVarInt((int)Version);
 
         node.Write(this);
+        Stream.Flush();
     }
 
     public void Dispose()
     {
-        Stream.Dispose();
+        Stream?.Dispose();
         GC.SuppressFinalize(this);
     }
 }

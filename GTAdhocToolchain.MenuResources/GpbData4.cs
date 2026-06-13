@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Copyright (c) 2026 Nenkai
+// SPDX-License-Identifier: MIT
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -49,12 +52,17 @@ public class GpbData4 : GpbBase
             bs.Position += 0x08;
             long fileSize = bs.ReadInt64();
 
-            var file = new GpbPair();
             bs.Position = entryNameOffset;
-            file.FileName = bs.ReadString(StringCoding.ZeroTerminated);
+            string gpbFileName = bs.ReadString(StringCoding.ZeroTerminated);
 
             bs.Position = dataOffset;
-            file.FileData = bs.ReadBytes((int)fileSize);
+            byte[] fileData = bs.ReadBytes((int)fileSize);
+
+            var file = new GpbPair()
+            {
+                FileName = gpbFileName,
+                FileData = fileData
+            };
 
             Files.Add(file);
         }

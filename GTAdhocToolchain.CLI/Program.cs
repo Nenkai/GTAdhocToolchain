@@ -1,9 +1,13 @@
-﻿using System;
+﻿// Copyright (c) 2026 Nenkai
+// SPDX-License-Identifier: MIT
+
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
 
-using CommandLine;
+using System.CommandLine;
 
 using Esprima;
 using Esprima.Ast;
@@ -20,21 +24,20 @@ using GTAdhocToolchain.Menu.Resources;
 using GTAdhocToolchain.Packaging;
 using GTAdhocToolchain.Preprocessor;
 using GTAdhocToolchain.Project;
-using System.Reflection;
 using GTAdhocToolchain.Core;
 
 namespace GTAdhocToolchain.CLI;
 
 public class Program
 {
-    public static readonly Version Version = Assembly.GetEntryAssembly().GetName().Version;
+    public static Version? GetExecutableVersion() => Assembly.GetEntryAssembly()?.GetName().Version;
 
     private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
 
-    public static void Main(string[] args)
+    public static async Task<int> Main(string[] args)
     {
         Console.WriteLine("---------------------------------------------");
-        Console.WriteLine($"- GTAdhocToolchain {Version} by Nenkai");
+        Console.WriteLine($"- GTAdhocToolchain {GetExecutableVersion()?.ToString() ?? "vUnknown"} by Nenkai");
         Console.WriteLine("---------------------------------------------");
         Console.WriteLine("- https://github.com/Nenkai");
         Console.WriteLine("---------------------------------------------");
@@ -58,17 +61,72 @@ public class Program
                 Environment.ExitCode = ProcessFile(args[0]);
             }
 
-            return;
+            return 0;
         }
 
-        Parser.Default.ParseArguments<BuildVerbs, DissasemblyReplVerbs, PackVerbs, UnpackVerbs, MProjectToBinVerbs, MProjectToTextVerbs>(args)
-            .WithParsed<BuildVerbs>(Build)
-            .WithParsed<DissasemblyReplVerbs>(DissasemblyRepl)
-            .WithParsed<PackVerbs>(Pack)
-            .WithParsed<UnpackVerbs>(Unpack)
-            .WithParsed<MProjectToBinVerbs>(MProjectToBin)
-            .WithParsed<MProjectToTextVerbs>(MProjectToText)
-            .WithNotParsed(HandleNotParsedArgs);
+        var buildCommand = new Command("build", "Builds/Compiles a project or script file.")
+        {
+            new Option<string>("--input", aliases: ["-i"]) { Description = "Input project file or source script. If not specified, attempts to find a .yaml file from the current directory." },
+            new Option<string>("--output", aliases: ["-o"]) { Description = "Output compiled scripts when compiling standalone scripts or projects." },
+            new Option<uint>("--version", ["-v"]) { DefaultValueFactory = (res) => 12, Description = "Adhoc compile version (for files, not projects)." },
+            new Option<bool>("--preprocess-only") { Description = "Preprocess only and output to stdout. Only for compiling scripts." },
+            new Option<string>("--base-include-folder", aliases: ["-b"]) { Description = "Set the root path for #include statements (for files, not projects)." },
+            new Option<bool>("--write-exceptions-to-file") { Description = "Artificially creates try/catch instructions to all code blocks compiled which will print adhoc exceptions to /APP_DATA_RAW/exceptions.txt (aka USRDIR) when thrown.\n" +
+                "Very useful if the game does not normally print any error on adhoc exceptions and you do not have access to a debugger to breakpoint on a certain function to check errors.\n" +
+                "This will only work for GT5 and above. Use carefully. Not entirely tested, may break or not work at all." },
+        };
+        buildCommand.SetAction(Build);
+
+        var replCommand = new Command("disassembly-repl", "Starts a disassembler repl for quickly disassembling input adhoc source code.")
+        {
+            new Option<uint>("--version", ["-v"]) { DefaultValueFactory = (res) => 12, Description = "Adhoc version. Defaults to 12." },
+        };
+        replCommand.SetAction(DissasemblyRepl);
+
+        var packCommand = new Command("pack", "Pack files like gpb's, or mpackage's.")
+        {
+            new Option<string>("--input", aliases: ["-i"]) { Required = true, Description = "Input folder." },
+            new Option<string>("--output", aliases: ["-o"]) { Required = true, Description = "Output folder for packed files." },
+            new Option<bool>("--le") { Description = "Pack as little endian?" },
+            new Option<bool>("--gt5") { Description = "Use GT5 pack mode (no leading /'s)" }
+        };
+        packCommand.SetAction(Pack);
+
+        var unpackCommand = new Command("unpack", "Unpack files like gpb's, or mpackage's.")
+        {
+            new Option<FileInfo>("--input", aliases: ["-i"]) { Required = true, Description = "Input file. (GPB's, mPackages)" },
+            new Option<string>("--output", aliases: ["-o"]) { Description = "Output folder for unpacked files." },
+            new Option<bool>("--convert-gpb-files") { Description = "Whether to convert GPB texture files to their original formats (png, dds)." }
+        };
+        unpackCommand.SetAction(Unpack);
+
+        var mprojectToBinCommand = new Command("mproject-to-bin", "Read mwidget/mproject and outputs it to a binary version of it.")
+        {
+            new Option<string>("--input", aliases: ["-i"]) { Required = true, Description = "Input folder." },
+            new Option<string>("--output", aliases: ["-o"]) { Required = true, Description = "Output folder." },
+            new Option<int>("--version", aliases: ["-v"]) { DefaultValueFactory = (res) => 1, Description = "Version of the binary file. Default is 1. (0 is currently unsupported, used for GT5 and under. 1 is GT6 and above." }
+        };
+        mprojectToBinCommand.SetAction(MProjectToBin);
+
+        var mprojectToTextCommand = new Command("mproject-to-text", "Read mwidget/mproject and outputs it to a text version of it.")
+        {
+            new Option<string>("--input", aliases: ["-i"]) { Required = true, Description = "Input folder." },
+            new Option<string>("--output", aliases: ["-o"]) { Required = true, Description = "Output folder." },
+            new Option<bool>("--debug", aliases: ["-d"]) { Description = "Write debug info to the output text file. Note: This will produce a non-working text mproject file." }
+        };
+        mprojectToTextCommand.SetAction(MProjectToText);
+
+        var rootCommand = new RootCommand("adhoc")
+        {
+            buildCommand,
+            replCommand,
+            packCommand,
+            unpackCommand,
+            mprojectToBinCommand,
+            mprojectToTextCommand
+        };
+
+        return await rootCommand.Parse(args).InvokeAsync();
     }
 
     private static int ProcessFile(string file)
@@ -77,14 +135,14 @@ public class Program
         {
             if (file.ToLower().EndsWith(".adc"))
             {
-                List<AdhocFile> scripts = null;
+                List<AdhocFile>? scripts = null;
                 try
                 {
                     scripts = AdhocFile.ReadFromFile(file);
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine($"Errored while reading: {e.Message}");
+                    Logger.Error(e, "Errored while reading {}:", file);
                     return -1;
                 }
 
@@ -101,19 +159,19 @@ public class Program
                 var gpb = GpbBase.ReadFile(file);
                 if (gpb is null)
                 {
-                    Console.WriteLine("Could not parse GPB Header.");
+                    Logger.Error("Could not parse GPB Header.");
                     return -1;
                 }
 
                 string fileName = Path.GetFileNameWithoutExtension(file);
-                string dir = Path.GetDirectoryName(file);
+                string? dir = Path.GetDirectoryName(file);
 
-                gpb.Unpack(Path.GetFileNameWithoutExtension(file), Path.Combine(dir, fileName), convertImages: true);
+                gpb.Unpack(Path.GetFileNameWithoutExtension(file), Path.Combine(dir ?? string.Empty, fileName), convertImages: true);
             }
         }
         catch (Exception e)
         {
-            Console.WriteLine($"Error: {e}");
+            Logger.Error(e, "Errored while processing file {}", file);
             return -1;
         }
 
@@ -138,20 +196,18 @@ public class Program
         }
     }
 
-    public static void Build(BuildVerbs buildVerbs)
+    public static int Build(ParseResult parseResult)
     {
-        if (!string.IsNullOrWhiteSpace(buildVerbs.InputPath) && File.Exists(buildVerbs.InputPath))
-        {
-            buildVerbs.InputPath = buildVerbs.InputPath;
-        }
-        else
+        string? inputPath = parseResult.GetValue<string>("--input");
+        string? outputPath = parseResult.GetValue<string>("--output");
+
+        if (string.IsNullOrWhiteSpace(inputPath))
         {
             string[] files = Directory.GetFiles(Directory.GetCurrentDirectory(), "*.yaml", SearchOption.AllDirectories);
             if (files.Length == 0)
             {
                 Logger.Error("No target project to compile in the current directory and no script file was specified. Specify the project (or script) to compile.");
-                Environment.ExitCode = -1;
-                return;
+                return -1;
             }
 
             if (files.Length > 1)
@@ -160,176 +216,219 @@ public class Program
                 foreach (var file in files)
                     Logger.Error($"- {Path.GetFileName(file)}");
 
-                Environment.ExitCode = -1;
-                return;
+                return -1;
             }
 
-            buildVerbs.InputPath = files[0];
+            inputPath = files[0];
+        }
+        else
+        {
+            if (!File.Exists(inputPath))
+            {
+                Logger.Error("Specified input file does not exist.");
+                return -1;
+            }
         }
 
-        if (Path.GetExtension(buildVerbs.InputPath) == ".yaml")
+        uint version = parseResult.GetValue<uint>("--version");
+        bool writeExceptionsToFile = parseResult.GetValue<bool>("--write-exceptions-to-file");
+        bool preprocessOnly = parseResult.GetValue<bool>("--preprocess-only");
+        string? baseIncludeFolder = parseResult.GetValue<string>("--base-include-folder");
+
+        if (Path.GetExtension(inputPath) == ".yaml")
         {
-            BuildProject(buildVerbs);
+            return BuildProject(inputPath, outputPath, writeExceptionsToFile);
         }
-        else if (Path.GetExtension(buildVerbs.InputPath) == ".ad")
+        else if (Path.GetExtension(inputPath) == ".ad")
         {
-            string output = !string.IsNullOrEmpty(buildVerbs.OutputPath) ? buildVerbs.OutputPath : buildVerbs.InputPath;
-            BuildScript(buildVerbs.InputPath, Path.ChangeExtension(output, ".adc"), buildVerbs.Version, buildVerbs.WriteExceptionsToFile, buildVerbs.PreprocessOnly, buildVerbs.BaseIncludeFolder);
+            string output = !string.IsNullOrEmpty(outputPath) ? outputPath : inputPath;
+            return BuildScript(inputPath, Path.ChangeExtension(output, ".adc"), version, writeExceptionsToFile, preprocessOnly, baseIncludeFolder);
         }
         else
         {
             Logger.Error("Input File is not a project or script.");
-            Environment.ExitCode = -1;
+            return -1;
         }
     }
 
-    public static void Pack(PackVerbs packVerbs)
+    public static int Pack(ParseResult parseResult)
     {
-        if (packVerbs.OutputPath.ToLower().EndsWith("gpb"))
+        string inputPath = parseResult.GetRequiredValue<string>("--input");
+        string outputPath = parseResult.GetRequiredValue<string>("--output");
+        bool gt5PackMode = parseResult.GetValue<bool>("--gt5");
+        bool littleEndian = parseResult.GetValue<bool>("--le");
+
+        if (outputPath.ToLower().EndsWith("gpb"))
         {
             try
             {
                 var gpb = new GpbData3();
-                gpb.AddFilesFromFolder(packVerbs.InputPath, packVerbs.GT5PackMode);
-                gpb.Pack(packVerbs.OutputPath, !packVerbs.LittleEndian);
-                Environment.ExitCode = 0;
+                gpb.AddFilesFromFolder(inputPath, gt5PackMode);
+                gpb.Pack(outputPath, !littleEndian);
+                return 0;
             }
             catch (Exception e)
             {
-                Console.WriteLine($"Failed to pack gpb - {e.Message}");
-                Environment.ExitCode = -1;
+                Logger.Error($"Failed to pack gpb - {e.Message}");
+                return -1;
             }
         }
-        else if (packVerbs.OutputPath.EndsWith("mpackage"))
+        else if (outputPath.EndsWith("mpackage"))
         {
             try
             {
-                AdhocPackage.PackFromFolder(packVerbs.InputPath, packVerbs.OutputPath);
-                Environment.ExitCode = 0;
+                AdhocPackage.PackFromFolder(inputPath, outputPath);
+                return 0;
             }
             catch (Exception e)
             {
-                Console.WriteLine($"Failed to pack mpackage - {e.Message}");
-                Environment.ExitCode = -1;
+                Logger.Error(e, "Failed to pack mpackage {}", inputPath);
+                return -1;
             }
         }
         else
         {
-            Console.WriteLine("Found nothing to pack - ensure the provided output path has the proper file extension (gpb/mpackage)");
-            Environment.ExitCode = -1;
+            Logger.Error("Found nothing to pack - ensure the provided output path has the proper file extension (gpb/mpackage)");
+            return -1;
         }
     }
 
-    public static void Unpack(UnpackVerbs unpackVerbs)
+    public static int Unpack(ParseResult parseResult)
     {
-        if (Directory.Exists(unpackVerbs.InputPath))
+        string? inputPath = parseResult.GetValue<string>("--input");
+        string? outputPath = parseResult.GetValue<string>("--output");
+        bool convertGpbFiles = parseResult.GetValue<bool>("--convert-gpb-files");
+
+        if (Directory.Exists(inputPath))
         {
-            foreach (var file in Directory.GetFiles(unpackVerbs.InputPath, "*", SearchOption.TopDirectoryOnly))
+            bool hasError = false;
+            foreach (var file in Directory.GetFiles(inputPath, "*", SearchOption.TopDirectoryOnly))
             {
-                UnpackFile(file, unpackVerbs.OutputPath, unpackVerbs.ConvertGPBFiles);
+                if (UnpackFile(file, outputPath, convertGpbFiles) != 0)
+                {
+                    hasError = true;
+                }
             }
+
+            return hasError ? -1 : 0;
         }
-        else if (File.Exists(unpackVerbs.InputPath))
+        else if (File.Exists(inputPath))
         {
-            UnpackFile(unpackVerbs.InputPath, unpackVerbs.OutputPath, unpackVerbs.ConvertGPBFiles);
+            return UnpackFile(inputPath, outputPath, convertGpbFiles);
         }
         else
         {
-            Console.WriteLine("Found nothing to unpack - ensure the provided input file has the proper file extension (gpb/mpackage)");
-            Environment.ExitCode = -1;
+            Logger.Error("Found nothing to unpack - ensure the provided input file has the proper file extension (gpb/mpackage)");
+            return -1;
         }
     }
 
-    private static void UnpackFile(string inputFile, string outputPath, bool convertGpbFiles)
+    private static int UnpackFile(string inputFile, string? outputPath, bool convertGpbFiles)
     {
         if (inputFile.ToLower().EndsWith("gpb"))
         {
-            Console.WriteLine($"[:] {inputFile} - assuming input is GPB");
+            Logger.Info($"[:] {inputFile} - assuming input is GPB");
             ExtractGpb(inputFile, outputPath, convertGpbFiles);
+            return 0;
         }
         else if (inputFile.EndsWith("mpackage"))
         {
-            Console.WriteLine($"[:] {inputFile} - assuming input is MPackage");
+            Logger.Info($"[:] {inputFile} - assuming input is MPackage");
             try
             {
                 AdhocPackage.ExtractPackage(inputFile);
-                Environment.ExitCode = 0;
+                return 0;
             }
             catch (Exception e)
             {
-                Console.WriteLine($"ERROR: Failed to unpack mpackage - {e.Message}.");
-                Environment.ExitCode = -1;
+                Logger.Error($"Failed to unpack mpackage - {e.Message}.");
+                return -1;
             }
         }
+
+        return 0; // No file, skipped
     }
 
-    private static void ExtractGpb(string inputFile, string outputPath, bool convertGpbFiles)
+    private static int ExtractGpb(string inputFile, string? outputPath, bool convertGpbFiles)
     {
         var gpb = GpbBase.ReadFile(inputFile);
         if (gpb is null)
         {
-            Console.WriteLine("Could not parse GPB Header.");
-            Environment.ExitCode = -1;
+            Logger.Error("Could not parse GPB Header.");
+            return -1;
         }
 
         if (string.IsNullOrEmpty(outputPath))
             outputPath = Path.GetDirectoryName(inputFile);
 
+        if (string.IsNullOrEmpty(outputPath))
+        {
+            Logger.Error("Could not determine an output directory.");
+            return -1;
+        }
+
         try
         {
             gpb.Unpack(Path.GetFileNameWithoutExtension(inputFile), outputPath, convertGpbFiles);
-            Environment.ExitCode = 0;
+            Logger.Info("Extracted to {outputPath}", outputPath);
+            return 0;
         }
         catch (Exception e)
         {
-            Console.WriteLine($"Failed to unpack gpb - {e.Message}.");
-            Environment.ExitCode = -1;
+            Logger.Error(e, "Failed to unpack gpb {}", inputFile);
+            return -1;
         }
     }
 
-    public static void HandleNotParsedArgs(IEnumerable<Error> errors)
+    private static int BuildProject(string inputPath, string? outputPath, bool writeExceptionsToFile = false)
     {
-        Environment.ExitCode = -1;
-    }
-
-    private static void BuildProject(BuildVerbs buildVerbs)
-    {
-        AdhocProject prj;
+        AdhocProject? prj;
         try
         {
-            prj = AdhocProject.Read(buildVerbs.InputPath);
+            prj = AdhocProject.Read(inputPath);
         }
         catch (Exception e)
         {
             Logger.Error($"Failed to load project file - {e.Message}");
-            Environment.ExitCode = -1;
-            return;
+            return -1;
         }
 
-        Logger.Info($"Project file: {buildVerbs.InputPath}");
+        if (prj is null)
+        {
+            Logger.Error($"Unable to verify project file.");
+            return -1;
+        }
+
+        Logger.Info($"Project file: {inputPath}");
         prj.PrintInfo();
 
         Logger.Info("Started project build.");
-        if (!prj.Build(buildVerbs.WriteExceptionsToFile, buildVerbs.OutputPath))
+        if (!prj.Build(writeExceptionsToFile, outputPath))
         {
             Logger.Error("Project build failed.");
-            Environment.ExitCode = -1;
+            return -1;
         }
         else
         {
             Logger.Info("Project build successful.");
-            Environment.ExitCode = 0;
+            return 0;
         }
     }
 
-    private static void BuildScript(string inputPath, string output, uint version = 12, bool debugExceptions = false, bool preprocessOnly = false, string baseIncludeFolder = "")
+    private static int BuildScript(string inputPath, string output, uint version = 12, bool debugExceptions = false, bool preprocessOnly = false, string? baseIncludeFolder = "")
     {
         var source = File.ReadAllText(inputPath);
         var time = new FileInfo(inputPath).LastWriteTime;
 
         try
         {
-            string absoluteIncludePath = Path.GetDirectoryName(inputPath);
+            string? absoluteIncludePath = Path.GetDirectoryName(inputPath);
+            if (string.IsNullOrWhiteSpace(absoluteIncludePath))
+            {
+                Logger.Error("Could not determine base directory of input file?");
+                return -1;
+            }
+
             string sourceFile = inputPath;
             if (!string.IsNullOrWhiteSpace(baseIncludeFolder))
             {
@@ -346,8 +445,7 @@ public class Program
             if (preprocessOnly)
             {
                 Console.Write(preprocessed);
-                Environment.ExitCode = 0;
-                return;
+                return 0;
             }
 
             Logger.Info($"Started script build ({inputPath}).");
@@ -366,13 +464,14 @@ public class Program
                 foreach (ParseError error in errorHandler.Errors)
                     Logger.Error($"Syntax error: {error.Description} at {error.Source}:{error.LineNumber}");
 
-                Environment.ExitCode = -1;
-                return;
+                return -1;
             }
 
             var compiler = new AdhocScriptCompiler(version);
             if (!string.IsNullOrWhiteSpace(baseIncludeFolder))
+            {
                 compiler.SetBaseIncludeFolder(absoluteIncludePath);
+            }
 
             if (debugExceptions)
                 compiler.BuildTryCatchDebugStatements();
@@ -384,8 +483,7 @@ public class Program
             codeGen.SaveTo(output);
 
             Logger.Info($"Script build successful.");
-            Environment.ExitCode = 0;
-            return;
+            return 0;
         }
         catch (PreprocessorException preprocessException)
         {
@@ -405,24 +503,27 @@ public class Program
         }
 
         Logger.Error("Script build failed.");
-        Environment.ExitCode = -1;
+        return -1;
     }
 
-    private static void DissasemblyRepl(DissasemblyReplVerbs replVerbs)
+    private static int DissasemblyRepl(ParseResult parseResult)
     {
+        uint version = parseResult.GetValue<uint>("--version");
         Console.Clear();
         Console.WriteLine("REPL mode. Start typing adhoc code to dissasemble it. Enter /? for more commands.");
-        Console.WriteLine($"Adhoc Version: {replVerbs.Version}");
+        Console.WriteLine($"Adhoc Version: {version}");
 
         while (true)
         {
             Console.Write(">");
-            var line = Console.ReadLine();
+            string? line = Console.ReadLine();
+            if (string.IsNullOrWhiteSpace(line))
+                continue;
 
             if (line.StartsWith("/?"))
             {
-                Console.WriteLine("/clear - Clears the console");
-                Console.WriteLine("/version - Sets adhoc version");
+                Logger.Error("/clear - Clears the console");
+                Logger.Error("/version - Sets adhoc version");
                 continue;
             }
             else if (line.StartsWith("/clear"))
@@ -435,16 +536,15 @@ public class Program
                 ReadOnlySpan<char> range = line.AsSpan()["/version".Length..].Trim();
                 if (range.IsEmpty)
                 {
-                    Console.WriteLine($"Current adhoc version is set to {replVerbs.Version}.");
+                    Logger.Error($"Current adhoc version is set to {version}.");
                 }
-                else if (uint.TryParse(range, out uint version))
+                else if (uint.TryParse(range, out version))
                 {
-                    Console.WriteLine($"Now compiling for adhoc version {version}");
-                    replVerbs.Version = version;
+                    Logger.Error($"Now compiling for adhoc version {version}");
                 }
                 else
                 {
-                    Console.WriteLine("Invalid version. Usage: /version <adhoc version>");
+                    Logger.Error("Invalid version. Usage: /version <adhoc version>");
                 }
 
                 continue;
@@ -473,7 +573,7 @@ public class Program
             {
                 try
                 {
-                    var compiler = new AdhocScriptCompiler(replVerbs.Version);
+                    var compiler = new AdhocScriptCompiler(version);
                     AdhocCodeFrame codeFrame = compiler.CompileScript(program, "test.ad");
 
                     AdhocCodeGen codeGen = new AdhocCodeGen(codeFrame, compiler.SymbolMap);
@@ -487,10 +587,10 @@ public class Program
 
                     void Dissasemble(InstructionBase inst, int instNumber, int depth)
                     {
-                        Console.WriteLine($"{new string(' ', depth * 2)} {instNumber, 3} | {inst}");
+                        Logger.Error($"{new string(' ', depth * 2)} {instNumber,3} | {inst}");
                         if (inst.IsFunctionOrMethod())
                         {
-                            SubroutineBase subroutine = inst as SubroutineBase;
+                            SubroutineBase subroutine = (SubroutineBase)inst;
                             for (int i = 0; i < subroutine.CodeFrame.Instructions.Count; i++)
                             {
                                 InstructionBase subInst = subroutine.CodeFrame.Instructions[i];
@@ -519,168 +619,88 @@ public class Program
         }
     }
 
-    public static void MProjectToBin(MProjectToBinVerbs verbs)
+    public static int MProjectToBin(ParseResult parseResult)
     {
-        if (verbs.Version == 0)
+        uint version = parseResult.GetValue<uint>("--version");
+        if (version == 0)
         {
-            Console.WriteLine("Version 0 is not currently supported.");
-            Environment.ExitCode = -1;
-            return;
+            Logger.Error("Version 0 is not currently supported.");
+            return -1;
         }
-        else if (verbs.Version > 1 || verbs.Version < 0)
+        else if (version > 1 || version < 0)
         {
-            Console.WriteLine("Version must be 0 or 1. (0 not current supported).");
-            Environment.ExitCode = -1;
-            return;
+            Logger.Error("Version must be 0 or 1. (0 not currently supported).");
+            return -1;
         }
 
-        var mbin = new MBinaryIO(verbs.InputPath);
+        string inputPath = parseResult.GetRequiredValue<string>("--input");
+        string outputPath = parseResult.GetRequiredValue<string>("--output");
+
+        var mbin = new MBinaryIO(inputPath);
         mNode rootNode = mbin.Read();
 
         if (rootNode is null)
         {
-            var mtext = new MTextIO(verbs.InputPath);
+            var mtext = new MTextIO(inputPath);
             rootNode = mtext.Read();
 
             if (rootNode is null)
             {
-                Console.WriteLine("Could not read mproject.");
-                return;
+                Logger.Error("Could not read mproject.");
+                return -1;
             }
         }
 
         try
         {
-            MBinaryWriter writer = new MBinaryWriter(verbs.OutputPath);
-            writer.Version = verbs.Version;
+            MBinaryWriter writer = new MBinaryWriter(outputPath);
+            writer.Version = (int)version;
             writer.WriteNode(rootNode);
 
-            Console.WriteLine($"Done. Exported to '{verbs.OutputPath}'.");
-            Environment.ExitCode = 0;
+            Logger.Info($"Done. Exported to '{outputPath}'.");
+            return 0;
         }
         catch (Exception e)
         {
-            Console.WriteLine($"Failed to export - {e.Message}");
-            Environment.ExitCode = -1;
+            Logger.Error(e, "Failed to export to '{}'", outputPath);
+            return -1;
         }
     }
 
-    public static void MProjectToText(MProjectToTextVerbs verbs)
+    public static int MProjectToText(ParseResult parseResult)
     {
-        var mbin = new MBinaryIO(verbs.InputPath);
+        string? inputPath = parseResult.GetRequiredValue<string>("--input");
+        string? outputPath = parseResult.GetRequiredValue<string>("--output");
+        bool debug = parseResult.GetValue<bool>("--debug");
+
+        var mbin = new MBinaryIO(inputPath);
         mNode rootNode = mbin.Read();
 
         if (rootNode is null)
         {
-            var mtext = new MTextIO(verbs.InputPath);
+            var mtext = new MTextIO(inputPath);
             rootNode = mtext.Read();
 
             if (rootNode is null)
             {
-                Console.WriteLine("Could not read mproject.");
-                return;
+                Logger.Error("Could not read mproject.");
+                return -1;
             }
         }
 
         try
         {
-            using MTextWriter writer = new MTextWriter(verbs.OutputPath);
-            writer.Debug = verbs.Debug;
+            using MTextWriter writer = new MTextWriter(outputPath);
+            writer.Debug = debug;
             writer.WriteNode(rootNode);
 
-            Console.WriteLine($"Done. Exported to '{verbs.OutputPath}'.");
-            Environment.ExitCode = 0;
+            Logger.Info("Done. Exported to '{}'.", outputPath);
+            return 0;
         }
         catch (Exception e)
         {
-            Console.WriteLine($"Failed to export - {e.Message}");
-            Environment.ExitCode = -1;
+            Logger.Error(e, "Failed to export to '{}'", outputPath);
+            return -1;
         }
     }
-}
-
-[Verb("build", HelpText = "Builds/Compiles a project or script file.")]
-public class BuildVerbs
-{
-    [Option('i', "input", HelpText = "Input project file or source script. If not specified, attempts to find a .yaml file from the current directory.")]
-    public string InputPath { get; set; }
-
-    [Option('o', "output", Required = false, HelpText = "Output compiled scripts when compiling standalone scripts or projects.")]
-    public string OutputPath { get; set; }
-
-    [Option('v', "version", Required = false, Default = 12u, HelpText = "Adhoc compile version (for files, not projects).")]
-    public uint Version { get; set; }
-
-    [Option("write-exceptions-to-file", Required = false, HelpText = "Artificially creates try/catch instructions to all code blocks compiled which will print adhoc exceptions to /APP_DATA_RAW/exceptions.txt (aka USRDIR) when thrown. " +
-        "Very useful if the game does not normally print any error on adhoc exceptions and you do not have access to a debugger to breakpoint on a certain function to check errors.\n" +
-        "This will only work for GT5 and above. Use carefully. Not entirely tested, may break or not work at all.")]
-    public bool WriteExceptionsToFile { get; set; }
-
-    [Option("preprocess-only", Required = false, HelpText = "Preprocess only and output to stdout. Only for compiling scripts.")]
-    public bool PreprocessOnly { get; set; }
-
-    [Option('b', "base-include-folder", Required = false, HelpText = "Set the root path for #include statements (for files, not projects).")]
-    public string BaseIncludeFolder { get; set; }
-}
-
-[Verb("disassembly-repl", HelpText = "Starts a disassembler repl for quickly disassembling input adhoc source code.")]
-public class DissasemblyReplVerbs
-{
-    [Option('v', "version", Default = 12u, HelpText = "Adhoc version. Defaults to 12.")]
-    public uint Version { get; set; } = 12u;
-}
-
-[Verb("pack", HelpText = "Pack files like gpb's, or mpackage's.")]
-public class PackVerbs
-{
-    [Option('i', "input", Required = true, HelpText = "Input folder.")]
-    public string InputPath { get; set; }
-
-    [Option('o', "output", Required = true, HelpText = "Output folder for packed files.")]
-    public string OutputPath { get; set; }
-
-    [Option("le", HelpText = "Pack as little endian?")]
-    public bool LittleEndian { get; set; }
-
-    [Option("gt5", HelpText = "Use GT5 pack mode (no leading /'s)")]
-    public bool GT5PackMode { get; set; }
-}
-
-[Verb("unpack", HelpText = "Unpack files like gpb's, or mpackage's.")]
-public class UnpackVerbs
-{
-    [Option('i', "input", Required = true, HelpText = "Input file. (GPB's, mPackages)")]
-    public string InputPath { get; set; }
-
-    [Option('o', "output", HelpText = "Output folder for unpacked files.")]
-    public string OutputPath { get; set; }
-
-    [Option("convert-gpb-files", HelpText = "Whether to convert GPB texture files to their original formats (png, dds).")]
-    public bool ConvertGPBFiles { get; set; } = true;
-}
-
-[Verb("mproject-to-bin", HelpText = "Read mwidget/mproject and outputs it to a binary version of it.")]
-public class MProjectToBinVerbs
-{
-    [Option('i', "input", Required = true, HelpText = "Input folder.")]
-    public string InputPath { get; set; }
-
-    [Option('o', "output", Required = true, HelpText = "Output folder.")]
-    public string OutputPath { get; set; }
-
-    [Option('v', "version", HelpText = "Version of the binary file. Default is 1. (0 is currently unsupported, used for GT5 and under. 1 is GT6 and above.")]
-    public int Version { get; set; }
-}
-
-[Verb("mproject-to-text", HelpText = "Read mwidget/mproject and outputs it to a text version of it.")]
-public class MProjectToTextVerbs
-{
-    [Option('i', "input", Required = true, HelpText = "Input folder.")]
-    public string InputPath { get; set; }
-
-    [Option('o', "output", Required = true, HelpText = "Output folder.")]
-    public string OutputPath { get; set; }
-
-    [Option('d', "debug", HelpText = "Write debug info to the output text file. Note: This will produce a non-working text mproject file.")]
-    public bool Debug { get; set; }
 }

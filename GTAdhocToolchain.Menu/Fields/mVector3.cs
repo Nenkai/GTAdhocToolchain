@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Copyright (c) 2026 Nenkai
+// SPDX-License-Identifier: MIT
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -30,9 +33,9 @@ public class mVector3 : mTypeBase
         }
         else
         {
-            X = (io.ReadNext() as mFloat).Value;
-            Y = (io.ReadNext() as mFloat).Value;
-            Z = (io.ReadNext() as mFloat).Value;
+            X = io.ReadNext<mFloat>().Value;
+            Y = io.ReadNext<mFloat>().Value;
+            Z = io.ReadNext<mFloat>().Value;
         }
     }
 
@@ -57,7 +60,7 @@ public class mVector3 : mTypeBase
             throw new UISyntaxError($"Unexpected token for mVector3 Z. Got {z}.");
 
 
-        string end = io.GetToken();
+        string? end = io.GetToken();
         if (end != MTextIO.SCOPE_END.ToString())
             throw new UISyntaxError($"Expected mVector3 scope end ({MTextIO.SCOPE_END}), got {end}");
     }

@@ -509,7 +509,9 @@ static a = 5;
 [Core.Hooking] <Info> gt7_hooks.cpp:171 DumpSubroutine: ASSIGN_POP
 [Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
 
-// Attribute
+////////////////////////////////////////////////////////////////////////
+// Attributes
+////////////////////////////////////////////////////////////////////////
 attribute a;
 [Core.Hooking] <Info> gt7_hooks.cpp:176 DumpSubroutine: NIL_CONST
 [Core.Hooking] <Info> gt7_hooks.cpp:162 DumpSubroutine: ATTRIBUTE_DEFINE: a
@@ -519,6 +521,39 @@ attribute a = 5;
 [Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 5
 [Core.Hooking] <Info> gt7_hooks.cpp:162 DumpSubroutine: ATTRIBUTE_DEFINE: a
 [Core.Hooking] <Info> gt7_hooks.cpp:122 DumpSubroutine: SET_STATE: EXIT
+
+// This one is to check if gt7's compiler emits these variable evals as non-static accesses
+// Because GT6's gtmode->GTModeProjectComponent::ButtonHelp::ButtonHelpGT6's clear method accesses an attribute defined after the method, but still accessed as a local
+
+module myModule
+{
+        attribute before_method_attr;
+
+        method test_attribute_access_scope()
+        {
+                var before = before_method_attr;
+                var after = after_method_attr;
+        }
+
+        attribute after_method_attr;
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:179 DumpSubroutine: MODULE_DEFINE: myModule
+[Core.Hooking] <Info> gt7_hooks.cpp:252 DumpSubroutine: NIL_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:209 DumpSubroutine: ATTRIBUTE_DEFINE: before_method_attr
+[Core.Hooking] <Info> gt7_hooks.cpp:231 DumpSubroutine: METHOD_DEFINE - test_attribute_access_scope
+  [Core.Hooking] <Info> gt7_hooks.cpp:105 DumpSubroutine: VARIABLE_EVAL: before_method_attr,before_method_attr, Local: 0
+  [Core.Hooking] <Info> gt7_hooks.cpp:110 DumpSubroutine: VARIABLE_PUSH: before, Local: 1
+  [Core.Hooking] <Info> gt7_hooks.cpp:252 DumpSubroutine: ASSIGN_POP
+  [Core.Hooking] <Info> gt7_hooks.cpp:105 DumpSubroutine: VARIABLE_EVAL: after_method_attr,after_method_attr, Local: 1
+  [Core.Hooking] <Info> gt7_hooks.cpp:110 DumpSubroutine: VARIABLE_PUSH: after, Local: 2
+  [Core.Hooking] <Info> gt7_hooks.cpp:252 DumpSubroutine: ASSIGN_POP
+  [Core.Hooking] <Info> gt7_hooks.cpp:252 DumpSubroutine: VOID_CONST
+  [Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:252 DumpSubroutine: NIL_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:209 DumpSubroutine: ATTRIBUTE_DEFINE: after_method_attr
+[Core.Hooking] <Info> gt7_hooks.cpp:245 DumpSubroutine: LEAVE: Depth:1, RewindLocalsStorageTo:1
+[Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: SET_STATE: EXIT
+[Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: SET_STATE: EXIT
 
 ////////////////////////////////////////////////////////////////////////
 // Map const
@@ -859,6 +894,12 @@ return 0.0;
 return 0.0f
 [Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] syntax error, unexpected tIDENT, expecting ';' (near token 'f')
 
+return -1L;
+[Core.Hooking] <Info> gt7_hooks.cpp:252 DumpSubroutine: LONG_CONST: -1L
+[Core.Hooking] <Info> gt7_hooks.cpp:252 DumpSubroutine: UNARY_OPERATOR
+[Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: SET_STATE: EXIT
+
 return 0x123
 [Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 291
 [Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: RETURN
@@ -927,6 +968,11 @@ return UInt(1);
 [Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: RETURN
 [Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
 
+return Long(-1);
+[Core.Hooking] <Info> gt7_hooks.cpp:252 DumpSubroutine: LONG_CONST: -1L
+[Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: SET_STATE: RETURN
+[Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: SET_STATE: EXIT
+
 return Float(1);
 [Core.Hooking] <Info> gt7_hooks.cpp:105 DumpSubroutine: FLOAT_CONST: 1
 [Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: RETURN
@@ -951,23 +997,42 @@ throw test;
 
 try
 {
+	test = 1;
+}
+
+[Core.Hooking] <Info> gt7_hooks.cpp:249 DumpSubroutine: TRY_CATCH: Jump:6
+[Core.Hooking] <Info> gt7_hooks.cpp:124 DumpSubroutine: INT_CONST: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:110 DumpSubroutine: VARIABLE_PUSH: test, Local: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:252 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:245 DumpSubroutine: LEAVE: Depth:1, RewindLocalsStorageTo:1
+[Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: SET_STATE: EXIT
+[Core.Hooking] <Info> gt7_hooks.cpp:145 DumpSubroutine: JUMP: 9
+[Core.Hooking] <Info> gt7_hooks.cpp:124 DumpSubroutine: INT_CONST: 0
+[Core.Hooking] <Info> gt7_hooks.cpp:252 DumpSubroutine: POP
+[Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: SET_STATE: EXIT
+
+try
+{
 
 }
 catch (e)
 {
-
+    test = false;
 }
-[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: TRY_CATCH
-[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
-[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 10
-[Core.Hooking] <Info> gt7_hooks.cpp:97 DumpSubroutine: INT_CONST: 0
-[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: e
-[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN
-[Core.Hooking] <Info> gt7_hooks.cpp:83 DumpSubroutine: VARIABLE_PUSH: catch#0
-[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: ASSIGN_POP
-[Core.Hooking] <Info> gt7_hooks.cpp:118 DumpSubroutine: JUMP: 9
-[Core.Hooking] <Info> gt7_hooks.cpp:193 DumpSubroutine: LEAVE
-[Core.Hooking] <Info> gt7_hooks.cpp:130 DumpSubroutine: SET_STATE: EXIT
+[Core.Hooking] <Info> gt7_hooks.cpp:249 DumpSubroutine: TRY_CATCH: Jump:2
+[Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: SET_STATE: EXIT
+[Core.Hooking] <Info> gt7_hooks.cpp:145 DumpSubroutine: JUMP: 13
+[Core.Hooking] <Info> gt7_hooks.cpp:124 DumpSubroutine: INT_CONST: 0
+[Core.Hooking] <Info> gt7_hooks.cpp:110 DumpSubroutine: VARIABLE_PUSH: e, Local: 2
+[Core.Hooking] <Info> gt7_hooks.cpp:252 DumpSubroutine: ASSIGN
+[Core.Hooking] <Info> gt7_hooks.cpp:110 DumpSubroutine: VARIABLE_PUSH: catch#0, Local: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:252 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:252 DumpSubroutine: BOOL_CONST
+[Core.Hooking] <Info> gt7_hooks.cpp:110 DumpSubroutine: VARIABLE_PUSH: test, Local: 3
+[Core.Hooking] <Info> gt7_hooks.cpp:252 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:145 DumpSubroutine: JUMP: 12
+[Core.Hooking] <Info> gt7_hooks.cpp:245 DumpSubroutine: LEAVE: Depth:0, RewindLocalsStorageTo:1
+[Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: SET_STATE: EXIT
 
 try
 {
@@ -1037,6 +1102,54 @@ throw 1;
 
 throw;
 [Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] syntax error, unexpected ';' (near token ';')
+
+// Catch with break
+try
+{
+
+}
+catch (e)
+{
+	break;
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:242 DumpSubroutine: TRY_CATCH
+[Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: SET_STATE: EXIT
+[Core.Hooking] <Info> gt7_hooks.cpp:145 DumpSubroutine: JUMP: 11
+[Core.Hooking] <Info> gt7_hooks.cpp:124 DumpSubroutine: INT_CONST: 0
+[Core.Hooking] <Info> gt7_hooks.cpp:110 DumpSubroutine: VARIABLE_PUSH: e, Local: 2
+[Core.Hooking] <Info> gt7_hooks.cpp:242 DumpSubroutine: ASSIGN
+[Core.Hooking] <Info> gt7_hooks.cpp:110 DumpSubroutine: VARIABLE_PUSH: catch#0, Local: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:242 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:145 DumpSubroutine: JUMP: 10
+[Core.Hooking] <Info> gt7_hooks.cpp:145 DumpSubroutine: JUMP: 10
+[Core.Hooking] <Info> gt7_hooks.cpp:239 DumpSubroutine: LEAVE: Depth:0, RewindLocalsStorageTo:1
+[Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: SET_STATE: EXIT
+
+// Catch with cases
+try
+{
+
+}
+catch (e)
+{
+        case x:
+}
+[Core.Hooking] <Info> gt7_hooks.cpp:242 DumpSubroutine: TRY_CATCH
+[Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: SET_STATE: EXIT
+[Core.Hooking] <Info> gt7_hooks.cpp:145 DumpSubroutine: JUMP: 15
+[Core.Hooking] <Info> gt7_hooks.cpp:124 DumpSubroutine: INT_CONST: 0
+[Core.Hooking] <Info> gt7_hooks.cpp:110 DumpSubroutine: VARIABLE_PUSH: e, Local: 2
+[Core.Hooking] <Info> gt7_hooks.cpp:242 DumpSubroutine: ASSIGN
+[Core.Hooking] <Info> gt7_hooks.cpp:110 DumpSubroutine: VARIABLE_PUSH: catch#0, Local: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:242 DumpSubroutine: ASSIGN_POP
+[Core.Hooking] <Info> gt7_hooks.cpp:105 DumpSubroutine: VARIABLE_EVAL: catch#0, Local: 1
+[Core.Hooking] <Info> gt7_hooks.cpp:115 DumpSubroutine: ATTRIBUTE_EVAL: isInstanceOf
+[Core.Hooking] <Info> gt7_hooks.cpp:105 DumpSubroutine: VARIABLE_EVAL: x,x, Local: 0
+[Core.Hooking] <Info> gt7_hooks.cpp:153 DumpSubroutine: CALL: 1 args
+[Core.Hooking] <Info> gt7_hooks.cpp:136 DumpSubroutine: JUMP_IF_TRUE: 14
+[Core.Hooking] <Info> gt7_hooks.cpp:145 DumpSubroutine: JUMP: 14
+[Core.Hooking] <Info> gt7_hooks.cpp:239 DumpSubroutine: LEAVE: Depth:0, RewindLocalsStorageTo:1
+[Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: SET_STATE: EXIT
 
 ////////////////////////////////////////////////////////////////////////
 // Function tests

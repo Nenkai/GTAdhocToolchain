@@ -1,4 +1,7 @@
-﻿using GTAdhocToolchain.Core.Instructions;
+﻿// Copyright (c) 2026 Nenkai
+// SPDX-License-Identifier: MIT
+
+using GTAdhocToolchain.Core.Instructions;
 using GTAdhocToolchain.Core.Variables;
 
 using Syroot.BinaryData;

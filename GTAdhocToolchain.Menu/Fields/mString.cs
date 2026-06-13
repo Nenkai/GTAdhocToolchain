@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Copyright (c) 2026 Nenkai
+// SPDX-License-Identifier: MIT
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -15,7 +18,7 @@ namespace GTAdhocToolchain.Menu.Fields;
 public class mString : mTypeBase
 #pragma warning restore IDE1006 // Naming Styles
 {
-    public string String { get; set; }
+    public string? String { get; set; }
 
     public override void Read(MBinaryIO io)
     {
@@ -26,7 +29,7 @@ public class mString : mTypeBase
     {
         String = io.GetString();
 
-        string end = io.GetToken();
+        string? end = io.GetToken();
         if (end != MTextIO.SCOPE_END.ToString())
             throw new UISyntaxError($"Expected string scope end ({MTextIO.SCOPE_END}), got {end}");
     }
@@ -42,7 +45,12 @@ public class mString : mTypeBase
         writer.WriteString(Name);
         writer.WriteSpace();
         writer.WriteString("string");
-        writer.WriteString("{\""); writer.WriteString(String); writer.WriteString("\"}");
+
+        writer.WriteString("{\""); 
+        if (!string.IsNullOrEmpty(String))
+            writer.WriteString(String); 
+        writer.WriteString("\"}");
+
         writer.SetNeedNewLine();
     }
 }

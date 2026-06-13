@@ -1,0 +1,34 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="arm64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+  </Folder>
+  <Project Path="AdhocLanguage.ProjectTemplate/AdhocLanguage.ProjectTemplate.csproj">
+    <Platform Solution="*|arm64" Project="arm64" />
+    <Platform Solution="*|x86" Project="x86" />
+  </Project>
+  <Project Path="AdhocLanguage.ProjectType/AdhocLanguage.ProjectType.csproj">
+    <Platform Solution="*|arm64" Project="arm64" />
+    <Platform Solution="*|x86" Project="x86" />
+  </Project>
+  <Project Path="esprima-dotnet/src/Esprima/Esprima.csproj" />
+  <Project Path="GTAdhocToolchain.Analyzer/GTAdhocToolchain.Analyzer.csproj" />
+  <Project Path="GTAdhocToolchain.CLI/GTAdhocToolchain.CLI.csproj" />
+  <Project Path="GTAdhocToolchain.CodeGen/GTAdhocToolchain.CodeGen.csproj" />
+  <Project Path="GTAdhocToolchain.Compiler/GTAdhocToolchain.Compiler.csproj" />
+  <Project Path="GTAdhocToolchain.Core/GTAdhocToolchain.Core.csproj" />
+  <Project Path="GTAdhocToolchain.Disasm/GTAdhocToolchain.Disasm.csproj" />
+  <Project Path="GTAdhocToolchain.Menu/GTAdhocToolchain.Menu.csproj" />
+  <Project Path="GTAdhocToolchain.MenuResources/GTAdhocToolchain.Menu.Resources.csproj" />
+  <Project Path="GTAdhocToolchain.Packaging/GTAdhocToolchain.Packaging.csproj" />
+  <Project Path="GTAdhocToolchain.Preprocessor/GTAdhocToolchain.Preprocessor.csproj" />
+  <Project Path="GTAdhocToolchain.Project/GTAdhocToolchain.Project.csproj" />
+  <Project Path="PDTools/PDTools.Compression/PDTools.Compression.csproj" />
+  <Project Path="PDTools/PDTools.Files/PDTools.Files.csproj" />
+  <Project Path="PDTools/PDTools.Hashing/PDTools.Hashing.csproj" />
+  <Project Path="PDTools/PDTools.Utils/PDTools.Utils.csproj" />
+</Solution>

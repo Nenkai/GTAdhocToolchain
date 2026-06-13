@@ -1,4 +1,7 @@
-﻿using Esprima;
+﻿// Copyright (c) 2026 Nenkai
+// SPDX-License-Identifier: MIT
+
+using Esprima;
 
 using System;
 using System.Collections.Generic;
@@ -726,7 +729,7 @@ public class AdhocScriptPreprocessor
                             if (tken.Type != TokenType.Identifier)
                                 continue;
 
-                            string tokenStr = tken.Value as string;
+                            string tokenStr = (string)tken.Value;
                             if (callArgs.TryGetValue(tokenStr, out List<Token> callTokens))
                             {
                                 // Remove arg identifier

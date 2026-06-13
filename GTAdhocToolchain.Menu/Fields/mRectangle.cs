@@ -1,4 +1,7 @@
-﻿using System;
+﻿// Copyright (c) 2026 Nenkai
+// SPDX-License-Identifier: MIT
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -31,15 +34,10 @@ public class mRectangle : mTypeBase
         }
         else
         {
-            mFloat x = io.ReadNext() as mFloat;
-            mFloat y = io.ReadNext() as mFloat;
-            mFloat width = io.ReadNext() as mFloat;
-            mFloat height = io.ReadNext() as mFloat;
-
-            X = x.Value;
-            Y = y.Value;
-            Width = width.Value;
-            Height = height.Value;
+            X = io.ReadNext<mFloat>().Value;
+            Y = io.ReadNext<mFloat>().Value;
+            Width = io.ReadNext<mFloat>().Value;
+            Height = io.ReadNext<mFloat>().Value;
         }
     }
 
@@ -69,7 +67,7 @@ public class mRectangle : mTypeBase
         else
             throw new UISyntaxError($"Unexpected token for mRectangle Height. Got {h}.");
 
-        string end = io.GetToken();
+        string? end = io.GetToken();
         if (end != MTextIO.SCOPE_END.ToString())
             throw new UISyntaxError($"Expected mRectangle scope end ({MTextIO.SCOPE_END}), got {end}");
     }
