@@ -341,6 +341,10 @@ public class AdhocScriptCompiler
             case Nodes.PragmaDumpStatement:
                 CompilePragmaDumpStatement(node.As<PragmaDumpStatement>());
                 break;
+            case Nodes.PragmaExecStatement:
+                CompilePragmaExecStatement(node.As<PragmaExecStatement>());
+                break;
+
             default:
                 ThrowCompilationError(node, $"Unsupported statement: {node.Type}");
                 break;
@@ -362,6 +366,15 @@ public class AdhocScriptCompiler
 
         Logger.Info("[Dump] {}:{}", statement.Location.Source, statement.Location.Start.Line);
         Dump(pathSymbols);
+    }
+
+    private void CompilePragmaExecStatement(PragmaExecStatement statement)
+    {
+        // TODO (maybe): Implement pragma exec when we have an interpreter.
+        // Though it makes little sense when the compiler isn't really running on the engine side
+        // Where all the APIs are already defined.
+
+        ThrowCompilationError(statement, "@exec allows running code at compile time and an interpreter is not currently implemented.");
     }
 
     // GT7 1.00: 305CAA0 (hParser::DumpPath)
