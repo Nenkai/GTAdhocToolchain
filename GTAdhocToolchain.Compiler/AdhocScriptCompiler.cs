@@ -4445,6 +4445,9 @@ public class AdhocScriptCompiler
             case AdhocInstructionType.ARRAY_PUSH:
                 DecrementStackCounter();
                 break;
+            case AdhocInstructionType.OBJECT_SELECTOR:
+                DecrementStackCounter();
+                break;
             case AdhocInstructionType.POP:
                 DecrementStackCounter();
                 break;
@@ -4541,6 +4544,7 @@ public class AdhocScriptCompiler
             case AdhocInstructionType.U_BYTE_CONST:
             case AdhocInstructionType.SHORT_CONST:
             case AdhocInstructionType.U_SHORT_CONST:
+            case AdhocInstructionType.SYMBOL_CONST:
                 IncrementStackCounter();
                 CurrentLocalScope.CleanupOnExit = true;
                 break;
@@ -4670,6 +4674,13 @@ public class AdhocScriptCompiler
                         DecrementStackCounter();
                 }
                 break;
+            case AdhocInstructionType.LOCAL_DEFINE:
+                break;
+            case AdhocInstructionType.SET_STATE_OLD:
+                break;
+
+            default:
+                throw new ArgumentException($"{nameof(AddInstruction)}: Unsupported instruction {instType}");
         }
 
         CurrentFrame.Instructions.Add(instruction);

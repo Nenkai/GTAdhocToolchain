@@ -22,7 +22,7 @@ public class AdhocCodeFrame
     /// </summary>
     public const int ADHOC_VERSION_DEFAULT = 12;
 
-    public AdhocVersion Version { get; set; } = new AdhocVersion(12);
+    public AdhocVersion Version { get; set; } = new AdhocVersion(ADHOC_VERSION_DEFAULT);
 
     /// <summary>
     /// Current instructions for this block.
