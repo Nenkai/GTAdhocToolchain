@@ -78,7 +78,7 @@ public struct AdhocVersion
     /// Whether a local variable should be allocated for 'self'.
     /// </summary>
     /// <returns></returns>
-    public readonly bool ShouldAllocateVariableForSelf() => VersionNumber >= 10;
+    public readonly bool ShouldAllocateVariableForSubroutines() => VersionNumber >= 10;
 
     /// <summary>
     /// Whether a static should be defined for each subroutine declaration.
@@ -187,7 +187,7 @@ public struct AdhocVersion
     public readonly bool HasAttributeEvalSupport() => VersionNumber >= 7;
 
     /// <summary>
-    /// Whether the ATTRIBUTE_EVAL instruction is supported.
+    /// Whether the VARIABLE_EVAL instruction is supported.
     /// </summary>
     /// <returns></returns>
     public readonly bool HasVariableEvalSupport() => VersionNumber >= 7;
