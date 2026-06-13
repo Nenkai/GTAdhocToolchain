@@ -29,4 +29,17 @@ public class DeclModule : DeclValue
     {
         Variables.Add(name, value);
     }
+
+    public override void Dump(StringBuilder sb, int depth = 0)
+    {
+        sb.Append(' ', depth * 2);
+        sb.Append($"@{VariableTypeToKeyword[Type]} {Name} {{\n");
+        foreach (var (k, v) in Variables)
+        {
+            v.Dump(sb, depth + 1);
+        }
+
+        sb.Append(' ', depth * 2);
+        sb.Append("}\n");
+    }
 }

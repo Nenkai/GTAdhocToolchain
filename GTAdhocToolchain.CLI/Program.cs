@@ -10,7 +10,6 @@ using System.Reflection;
 using System.CommandLine;
 
 using Esprima;
-using Esprima.Ast;
 
 using NLog;
 
@@ -522,8 +521,8 @@ public class Program
 
             if (line.StartsWith("/?"))
             {
-                Logger.Error("/clear - Clears the console");
-                Logger.Error("/version - Sets adhoc version");
+                Console.WriteLine("/clear - Clears the console");
+                Console.WriteLine("/version - Sets adhoc version");
                 continue;
             }
             else if (line.StartsWith("/clear"))
@@ -536,15 +535,15 @@ public class Program
                 ReadOnlySpan<char> range = line.AsSpan()["/version".Length..].Trim();
                 if (range.IsEmpty)
                 {
-                    Logger.Error($"Current adhoc version is set to {version}.");
+                    Console.WriteLine($"Current adhoc version is set to {version}.");
                 }
                 else if (uint.TryParse(range, out version))
                 {
-                    Logger.Error($"Now compiling for adhoc version {version}");
+                    Console.WriteLine($"Now compiling for adhoc version {version}");
                 }
                 else
                 {
-                    Logger.Error("Invalid version. Usage: /version <adhoc version>");
+                    Console.WriteLine("Invalid version. Usage: /version <adhoc version>");
                 }
 
                 continue;
@@ -587,7 +586,7 @@ public class Program
 
                     void Dissasemble(InstructionBase inst, int instNumber, int depth)
                     {
-                        Logger.Error($"{new string(' ', depth * 2)} {instNumber,3} | {inst}");
+                        Console.WriteLine($"{new string(' ', depth * 2)} {instNumber,3} | {inst}");
                         if (inst.IsFunctionOrMethod())
                         {
                             SubroutineBase subroutine = (SubroutineBase)inst;
@@ -637,7 +636,7 @@ public class Program
         string outputPath = parseResult.GetRequiredValue<string>("--output");
 
         var mbin = new MBinaryIO(inputPath);
-        mNode rootNode = mbin.Read();
+        mNode? rootNode = mbin.Read();
 
         if (rootNode is null)
         {
@@ -674,7 +673,7 @@ public class Program
         bool debug = parseResult.GetValue<bool>("--debug");
 
         var mbin = new MBinaryIO(inputPath);
-        mNode rootNode = mbin.Read();
+        mNode? rootNode = mbin.Read();
 
         if (rootNode is null)
         {

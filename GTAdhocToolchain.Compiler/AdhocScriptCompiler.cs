@@ -10,6 +10,7 @@ using GTAdhocToolchain.Core.Variables;
 
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Text;
 
 namespace GTAdhocToolchain.Compiler;
 
@@ -335,10 +336,42 @@ public class AdhocScriptCompiler
             case Nodes.LabeledStatement: // NOTE: The original compiler doesn't have this. Instead, the label is part of each loop statement.
                 CompileLabeledStatement(node.As<LabeledStatement>());
                 break;
+
+            // Pragmas
+            case Nodes.PragmaDumpStatement:
+                CompilePragmaDumpStatement(node.As<PragmaDumpStatement>());
+                break;
             default:
                 ThrowCompilationError(node, $"Unsupported statement: {node.Type}");
                 break;
         }
+    }
+
+    private void CompilePragmaDumpStatement(PragmaDumpStatement statement)
+    {
+        List<AdhocSymbol> pathSymbols = [];
+        if (statement.Path.Type == Nodes.Identifier)
+        {
+            Identifier identifier = statement.Path.As<Identifier>();
+            pathSymbols.Add(SymbolMap.RegisterSymbol(identifier.Name!));
+        }
+        else if (statement.Path is StaticMemberExpression staticMemberExpression)
+        {
+            BuildStaticPath(staticMemberExpression, ref pathSymbols);
+        }
+
+        Logger.Info("[Dump] {}:{}", statement.Location.Source, statement.Location.Start.Line);
+        Dump(pathSymbols);
+    }
+
+    // GT7 1.00: 305CAA0 (hParser::DumpPath)
+    private void Dump(List<AdhocSymbol> path)
+    {
+        DeclValue? variable = GetModuleVariableFromPath(path);
+
+        var sb = new StringBuilder();
+        variable?.Dump(sb);
+        Console.Write(sb.ToString());
     }
 
     // NOTE: The original compiler doesn't have this. Instead, the label is part of each loop statement.
@@ -1126,7 +1159,7 @@ public class AdhocScriptCompiler
         
        // Entering body, but we need to get the iterator's value into our declared variable, equivalent to *iterator
        var valueEval = new InsVariableEvaluation();
-       valueEval.VariableSymbols.Add(tempName);
+       valueEval.Path.Add(tempName);
        AddInstruction(valueEval, foreachStatement.Left.Location);
        AddInstruction(new InsEval());
 
@@ -1373,7 +1406,7 @@ public class AdhocScriptCompiler
 
         foreach (var (StackIndex, Symbol) in subroutineFrame.CapturedCallbackVariables)
         {
-            AddInstruction(new InsVariableEvaluation() { VariableSymbols = [Symbol] });
+            AddInstruction(new InsVariableEvaluation() { Path = [Symbol] });
         }
 
         // TODO
@@ -1724,7 +1757,7 @@ public class AdhocScriptCompiler
             AdhocSymbol tempListVariable = nestedListAndTmpVarPair.Value;
 
             if (CurrentFrame.Version.ExpressionBeforeEvalOrPush())
-                AddInstruction(new InsVariableEvaluation() { VariableSymbols = [tempListVariable] });
+                AddInstruction(new InsVariableEvaluation() { Path = [tempListVariable] });
 
             CompileListAsssignmentExpression(nestedList, new Identifier(tempListVariable.Name), popResult: true); // In a nested list, we are not reusing the result. pop it.
         }
@@ -1917,7 +1950,7 @@ public class AdhocScriptCompiler
         AdhocSymbol symb = SymbolMap.RegisterSymbol(AdhocConstants.SELF);
         int idx = 0; // Always 0 when refering to self
         var varEval = new InsVariableEvaluation(idx);
-        varEval.VariableSymbols.Add(symb); // Self is always considered as a local. Just one
+        varEval.Path.Add(symb); // Self is always considered as a local. Just one
         AddInstruction(varEval, selfExpression.Location);
     }
 
@@ -1995,13 +2028,13 @@ public class AdhocScriptCompiler
 
         // Get task - <task> = System::AwaitTaskStart(<func>);
         AddInstruction(new InsCall(1));
-        AddInstruction(new InsVariablePush() { VariableSymbols = [taskSymbol] }, awaitExpr.Location);
+        AddInstruction(new InsVariablePush() { Path = [taskSymbol] }, awaitExpr.Location);
         AddInstruction(InsAssignPop.Default);
 
         // Get result of task - <result> = System::AwaitTaskResult(<task>);
         var awaitResult = new StaticMemberExpression(new Identifier(AdhocConstants.SYSTEM), new Identifier("AwaitTaskResult"), false);
         CompileExpression(awaitResult);
-        AddInstruction(new InsVariableEvaluation() { VariableSymbols = [taskSymbol] });
+        AddInstruction(new InsVariableEvaluation() { Path = [taskSymbol] });
         AddInstruction(new InsCall(1));
 
         AddPostCompilationWarning(CompilationMessages.Warning_UsingAwait_Code);
@@ -2590,8 +2623,8 @@ public class AdhocScriptCompiler
         AdhocSymbol varSymb = SymbolMap.RegisterSymbol(staticIdentifier.Id.Name!);
 
         var varPush = new InsVariablePush();
-        varPush.VariableSymbols.Add(varSymb);
-        varPush.VariableSymbols.Add(varSymb);
+        varPush.Path.Add(varSymb);
+        varPush.Path.Add(varSymb);
         AddInstruction(varPush, staticIdentifier.Location);
     }
 
@@ -2759,35 +2792,20 @@ public class AdhocScriptCompiler
     private void CompileStaticMemberExpression(StaticMemberExpression staticExp)
     {
         // Recursively build the namespace path
-        List<string> pathParts = new(4);
+        List<AdhocSymbol> pathParts = new(4);
         BuildStaticPath(staticExp, ref pathParts);
-
-        string fullPath = string.Join(AdhocConstants.OPERATOR_STATIC, pathParts);
-        AdhocSymbol fullPathSymb = SymbolMap.RegisterSymbol(fullPath);
 
         if (CurrentFrame.Version.HasVariableEvalSupport())
         {
             InsVariableEvaluation eval = new InsVariableEvaluation();
-            foreach (string part in pathParts)
-            {
-                AdhocSymbol symb = SymbolMap.RegisterSymbol(part);
-                eval.VariableSymbols.Add(symb);
-            }
-
-            eval.VariableSymbols.Add(fullPathSymb);
+            eval.Path = pathParts;
 
             AddInstruction(eval, staticExp.Location);
         }
         else
         {
             InsVariablePush push = new InsVariablePush();
-            foreach (string part in pathParts)
-            {
-                AdhocSymbol symb = SymbolMap.RegisterSymbol(part);
-                push.VariableSymbols.Add(symb);
-            }
-
-            push.VariableSymbols.Add(fullPathSymb);
+            push.Path = pathParts;
 
             AddInstruction(push, staticExp.Location);
             AddInstruction(new InsEval(), staticExp.Location);
@@ -2802,20 +2820,11 @@ public class AdhocScriptCompiler
     private void CompileStaticMemberExpressionPush(StaticMemberExpression staticExp)
     {
         // Recursively build the namespace path
-        List<string> pathParts = new(4);
+        List<AdhocSymbol> pathParts = new(4);
         BuildStaticPath(staticExp, ref pathParts);
 
         InsVariablePush push = new InsVariablePush();
-        foreach (string part in pathParts)
-        {
-            AdhocSymbol symb = SymbolMap.RegisterSymbol(part);
-            push.VariableSymbols.Add(symb);
-        }
-
-        string fullPath = string.Join(AdhocConstants.OPERATOR_STATIC, pathParts);
-        AdhocSymbol fullPathSymb = SymbolMap.RegisterSymbol(fullPath);
-        push.VariableSymbols.Add(fullPathSymb);
-
+        push.Path = pathParts;
         AddInstruction(push, staticExp.Location);
     }
 
@@ -2827,19 +2836,11 @@ public class AdhocScriptCompiler
     private void CompileStaticMemberExpressionAttributeEval(StaticMemberExpression staticExp)
     {
         // Recursively build the namespace path
-        List<string> pathParts = new(4);
+        List<AdhocSymbol> pathParts = new(4);
         BuildStaticPath(staticExp, ref pathParts);
 
         InsAttributeEvaluation attrEval = new InsAttributeEvaluation();
-        foreach (string part in pathParts)
-        {
-            AdhocSymbol symb = SymbolMap.RegisterSymbol(part);
-            attrEval.AttributeSymbols.Add(symb);
-        }
-
-        string fullPath = string.Join(AdhocConstants.OPERATOR_STATIC, pathParts);
-        AdhocSymbol fullPathSymb = SymbolMap.RegisterSymbol(fullPath);
-        attrEval.AttributeSymbols.Add(fullPathSymb);
+        attrEval.Path = pathParts;
         AddInstruction(attrEval, staticExp.Location);
     }
 
@@ -3451,7 +3452,7 @@ public class AdhocScriptCompiler
         AdhocSymbol varSymb = SymbolMap.RegisterSymbol(identifier);
 
         var varPush = new InsVariablePush();
-        varPush.VariableSymbols.Add(varSymb);
+        varPush.Path.Add(varSymb);
         AddInstruction(varPush, location);
 
         return varSymb;
@@ -3616,7 +3617,7 @@ public class AdhocScriptCompiler
         if (CurrentFrame.Version.HasAttributeEvalSupport())
         {
             var attrEval = new InsAttributeEvaluation();
-            attrEval.AttributeSymbols.Add(symbol); // Only one
+            attrEval.Path.Add(symbol); // Only one
             AddInstruction(attrEval, location);
         }
         else
@@ -3639,13 +3640,13 @@ public class AdhocScriptCompiler
         if (CurrentFrame.Version.HasVariableEvalSupport())
         {
             var varEval = new InsVariableEvaluation();
-            varEval.VariableSymbols.Add(symbol); // Only one
+            varEval.Path.Add(symbol); // Only one
             AddInstruction(varEval, location);
         }
         else
         {
             var varPush = new InsVariablePush();
-            varPush.VariableSymbols.Add(symbol); // Only one
+            varPush.Path.Add(symbol); // Only one
             AddInstruction(varPush, location);
             AddInstruction(new InsEval(), location);
         }
@@ -3896,23 +3897,32 @@ public class AdhocScriptCompiler
         return exp is UnaryExpression unaryExp && unaryExp.Operator == UnaryOperator.ReferenceOf;
     }
 
-    private static void BuildStaticPath(StaticMemberExpression exp, ref List<string> pathParts)
+    private void BuildStaticPath(StaticMemberExpression exp, ref List<AdhocSymbol> pathParts)
+    {
+        BuildStaticPathChild(exp, ref pathParts);
+
+        string fullPath = string.Join(AdhocConstants.OPERATOR_STATIC, pathParts.Select(e => e.Name));
+        AdhocSymbol fullPathSymb = SymbolMap.RegisterSymbol(fullPath);
+        pathParts.Add(fullPathSymb);
+    }
+
+    private void BuildStaticPathChild(StaticMemberExpression exp, ref List<AdhocSymbol> pathParts)
     {
         if (exp.Object is StaticMemberExpression obj)
         {
-            BuildStaticPath(obj, ref pathParts);
+            BuildStaticPathChild(obj, ref pathParts);
         }
         else if (exp.Object is Identifier identifier)
         {
-            pathParts.Add(identifier.Name!);
+            pathParts.Add(SymbolMap.RegisterSymbol(identifier.Name!));
         }
 
         if (exp.Property is Identifier propIdentifier)
         {
-            pathParts.Add(propIdentifier.Name!);
-            return;
+            pathParts.Add(SymbolMap.RegisterSymbol(propIdentifier.Name!));
         }
     }
+
     #endregion
 
     #region Warning/Error Handling Methods
@@ -3992,8 +4002,8 @@ public class AdhocScriptCompiler
     /// <param name="path"></param>
     /// <returns></returns>
     /// <exception cref="Exception"></exception>
-    // GT7 1.00: 305C090 (hParser::GetLastModuleFromPath)
-    private DeclValue? GetLastModuleFromPath(List<AdhocSymbol> path)
+    // GT7 1.00: 305C090 (hParser::GetModuleVariableFromPath)
+    private DeclValue? GetModuleVariableFromPath(List<AdhocSymbol> path)
     {
         // Determine root.
         DeclValue? targetModuleValue = null;
@@ -4056,7 +4066,7 @@ public class AdhocScriptCompiler
     {
         alias ??= target;
 
-        DeclValue? moduleValue = GetLastModuleFromPath(path);
+        DeclValue? moduleValue = GetModuleVariableFromPath(path);
         if (moduleValue is not null)
         {
             if (moduleValue is DeclModule module)
@@ -4086,7 +4096,7 @@ public class AdhocScriptCompiler
     {
         alias ??= target;
 
-        DeclValue? moduleValue = GetLastModuleFromPath(path);
+        DeclValue? moduleValue = GetModuleVariableFromPath(path);
         if (moduleValue is not null)
         {
             if (moduleValue is DeclModule module)
@@ -4628,7 +4638,7 @@ public class AdhocScriptCompiler
                     IncrementStackCounter();
 
                     var variableEval = (InsVariableEvaluation)instruction;
-                    variableEval.VariableStorageIndex = GetVariableIndex(variableEval.VariableSymbols, isOnlyEval: true, location);
+                    variableEval.VariableStorageIndex = GetVariableIndex(variableEval.Path, isOnlyEval: true, location);
 
                     CurrentLocalScope.CleanupOnExit = true;
                 }
@@ -4638,7 +4648,7 @@ public class AdhocScriptCompiler
                     IncrementStackCounter();
 
                     var variablePush = (InsVariablePush)instruction;
-                    variablePush.VariableStorageIndex = GetVariableIndex(variablePush.VariableSymbols, isOnlyEval: false, location);
+                    variablePush.VariableStorageIndex = GetVariableIndex(variablePush.Path, isOnlyEval: false, location);
 
                     CurrentLocalScope.CleanupOnExit = true;
                 }
@@ -4840,7 +4850,7 @@ public class AdhocScriptCompiler
         {
             if (pathParts.Count > 1)
             {
-                DeclValue moduleValue = GetLastModuleFromPath(pathParts);
+                DeclValue moduleValue = GetModuleVariableFromPath(pathParts);
                 if (moduleValue is not null)
                 {
                     varType = moduleValue.Type;
