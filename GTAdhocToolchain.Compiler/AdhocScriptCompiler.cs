@@ -1359,10 +1359,6 @@ public class AdhocScriptCompiler
         if (CurrentFrame.Version.HasReservedLocalInFrame())
             DefineVariableInCurrentScope(SymbolMap.RegisterSymbol(AdhocConstants.SELF), AdhocVariableType.LocalVariable);
 
-        // In older versions the subroutines don't count towards the local storage (until referenced)
-        // Just keep track of it instead
-        // TODO!
-
         if (body.Type == Nodes.BlockStatement)
             CompileStatementList(body.As<BlockStatement>());
         else if (body.Type == Nodes.CallExpression)
