@@ -76,7 +76,8 @@ public class AdhocScriptCompiler
     public DeclModule CurrentModule { get; set; }
 
     /// <summary>
-    /// Module or class depth per frame.
+    /// Module or class depth per frame. <br/>
+    /// GT5 uses this in LEAVE instructions to rewind the stack to a prior depth point. GT6 (and above?) does not use it.
     /// </summary>
     public LinkedList<int> DepthPerFrame { get; set; } = new();
 
@@ -4219,8 +4220,6 @@ public class AdhocScriptCompiler
             return;
         }
 
-        // TODO strict mode
-
         if (false /* TODO strict mode */ && variableType <= AdhocVariableType.Static)
         {
             if (variableType != AdhocVariableType.LocalVariable)
@@ -4247,10 +4246,11 @@ public class AdhocScriptCompiler
             }
         }
 
+        Variable? variable;
         switch (variableType)
         {
             case AdhocVariableType.LocalVariable:
-                if (!CurrentLocalScope.Variables.TryGetValue(name, out var varEntry))
+                if (!CurrentLocalScope.Variables.TryGetValue(name, out variable))
                 {
                     DefineLocalVariable(name, location);
                     return;
@@ -4258,13 +4258,44 @@ public class AdhocScriptCompiler
                 break;
 
             default:
-                if (!CurrentModuleOrClassScope.Variables.TryGetValue(name, out var _))
+                if (!CurrentModuleOrClassScope.Variables.TryGetValue(name, out variable))
                 {
                     DefineStaticVariable(variableType, name, location);
                     return;
                 }
                 break;
         }
+
+        // Check redefinition types
+        switch (variable.Type)
+        {
+            case AdhocVariableType.Attribute:
+            case AdhocVariableType.Function:
+            case AdhocVariableType.Method:
+            case AdhocVariableType.Static:
+                if (variable.Type == variableType)
+                    return; // Redeclaring to same type, no problems
+                break;
+
+            case AdhocVariableType.Class:
+                if (variableType == AdhocVariableType.Class || variableType == AdhocVariableType.Module)
+                    return; // Redeclaring to already module or class type, no problems
+                break;
+
+            case AdhocVariableType.Module:
+                if (variableType == AdhocVariableType.Module)
+                    return; // Redeclaring to already module type, no problems
+                break;
+
+            case AdhocVariableType.LocalVariable:
+                break; // Local is being redeclared, not good.
+
+            default:
+                return;
+        }
+
+        // %s '%s' is already defined as %s at %s:%d.
+        ThrowNameError($"{location?.Source}:{location?.Start.Line ?? 0}: {variableType} '{name.Name}' is already defined as {variable.Type} at {variable.DeclarationSourceFileName}:{variable.DeclarationLineNumber}.");
     }
 
     /// <summary>
