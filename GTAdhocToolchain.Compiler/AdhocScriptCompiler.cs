@@ -384,8 +384,6 @@ public class AdhocScriptCompiler
 
     public void CompileModuleConstructorStatement(ModuleConstructorStatement ctorStatement)
     {
-        // TODO Push current module
-
         // Compile the target expression
         CompileExpression(ctorStatement.Id);
 
@@ -399,9 +397,6 @@ public class AdhocScriptCompiler
 
         // Exit ctor
         InsertSetState(AdhocRunState.EXIT);
-
-        CurrentModule = ParentModules[^1];
-        ParentModules.Remove(ParentModules[^1]);
     }
 
     public void CompileSourceFileStatement(SourceFileStatement srcFileStatement)
