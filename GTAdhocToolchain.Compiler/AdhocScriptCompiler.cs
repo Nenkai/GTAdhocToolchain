@@ -135,7 +135,9 @@ public class AdhocScriptCompiler
         try
         {
             ParentModules.Add(CurrentModule);
-            SetCurrentModulePath(["main", "main"], AdhocVariableType.Module);
+
+            AdhocSymbol main = SymbolMap.RegisterSymbol("main");
+            SetCurrentModulePath([main, main], AdhocVariableType.Module);
 
             EnterCodeFrame();
 
@@ -344,6 +346,9 @@ public class AdhocScriptCompiler
             case Nodes.PragmaExecStatement:
                 CompilePragmaExecStatement(node.As<PragmaExecStatement>());
                 break;
+            case Nodes.PragmaCurrentModuleStatement:
+                CompilePragmaCurrentModuleStatement(node.As<PragmaCurrentModuleStatement>());
+                break;
 
             default:
                 ThrowCompilationError(node, $"Unsupported statement: {node.Type}");
@@ -375,6 +380,22 @@ public class AdhocScriptCompiler
         // Where all the APIs are already defined.
 
         ThrowCompilationError(statement, "@exec allows running code at compile time and an interpreter is not currently implemented.");
+    }
+
+    private void CompilePragmaCurrentModuleStatement(PragmaCurrentModuleStatement statement)
+    {
+        List<AdhocSymbol> pathSymbols = [];
+        if (statement.Path.Type == Nodes.Identifier)
+        {
+            Identifier identifier = statement.Path.As<Identifier>();
+            pathSymbols.Add(SymbolMap.RegisterSymbol(identifier.Name!));
+        }
+        else if (statement.Path is StaticMemberExpression staticMemberExpression)
+        {
+            BuildStaticPath(staticMemberExpression, ref pathSymbols);
+        }
+
+        SetCurrentModulePath(pathSymbols, AdhocVariableType.Module);
     }
 
     // GT7 1.00: 305CAA0 (hParser::DumpPath)
@@ -725,10 +746,12 @@ public class AdhocScriptCompiler
     public void CompileClassDeclaration(ClassDeclaration classDecl)
     {
         Identifier name = classDecl.Id.As<Identifier>();
-        SetCurrentClass(name);
+        AdhocSymbol nameSymbol = SymbolMap.RegisterSymbol(name.Name);
+
+        SetCurrentClass(nameSymbol);
 
         InsClassDefine @class = new InsClassDefine();
-        @class.Name = SymbolMap.RegisterSymbol(name.Name);
+        @class.Name = nameSymbol;
 
         if (classDecl.SuperClass is not null)
         {
@@ -777,10 +800,10 @@ public class AdhocScriptCompiler
     }
 
     // GT7 1.00 - 305E8E0 (hParser::SetCurrentClass)
-    private void SetCurrentClass(Identifier name)
+    private void SetCurrentClass(AdhocSymbol symbol)
     {
         ParentModules.Add(CurrentModule);
-        SetCurrentModulePath([name.Name!], AdhocVariableType.Class);
+        SetCurrentModulePath([symbol], AdhocVariableType.Class);
     }
 
     private void CompileModuleDeclaration(ModuleDeclaration moduleDecl)
@@ -788,13 +811,13 @@ public class AdhocScriptCompiler
         List<string> modulePath = [];
         if (moduleDecl.Id is Identifier identifier)
         {
-            if (identifier.Name!.Contains("::"))
-                modulePath.AddRange(identifier.Name.Split("::"));
+            if (identifier.Name!.Contains(AdhocConstants.OPERATOR_STATIC))
+                modulePath.AddRange(identifier.Name.Split(AdhocConstants.OPERATOR_STATIC));
             modulePath.Add(identifier.Name);
         }
         else if (moduleDecl.Id is StaticIdentifier staticIdentifier)
         {
-             modulePath.AddRange(staticIdentifier.Id.Name!.Split("::"));
+             modulePath.AddRange(staticIdentifier.Id.Name!.Split(AdhocConstants.OPERATOR_STATIC));
              modulePath.Add(staticIdentifier.Id.Name);
         }
 
@@ -806,7 +829,7 @@ public class AdhocScriptCompiler
         AddInstruction(moduleDefine, moduleDecl.Location);
 
         ParentModules.Add(CurrentModule);
-        SetCurrentModulePath(modulePath, AdhocVariableType.Module);
+        SetCurrentModulePath(modulePathSymbols, AdhocVariableType.Module);
 
         EnterModuleOrClassScope();
         CompileBlockStatement(moduleDecl.Body.As<BlockStatement>(), openScope: false);
@@ -4154,15 +4177,15 @@ public class AdhocScriptCompiler
     /// <param name="variableType"></param>
     /// <exception cref="Exception"></exception>
     // GT7 1.00: 305D320 (hParser::SetCurrentModule)
-    private void SetCurrentModulePath(List<string> path, AdhocVariableType variableType)
+    private void SetCurrentModulePath(List<AdhocSymbol> path, AdhocVariableType variableType)
     {
         // Try finding an existing starting scope path based on our input path
         DeclValue? baseModule = null;
-        if (path[0] == "__toplevel__")
+        if (path[0].Name == "__toplevel__")
         {
             baseModule = TopLevel;
         }
-        else if (path[0] == "__module__")
+        else if (path[0].Name == "__module__")
         {
             baseModule = CurrentModule;
         }
@@ -4171,13 +4194,13 @@ public class AdhocScriptCompiler
             // Go up in module scopes until we find a matching starting path
             for (var currentModule = CurrentModule; currentModule != null; currentModule = currentModule.ParentModule)
             {
-                if (currentModule.Variables.TryGetValue(path[0], out DeclValue? moduleVariable))
+                if (currentModule.Variables.TryGetValue(path[0].Name, out DeclValue? moduleVariable))
                 {
                     // Found a module scope that starts with what we expect
                     if (moduleVariable.Type != AdhocVariableType.Unknown)
                         baseModule = moduleVariable;
                     else
-                        baseModule = (DeclModule)GetOrDefineModuleAttribute(currentModule, path[0], variableType); // Redefine if there's any ambiguity.
+                        baseModule = (DeclModule)GetOrDefineModuleAttribute(currentModule, path[0].Name, variableType); // Redefine if there's any ambiguity.
                     break;
                 }
 
@@ -4193,7 +4216,7 @@ public class AdhocScriptCompiler
             baseModule = CurrentModule;
             for (int i = 0; i < Math.Max(path.Count - 1, 1); i++)
             {
-                baseModule = GetOrDefineModuleAttribute((DeclModule)baseModule, path[i], variableType);
+                baseModule = GetOrDefineModuleAttribute((DeclModule)baseModule, path[i].Name, variableType);
             }
         }
         else
@@ -4202,18 +4225,21 @@ public class AdhocScriptCompiler
             for (int i = 1; i < path.Count - 1; i++)
             {
                 if (baseModule is not DeclModule declModule)
-                    throw new Exception($"[NameError] '{baseModule.Name}' is not a module name (in {path[^1]}"); // [NameError] '%s' is not a module name. (in %s)
+                {
+                    ThrowNameError($"'{baseModule.Name}' is not a module name (in {path[^1]}"); // '%s' is not a module name. (in %s)
+                    return;
+                }
 
-                if (declModule.Variables.TryGetValue(path[i], out DeclValue? moduleVariable))
+                if (declModule.Variables.TryGetValue(path[i].Name, out DeclValue? moduleVariable))
                 {
                     if (moduleVariable.Type != AdhocVariableType.Unknown)
                         baseModule = moduleVariable;
                     else
-                        baseModule = GetOrDefineModuleAttribute((DeclModule)baseModule, path[i], variableType); // Redefine if there's any ambiguity.
+                        baseModule = GetOrDefineModuleAttribute((DeclModule)baseModule, path[i].Name, variableType); // Redefine if there's any ambiguity.
                 }
                 else
                 {
-                    baseModule = GetOrDefineModuleAttribute((DeclModule)baseModule, path[i], variableType);
+                    baseModule = GetOrDefineModuleAttribute((DeclModule)baseModule, path[i].Name, variableType);
                 }
             }
         }
@@ -4223,7 +4249,7 @@ public class AdhocScriptCompiler
             CurrentModule = (DeclModule)baseModule;
         }
         else
-            throw new Exception($"NameError: cannot set current module {path[^1]}"); // NameError: cannot set current module %s
+            ThrowNameError($"cannot set current module {path[^1]}"); // cannot set current module %s
     }
 
     /// <summary>
