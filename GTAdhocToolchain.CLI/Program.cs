@@ -494,7 +494,10 @@ public class Program
         }
         catch (AdhocCompilationException compileException)
         {
-            Logger.Error($"Compilation error: {compileException.Message}");
+            if (compileException.InnerException is not null)
+                Logger.Error($"Compilation error: {compileException.Message} - {compileException.InnerException.Message}");
+            else
+                Logger.Error($"Compilation error: {compileException.Message}");
         }
         catch (Exception e)
         {
@@ -608,7 +611,10 @@ public class Program
                 }
                 catch (AdhocCompilationException compileException)
                 {
-                    Logger.Error($"Compilation error: {compileException.Message}");
+                    if (compileException.InnerException is not null)
+                        Logger.Error($"Compilation error: {compileException.Message} - {compileException.InnerException.Message}");
+                    else
+                        Logger.Error($"Compilation error: {compileException.Message}");
                 }
                 catch (Exception e)
                 {

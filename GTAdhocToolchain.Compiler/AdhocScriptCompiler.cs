@@ -59,7 +59,13 @@ public class AdhocScriptCompiler
     public List<(string Label, List<int> Jumps)> Continues { get; set; } = [];
     public List<(string Label, List<int> Jumps)> Breaks { get; set; } = [];
 
-    // This would be part of hParser
+    /// <summary>
+    /// Module or class depth per frame. <br/>
+    /// GT5 uses this in LEAVE instructions to rewind the stack to a prior depth point. GT6 (and above?) does not use it.
+    /// </summary>
+    public LinkedList<int> DepthPerFrame { get; set; } = new();
+
+    // The following would be part of hParser
 
     /// <summary>
     /// Parent modules. Does not include the current module. Use <see cref="CurrentModule"/> to get the current module.<br/>
@@ -78,15 +84,13 @@ public class AdhocScriptCompiler
     /// </summary>
     public DeclModule CurrentModule { get; set; }
 
-    /// <summary>
-    /// Module or class depth per frame. <br/>
-    /// GT5 uses this in LEAVE instructions to rewind the stack to a prior depth point. GT6 (and above?) does not use it.
-    /// </summary>
-    public LinkedList<int> DepthPerFrame { get; set; } = new();
+    public LinkedList<bool> StrictStack { get; set; } = new();
 
     ///////////////////////////////////////////////////////////////////
     // ... End of original compiler properties
     ///////////////////////////////////////////////////////////////////
+
+    public bool IsStrictMode => StrictStack.Last?.Value ?? false;
 
     private AdhocVersion Version { get; }
 
@@ -105,9 +109,12 @@ public class AdhocScriptCompiler
     {
         Version = new AdhocVersion(version);
 
-        // Normally part of parser
-        CurrentModule = new DeclModule(parent: null, "__toplevel__", AdhocVariableType.Module, null);
-        TopLevel = CurrentModule;
+        // Normally part of parser (hParser::hParser())
+        {
+            CurrentModule = new DeclModule(parent: null, "__toplevel__", AdhocVariableType.Module, null);
+            TopLevel = CurrentModule;
+            StrictStack.AddLast(false);
+        }
     }
 
     public string BaseIncludeFolder { get; set; }
@@ -168,11 +175,11 @@ public class AdhocScriptCompiler
         }
         catch (StrictCheckException ex)
         {
-            throw new AdhocCompilationException(ex);
+            throw new AdhocCompilationException("StrictError", ex);
         }
         catch (NameErrorException ex)
         {
-            throw new AdhocCompilationException(ex);
+            throw new AdhocCompilationException("NameError", ex);
         }
     }
 
@@ -364,6 +371,18 @@ public class AdhocScriptCompiler
             case Nodes.PragmaVarStatement:
                 CompilePragmaVarStatement(node.As<PragmaVarStatement>());
                 break;
+            case Nodes.PragmaUseStrictStatement:
+                CompilePragmaUseStrictStatement(node.As<PragmaUseStrictStatement>());
+                break;
+            case Nodes.PragmaNoStrictStatement:
+                CompilePragmaNoStrictStatement(node.As<PragmaNoStrictStatement>());
+                break;
+            case Nodes.PragmaPushStrictStatement:
+                CompilePragmaPushStrictStatement(node.As<PragmaPushStrictStatement>());
+                break;
+            case Nodes.PragmaPopStrictStatement:
+                CompilePragmaPopStrictStatement(node.As<PragmaPopStrictStatement>());
+                break;
 
             default:
                 ThrowCompilationError(node, $"Unsupported statement: {node.Type}");
@@ -433,10 +452,11 @@ public class AdhocScriptCompiler
         // Grab target, define a new ctor scope
         AddInstruction(new InsModuleConstructor());
 
-        // TODO: Push & pop strict?
+        PushStrict(false);
         EnterModuleOrClassScope();
         CompileStatement(ctorStatement.Body);
         LeaveModuleOrClassScope();
+        PopStrict();
 
         // Exit ctor
         InsertSetState(AdhocRunState.EXIT);
@@ -474,12 +494,6 @@ public class AdhocScriptCompiler
         InsUndef undefIns = new InsUndef();
         undefIns.Path = path;
         AddInstruction(undefIns, undefStatement.Location);
-    }
-
-    // GT7 1.00: 30D5CB0 (mCompiler::UndefSymbol)
-    private void UndefSymbol(AdhocSymbol symbol)
-    {
-        CurrentModuleOrClassScope.Variables.Remove(symbol);
     }
 
     // GT7 1.00: 30F26D0 (mCompiler::CompileTryCatch)
@@ -3514,7 +3528,7 @@ public class AdhocScriptCompiler
                 throw new NotSupportedException();
 
                 // Temporarily push previous module so we can move to the specified module
-                ParentModules.Add(CurrentModule); 
+                ParentModules!.Add(CurrentModule); 
                 SetCurrentModulePath(null, AdhocVariableType.Module);
 
                 DefineVariableForCurrentModule(decl.As<Identifier>().Name!, varType, decl.Location); // Define variable
@@ -3524,6 +3538,33 @@ public class AdhocScriptCompiler
                 CurrentModule = ParentModules[^1];
             }
         }
+    }
+
+    private void CompilePragmaUseStrictStatement(PragmaUseStrictStatement _)
+    {
+        StrictStack.Last!.ValueRef = true;
+    }
+
+    private void CompilePragmaNoStrictStatement(PragmaNoStrictStatement _)
+    {
+        StrictStack.Last!.ValueRef = false;
+    }
+
+    private void CompilePragmaPushStrictStatement(PragmaPushStrictStatement statement)
+    {
+        if (statement.Value.NumericValue is bool value)
+            StrictStack.Last!.ValueRef = value;
+        else
+            StrictStack.Last!.ValueRef = Convert.ToInt32(statement.Value.NumericValue) == 1;
+    }
+
+    private void CompilePragmaPopStrictStatement(PragmaPopStrictStatement statement)
+    {
+        // This warning isn't part of the original compiler
+        if (StrictStack.Count == 1)
+            PrintCompilationWarning(statement, "Strict stack at top level.");
+
+        PopStrict();
     }
 
     #endregion
@@ -4382,20 +4423,20 @@ public class AdhocScriptCompiler
                     }
                     else
                     {
-                        if (false /* TODO: Strict mode */)
+                        if (IsStrictMode)
                             ThrowStrictCheckError($"undefined variable {path[^1].Name}::{target.Name}.");
                     }
                 }
             }
             else
             {
-                if (false /* TODO: Strict mode */)
+                if (IsStrictMode)
                     ThrowStrictCheckError($"{moduleValue.Name} is not a module name. (in {path[^1].Name}).");
             }
         }
         else
         {
-            if (false /* TODO: Strict mode */)
+            if (IsStrictMode)
                 ThrowStrictCheckError($"undefined module variable '{path[^1]}'.");
         }
     }
@@ -4499,6 +4540,17 @@ public class AdhocScriptCompiler
             ThrowNameError($"cannot set current module {path[^1]}"); // cannot set current module %s
     }
 
+    // GT7 1.00: 30D5CB0 (mCompiler::UndefSymbol)
+    private void UndefSymbol(AdhocSymbol symbol)
+    {
+        CurrentModuleOrClassScope.Variables.Remove(symbol);
+    }
+
+    private bool IsDeclarationType(AdhocVariableType variableType)
+    {
+        return variableType <= AdhocVariableType.Static;
+    }
+
     /// <summary>
     /// Defines a variable within the current scope.
     /// </summary>
@@ -4514,13 +4566,11 @@ public class AdhocScriptCompiler
             return;
         }
 
-        if (false /* TODO strict mode */ && variableType <= AdhocVariableType.Static)
+        if (IsStrictMode && IsDeclarationType(variableType))
         {
             if (variableType != AdhocVariableType.LocalVariable)
             {
-                // Look up the symbol in the parser's declaration table
-                DeclValue value = null;
-
+                DeclValue? value = FindVariableFromSymbol(name);
                 if (value is not null)
                 {
                     if (value.Type == AdhocVariableType.Delegate || value.Type == variableType)
@@ -4530,7 +4580,8 @@ public class AdhocScriptCompiler
                     }
                     else
                     {
-                        ThrowStrictCheckError($"{variableType} '{value.Name}' is already defined as {value.Type} at {value.Location.Value.Source}:{value.Location.Value.Start.Line}.");
+                        string fullPath = value.GetFullPath();
+                        ThrowStrictCheckError($"{variableType} '{fullPath}' is already defined as {value.Type} at {value.Location.Value.Source}:{value.Location.Value.Start.Line}.");
                     }
                 }
                 else
@@ -4590,6 +4641,23 @@ public class AdhocScriptCompiler
 
         // %s '%s' is already defined as %s at %s:%d.
         ThrowNameError($"{location?.Source}:{location?.Start.Line ?? 0}: {variableType} '{name.Name}' is already defined as {variable.Type} at {variable.DeclarationSourceFileName}:{variable.DeclarationLineNumber}.");
+    }
+
+    private DeclValue? FindVariableFromSymbol(AdhocSymbol path)
+    {
+        if (path.Name == "__toplevel__")
+        {
+            return TopLevel;
+        }
+        else if (path.Name == "__module__")
+        {
+            return CurrentModule;
+        }
+        
+        if (CurrentModule.Variables.TryGetValue(path.Name, out DeclValue? value))
+            return value;
+
+        return null;
     }
 
     /// <summary>
@@ -4764,30 +4832,34 @@ public class AdhocScriptCompiler
             pathParts.Add(pathParts[0]);
         }
 
-        // TODO strict mode. we shouldn't be allowed to define anything that's not yet defined.
+        // Strict mode. we shouldn't be allowed to define anything that's not yet defined.
         var varType = pathParts.Count > 1 ? AdhocVariableType.Unknown : AdhocVariableType.LocalVariable;
-        if (false /* TODO: strict mode */)
+        if (IsStrictMode)
         {
             if (pathParts.Count > 1)
             {
-                DeclValue moduleValue = GetModuleVariableFromPath(pathParts);
+                DeclValue? moduleValue = GetModuleVariableFromPath(pathParts);
                 if (moduleValue is not null)
                 {
                     varType = moduleValue.Type;
                 }
                 else
-                    ThrowStrictCheckError($"undefined variable '{pathParts[^1].Name}'.");
+                {
+                    // undefined variable '%s'.
+                    ThrowStrictCheckError($"undefined variable '{fullSymbolPath.Name}' at {location?.Source}:{location?.Start.Line}.");
+                }
             }
             else
-                ThrowStrictCheckError($"undefined variable '%s'.");
+            {
+                // undefined variable '%s'.
+                ThrowStrictCheckError($"undefined variable '{fullSymbolPath.Name}' at {location?.Source}:{location?.Start.Line}.");
+            }
         }
+        
+        if (varType == AdhocVariableType.LocalVariable)
+            return DefineLocalVariable(fullSymbolPath, location);
         else
-        {
-            if (varType == AdhocVariableType.LocalVariable)
-                return DefineLocalVariable(fullSymbolPath, location);
-            else
-                return DefineStaticVariable(varType, fullSymbolPath, location);
-        }
+            return DefineStaticVariable(varType, fullSymbolPath, location);
     }
     #endregion
 
@@ -4979,4 +5051,14 @@ public class AdhocScriptCompiler
             : base(message) { }
     }
     #endregion
+
+    public void PopStrict()
+    {
+        StrictStack.RemoveLast();
+    }
+
+    public void PushStrict(bool useStrict)
+    {
+        StrictStack.AddLast(useStrict);
+    }
 }
