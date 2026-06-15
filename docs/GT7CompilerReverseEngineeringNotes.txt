@@ -2307,6 +2307,28 @@ import main::test::*;
 [Core.Hooking] <Info> gt7_hooks.cpp:153 DumpSubroutine: IMPORT: path:main,test,main::test, target:__mul__, alias:nil
 [Core.Hooking] <Info> gt7_hooks.cpp:142 DumpSubroutine: SET_STATE: EXIT
 
+////////////////////////////////////////////////////////////////////////
+// Pragma var
+////////////////////////////////////////////////////////////////////////
+
+@attribute test;
+[Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: SET_STATE: EXIT
+
+@attribute test::b, test2;
+[Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: SET_STATE: EXIT
+
+@attribute test, test2;
+[Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: SET_STATE: EXIT
+
+@function test, test2;
+[Core.Hooking] <Info> gt7_hooks.cpp:158 DumpSubroutine: SET_STATE: EXIT
+
+@module test::b, test2;
+[Core.Hooking] <Info> gt7_hooks.cpp:73 MException_MExceptionImpl: MException: gt7/boot/init_ecs.ad:158:0: [SyntaxError] syntax error, unexpected ',', expecting tSCOPE or '{' (near token ',')
+gt7/boot/boot_sequence_common.ad:243;gt7/boot/boot_entry.ad:89;gt7/SequenceController.ad:126;(from C:\w\label\pkg-1-tokyo\src\master\adhoc\src\h_parser.cpp:605)
+[Debug] <Critical> exception.cpp:156 sceKernelDebugRaiseException: Unreachable code!
+error -0x5ffdfff8
+
 ///////////////////////////////////////////////////////
 ____COMPILER REVERSE ENGINEERING NOTES_________________
 
