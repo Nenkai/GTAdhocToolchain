@@ -187,6 +187,18 @@ public class AdhocScriptCompiler
     }
 
     /// <summary>
+    /// Compiles a statement and opens a new scope (unless it is a continue or break statement.).
+    /// </summary>
+    /// <param name="frame"></param>
+    /// <param name="statement"></param>
+    private void CompileStatementWithScope(Statement statement)
+    {
+        EnterScope(false);
+        CompileStatement(statement);
+        LeaveScope();
+    }
+
+    /// <summary>
     /// Builds code for printing exceptions to file (used in CompileStatements())
     /// </summary>
     public void BuildTryCatchDebugStatements()
@@ -349,53 +361,14 @@ public class AdhocScriptCompiler
             case Nodes.PragmaCurrentModuleStatement:
                 CompilePragmaCurrentModuleStatement(node.As<PragmaCurrentModuleStatement>());
                 break;
+            case Nodes.PragmaVarStatement:
+                CompilePragmaVarStatement(node.As<PragmaVarStatement>());
+                break;
 
             default:
                 ThrowCompilationError(node, $"Unsupported statement: {node.Type}");
                 break;
         }
-    }
-
-    private void CompilePragmaDumpStatement(PragmaDumpStatement statement)
-    {
-        List<AdhocSymbol> pathSymbols = [];
-        if (statement.Path.Type == Nodes.Identifier)
-        {
-            Identifier identifier = statement.Path.As<Identifier>();
-            pathSymbols.Add(SymbolMap.RegisterSymbol(identifier.Name!));
-        }
-        else if (statement.Path is StaticMemberExpression staticMemberExpression)
-        {
-            BuildStaticPath(staticMemberExpression, ref pathSymbols);
-        }
-
-        Logger.Info("[Dump] {}:{}", statement.Location.Source, statement.Location.Start.Line);
-        Dump(pathSymbols);
-    }
-
-    private void CompilePragmaExecStatement(PragmaExecStatement statement)
-    {
-        // TODO (maybe): Implement pragma exec when we have an interpreter.
-        // Though it makes little sense when the compiler isn't really running on the engine side
-        // Where all the APIs are already defined.
-
-        ThrowCompilationError(statement, "@exec allows running code at compile time and an interpreter is not currently implemented.");
-    }
-
-    private void CompilePragmaCurrentModuleStatement(PragmaCurrentModuleStatement statement)
-    {
-        List<AdhocSymbol> pathSymbols = [];
-        if (statement.Path.Type == Nodes.Identifier)
-        {
-            Identifier identifier = statement.Path.As<Identifier>();
-            pathSymbols.Add(SymbolMap.RegisterSymbol(identifier.Name!));
-        }
-        else if (statement.Path is StaticMemberExpression staticMemberExpression)
-        {
-            BuildStaticPath(staticMemberExpression, ref pathSymbols);
-        }
-
-        SetCurrentModulePath(pathSymbols, AdhocVariableType.Module);
     }
 
     // GT7 1.00: 305CAA0 (hParser::DumpPath)
@@ -747,7 +720,6 @@ public class AdhocScriptCompiler
     {
         Identifier name = classDecl.Id.As<Identifier>();
         AdhocSymbol nameSymbol = SymbolMap.RegisterSymbol(name.Name);
-
         SetCurrentClass(nameSymbol);
 
         InsClassDefine @class = new InsClassDefine();
@@ -787,23 +759,6 @@ public class AdhocScriptCompiler
         InsertSetState(AdhocRunState.EXIT);
 
         LeaveCurrentModule();
-    }
-
-    // GT7 1.00: 305E970 (hParser::LeaveCurrentModule)
-    private void LeaveCurrentModule()
-    {
-        if (CurrentModule != ParentModules[^1])
-            CurrentModule = ParentModules[^1];
-
-        if (ParentModules.Count != 0)
-            ParentModules.Remove(ParentModules[^1]);
-    }
-
-    // GT7 1.00 - 305E8E0 (hParser::SetCurrentClass)
-    private void SetCurrentClass(AdhocSymbol symbol)
-    {
-        ParentModules.Add(CurrentModule);
-        SetCurrentModulePath([symbol], AdhocVariableType.Class);
     }
 
     private void CompileModuleDeclaration(ModuleDeclaration moduleDecl)
@@ -1343,7 +1298,7 @@ public class AdhocScriptCompiler
         ArgumentException.ThrowIfNullOrEmpty(funcDecl.Id?.Name, "funcDecl.Id?.Name");
 
         AdhocSymbol nameSymbol = SymbolMap.RegisterSymbol(funcDecl.Id.Name);
-        DefineAttributeForCurrentModule(funcDecl.Id.Name, AdhocVariableType.Function, funcDecl.Id.Location);
+        DefineVariableForCurrentModule(funcDecl.Id.Name, AdhocVariableType.Function, funcDecl.Id.Location);
         DefineVariableInCurrentScope(SymbolMap.RegisterSymbol(funcDecl.Id.Name), AdhocVariableType.Function, funcDecl.Id.Location);
         
         var functionFrame = CompileSubroutine(funcDecl, funcDecl.Body, funcDecl.Id, funcDecl.Params);
@@ -1953,7 +1908,7 @@ public class AdhocScriptCompiler
             ThrowCompilationError(delegateDefinition, CompilationMessages.Error_DelegatesUnsupported);
 
         var idSymb = SymbolMap.RegisterSymbol(delegateDefinition.Identifier.Name!);
-        DefineAttributeForCurrentModule(idSymb.Name, AdhocVariableType.Delegate, delegateDefinition.Identifier.Location);
+        DefineVariableForCurrentModule(idSymb.Name, AdhocVariableType.Delegate, delegateDefinition.Identifier.Location);
         DefineVariableInCurrentScope(idSymb, AdhocVariableType.Delegate, delegateDefinition.Identifier.Location);
 
         InsDelegateDefine ins = new InsDelegateDefine(idSymb);
@@ -2104,7 +2059,7 @@ public class AdhocScriptCompiler
 
         // static definition with no value
         var idSymb = SymbolMap.RegisterSymbol(name);
-        DefineAttributeForCurrentModule(name, AdhocVariableType.Static, ident.Location);
+        DefineVariableForCurrentModule(name, AdhocVariableType.Static, ident.Location);
         DefineVariableInCurrentScope(idSymb, AdhocVariableType.Static, ident.Location);
 
         if (staticDeclaration.Declaration.Init is null)
@@ -2161,7 +2116,7 @@ public class AdhocScriptCompiler
                 AddInstruction(new InsNilConst(), ident.Location);
 
             var idSymb = SymbolMap.RegisterSymbol(ident.Name!);
-            DefineAttributeForCurrentModule(idSymb.Name, AdhocVariableType.Attribute, ident.Location);
+            DefineVariableForCurrentModule(idSymb.Name, AdhocVariableType.Attribute, ident.Location);
             DefineVariableInCurrentScope(idSymb, AdhocVariableType.Attribute, ident.Location);
 
             InsAttributeDefine staticDefine = new InsAttributeDefine(idSymb);
@@ -2181,7 +2136,7 @@ public class AdhocScriptCompiler
 
             Identifier identifier = assignmentExpression.Left.As<Identifier>();
             var idSymb = SymbolMap.RegisterSymbol(identifier.Name!);
-            DefineAttributeForCurrentModule(idSymb.Name, AdhocVariableType.Attribute, identifier.Location);
+            DefineVariableForCurrentModule(idSymb.Name, AdhocVariableType.Attribute, identifier.Location);
             DefineVariableInCurrentScope(idSymb, AdhocVariableType.Attribute, identifier.Location);
 
             // Value if any
@@ -2278,7 +2233,7 @@ public class AdhocScriptCompiler
         string name = id.Name!;
 
         var symbol = SymbolMap.RegisterSymbol(name);
-        DefineAttributeForCurrentModule(name, AdhocVariableType.Method, id.Location);
+        DefineVariableForCurrentModule(name, AdhocVariableType.Method, id.Location);
         DefineVariableInCurrentScope(symbol, AdhocVariableType.Method, id.Location);
         AdhocCodeFrame methodFrame = CompileSubroutine(methodDecl, methodDecl.Body, id, methodDecl.Params);
 
@@ -3478,23 +3433,6 @@ public class AdhocScriptCompiler
     }
 
     /// <summary>
-    /// Inserts a variable push instruction to push a variable.
-    /// </summary>
-    /// <param name="frame"></param>
-    /// <param name="identifier"></param>
-    /// <returns></returns>
-    private AdhocSymbol InsertLocalVariablePush(string identifier, Location? location = null)
-    {
-        AdhocSymbol varSymb = SymbolMap.RegisterSymbol(identifier);
-
-        var varPush = new InsVariablePush();
-        varPush.Path.Add(varSymb);
-        AddInstruction(varPush, location);
-
-        return varSymb;
-    }
-
-    /// <summary>
     /// Inserts a push to an object attribute
     /// </summary>
     /// <param name="frame"></param>
@@ -3514,6 +3452,81 @@ public class AdhocScriptCompiler
         AddInstruction(attrPush, propIdent.Location);
     }
 
+    #region Pragmas
+    private void CompilePragmaDumpStatement(PragmaDumpStatement statement)
+    {
+        List<AdhocSymbol> pathSymbols = [];
+        if (statement.Path.Type == Nodes.Identifier)
+        {
+            Identifier identifier = statement.Path.As<Identifier>();
+            pathSymbols.Add(SymbolMap.RegisterSymbol(identifier.Name!));
+        }
+        else if (statement.Path is StaticMemberExpression staticMemberExpression)
+        {
+            BuildStaticPath(staticMemberExpression, ref pathSymbols);
+        }
+
+        Logger.Info("[Dump] {}:{}", statement.Location.Source, statement.Location.Start.Line);
+        Dump(pathSymbols);
+    }
+
+    private void CompilePragmaExecStatement(PragmaExecStatement statement)
+    {
+        // TODO (maybe): Implement pragma exec when we have an interpreter.
+        // Though it makes little sense when the compiler isn't really running on the engine side
+        // Where all the APIs are already defined.
+
+        ThrowCompilationError(statement, "@exec allows running code at compile time and an interpreter is not currently implemented.");
+    }
+
+    private void CompilePragmaCurrentModuleStatement(PragmaCurrentModuleStatement statement)
+    {
+        List<AdhocSymbol> pathSymbols = [];
+        if (statement.Path.Type == Nodes.Identifier)
+        {
+            Identifier identifier = statement.Path.As<Identifier>();
+            pathSymbols.Add(SymbolMap.RegisterSymbol(identifier.Name!));
+        }
+        else if (statement.Path is StaticMemberExpression staticMemberExpression)
+        {
+            BuildStaticPath(staticMemberExpression, ref pathSymbols);
+        }
+
+        SetCurrentModulePath(pathSymbols, AdhocVariableType.Module);
+    }
+
+    // GT7 1.00: 30F38E0
+    private void CompilePragmaVarStatement(PragmaVarStatement statement)
+    {
+        AdhocVariableType varType = Utils.KeywordToVariableType[statement.Type.Name!];
+        foreach (var decl in statement.Declaration.Declarations)
+        {
+            // TODO: Declarations are allowed to be paths too (unless it's modules)
+            // We don't currently support that because on the esprima side we don't support parsing paths for declarations
+
+            if (decl.Type == Nodes.Identifier)
+            {
+                DefineVariableForCurrentModule(decl.As<Identifier>().Name!, varType, decl.Location);
+            }
+            else
+            {
+                // Will not be called for now, but, it goes like this
+                throw new NotSupportedException();
+
+                // Temporarily push previous module so we can move to the specified module
+                ParentModules.Add(CurrentModule); 
+                SetCurrentModulePath(null, AdhocVariableType.Module);
+
+                DefineVariableForCurrentModule(decl.As<Identifier>().Name!, varType, decl.Location); // Define variable
+                
+                // Resume
+                ParentModules.Remove(CurrentModule);
+                CurrentModule = ParentModules[^1];
+            }
+        }
+    }
+
+    #endregion
 
     #region Scope Handling
 
@@ -3628,20 +3641,61 @@ public class AdhocScriptCompiler
 
     #endregion
 
-    /// <summary>
-    /// Compiles a statement and opens a new scope (unless it is a continue or break statement.).
-    /// </summary>
-    /// <param name="frame"></param>
-    /// <param name="statement"></param>
-    private void CompileStatementWithScope(Statement statement)
+    #region Continue/Break
+    private void RegisterLoopLabelForContinue(string symbol)
     {
-        EnterScope(false);
-        CompileStatement(statement);
-        LeaveScope();
+        Continues.Add((symbol, []));
     }
 
+    private void RegisterLoopLabelForBreak(string symbol)
+    {
+        Breaks.Add((symbol, []));
+    }
+
+    // GT7 1.00: 30DAB90 (mCompiler::ProcessContinues)
+    private void ProcessContinues(int index)
+    {
+        var list = Continues[^1];
+        for (int i = 0; i < list.Jumps.Count; i++)
+        {
+            var prevJump = (InsJump)CurrentFrame.Instructions[list.Jumps[i]];
+            prevJump.JumpInstructionIndex = index;
+        }
+
+        Continues.Remove(list);
+    }
+
+    private void ProcessBreaks(int index)
+    {
+        var list = Breaks[^1];
+        for (int i = 0; i < list.Jumps.Count; i++)
+        {
+            var prevJump = (InsJump)CurrentFrame.Instructions[list.Jumps[i]];
+            prevJump.JumpInstructionIndex = index;
+        }
+
+        Breaks.Remove(list);
+    }
+    #endregion
 
     #region Instruction insert methods
+    /// <summary>
+    /// Inserts a variable push instruction to push a variable.
+    /// </summary>
+    /// <param name="frame"></param>
+    /// <param name="identifier"></param>
+    /// <returns></returns>
+    private AdhocSymbol InsertLocalVariablePush(string identifier, Location? location = null)
+    {
+        AdhocSymbol varSymb = SymbolMap.RegisterSymbol(identifier);
+
+        var varPush = new InsVariablePush();
+        varPush.Path.Add(varSymb);
+        AddInstruction(varPush, location);
+
+        return varSymb;
+    }
+
     /// <summary>
     /// Inserts an attribute eval instruction to access an attribute of a certain object.
     /// </summary>
@@ -3840,594 +3894,6 @@ public class AdhocScriptCompiler
             AddInstruction(new InsNop(), location, useEndLineNumber);
     }
 
-    #endregion
-
-    #region Utils
-
-    private static string? AssignOperatorToString(AssignmentOperator op)
-    {
-        return op switch
-        {
-            AssignmentOperator.PlusAssign => AdhocConstants.OPERATOR_ADD,
-            AssignmentOperator.MinusAssign => AdhocConstants.OPERATOR_SUBTRACT,
-            AssignmentOperator.TimesAssign => AdhocConstants.OPERATOR_MULTIPLY,
-            AssignmentOperator.DivideAssign => AdhocConstants.OPERATOR_DIVIDE,
-            AssignmentOperator.ModuloAssign => AdhocConstants.OPERATOR_MODULO,
-            AssignmentOperator.BitwiseAndAssign => AdhocConstants.OPERATOR_BITWISE_AND,
-            AssignmentOperator.BitwiseOrAssign => AdhocConstants.OPERATOR_BITWISE_OR,
-            AssignmentOperator.BitwiseXOrAssign => AdhocConstants.OPERATOR_BITWISE_XOR,
-            AssignmentOperator.ExponentiationAssign => AdhocConstants.OPERATOR_POWER,
-            AssignmentOperator.RightShiftAssign => AdhocConstants.OPERATOR_RIGHT_SHIFT,
-            AssignmentOperator.LeftShiftAssign => AdhocConstants.OPERATOR_LEFT_SHIFT,
-            _ => null
-        };
-    }
-
-
-    private static bool IsAdhocAssignWithOperandOperator(AssignmentOperator op)
-    {
-        switch (op)
-        {
-            case AssignmentOperator.PlusAssign:
-            case AssignmentOperator.MinusAssign:
-            case AssignmentOperator.TimesAssign:
-            case AssignmentOperator.DivideAssign:
-            case AssignmentOperator.ModuloAssign:
-            case AssignmentOperator.BitwiseAndAssign:
-            case AssignmentOperator.BitwiseOrAssign:
-            case AssignmentOperator.BitwiseXOrAssign:
-            case AssignmentOperator.ExponentiationAssign:
-            case AssignmentOperator.RightShiftAssign:
-            case AssignmentOperator.LeftShiftAssign:
-                return true;
-        }
-
-        return false;
-    }
-
-    /// <summary>
-    /// Returns whether an expression is an identifier mapping to base numeric types.
-    /// </summary>
-    /// <param name="expression"></param>
-    /// <returns></returns>
-    private static bool IsNumberTypeIdentifier(Expression expression)
-    {
-        if (expression is Identifier identifier)
-        {
-            switch (identifier.Name)
-            {
-                case "Byte":
-                case "UByte":
-                case "Short":
-                case "UShort":
-                case "Int":
-                case "UInt":
-                case "Long":
-                case "ULong":
-                case "Float":
-                case "Double":
-                    return true;
-            }
-        }
-
-        return false;
-    }
-
-    /// <summary>
-    /// Returns whether the provided expression is an unary indirection of expression (i.e *myObj).
-    /// </summary>
-    /// <param name="exp"></param>
-    /// <returns></returns>
-    private static bool IsUnaryIndirection(Expression exp)
-    {
-        return exp is UnaryExpression unaryExp && unaryExp.Operator == UnaryOperator.Indirection;
-    }
-
-    /// <summary>
-    /// Returns whether the provided expression is an unary reference of expression (i.e &myObj).
-    /// </summary>
-    /// <param name="exp"></param>
-    /// <returns></returns>
-    private static bool IsUnaryReferenceOfExpression(Expression exp)
-    {
-        return exp is UnaryExpression unaryExp && unaryExp.Operator == UnaryOperator.ReferenceOf;
-    }
-
-    private void BuildStaticPath(StaticMemberExpression exp, ref List<AdhocSymbol> pathParts)
-    {
-        BuildStaticPathChild(exp, ref pathParts);
-
-        string fullPath = string.Join(AdhocConstants.OPERATOR_STATIC, pathParts.Select(e => e.Name));
-        AdhocSymbol fullPathSymb = SymbolMap.RegisterSymbol(fullPath);
-        pathParts.Add(fullPathSymb);
-    }
-
-    private void BuildStaticPathChild(StaticMemberExpression exp, ref List<AdhocSymbol> pathParts)
-    {
-        if (exp.Object is StaticMemberExpression obj)
-        {
-            BuildStaticPathChild(obj, ref pathParts);
-        }
-        else if (exp.Object is Identifier identifier)
-        {
-            pathParts.Add(SymbolMap.RegisterSymbol(identifier.Name!));
-        }
-
-        if (exp.Property is Identifier propIdentifier)
-        {
-            pathParts.Add(SymbolMap.RegisterSymbol(propIdentifier.Name!));
-        }
-    }
-
-    #endregion
-
-    #region Warning/Error Handling Methods
-    private void PrintPostCompilationWarnings()
-    {
-        foreach (var warn in PostCompilationWarnings)
-            Logger.Warn($"Feature Warning: {CompilationMessages.Warnings[warn]}. This may crash older game builds.");
-    }
-
-    private void AddPostCompilationWarning(string warningCode)
-    {
-        PostCompilationWarnings.Add(warningCode);
-    }
-
-    private void PrintCompilationWarning(Node node, string message)
-    {
-        Logger.Warn(GetSourceNodeString(node, message));
-    }
-
-    [DoesNotReturn]
-    private void ThrowCompilationError(Node node, string message)
-    {
-        throw GetCompilationError(node, message);
-    }
-
-    /// <summary>
-    /// Gets a new compilation exception.
-    /// </summary>
-    /// <param name="node"></param>
-    /// <param name="message"></param>
-    /// <returns></returns>
-    private AdhocCompilationException GetCompilationError(Node node, string message)
-    {
-        return new AdhocCompilationException(GetSourceNodeString(node, message));
-    }
-
-    private static string GetSourceNodeString(Node node, string message)
-    {
-        return $"{message} at {node.Location.Source}:{node.Location.Start.Line}";
-    }
-
-    /// <summary>
-    /// Gets or define a new attribute within a module.
-    /// </summary>
-    /// <param name="module"></param>
-    /// <param name="attributeName"></param>
-    /// <param name="newVariableType"></param>
-    /// <returns></returns>
-    // GT7 1.00: 305CB40 (hParser::GetOrDefineModuleAttribute)
-    private DeclValue GetOrDefineModuleAttribute(DeclModule module, string attributeName, AdhocVariableType newVariableType, Location? location = null)
-    {
-        if (module.Variables.TryGetValue(attributeName, out DeclValue? value))
-        {
-            // Found something.
-
-            // If our expected type, or the value type is unknown, it is removed
-            if (newVariableType == AdhocVariableType.Unknown || value.Type == AdhocVariableType.Unknown)
-                module.Variables.Remove(attributeName); // Undef, just to make sure.
-            else
-                return value; // This will be returned regardless of expected type
-        }
-
-        // Define new one
-        DeclValue newModule;
-        if (newVariableType == AdhocVariableType.Module || newVariableType == AdhocVariableType.Class)
-            newModule = new DeclModule(parent: module, attributeName, newVariableType, location);
-        else
-            newModule = new DeclValue(parent: module, attributeName, newVariableType, location);
-
-        module.AddVariable(attributeName, newModule);
-        return newModule;
-    }
-
-    /// <summary>
-    /// Returns the last module value from a path.
-    /// </summary>
-    /// <param name="path"></param>
-    /// <returns></returns>
-    /// <exception cref="Exception"></exception>
-    // GT7 1.00: 305C090 (hParser::GetModuleVariableFromPath)
-    private DeclValue? GetModuleVariableFromPath(List<AdhocSymbol> path)
-    {
-        // Determine root.
-        DeclValue? targetModuleValue = null;
-
-        var pathStart = path[0];
-        if (path.Count == 0)
-        {
-            if (TopLevel is not null)
-                targetModuleValue = TopLevel;
-            else
-                targetModuleValue = CurrentModule;
-        }
-        else if (pathStart.Name == "__toplevel__")
-        {
-            targetModuleValue = TopLevel;
-        }
-        else if (pathStart.Name == "__module__")
-        {
-            targetModuleValue = CurrentModule;
-        }
-        else
-        {
-            // Climb current module to top level for potential module start matches
-            for (var module = CurrentModule; module != null; module = module.ParentModule)
-            {
-                if (module.Variables.TryGetValue(pathStart.Name, out DeclValue? moduleValue))
-                {
-                    targetModuleValue = moduleValue;
-                    break;
-                }
-            }
-        }
-
-        // No valid root found in existing scopes.
-        if (targetModuleValue is null)
-            return null;
-
-        // Navigate from base module to specific module.
-        for (int i = 1; i < path.Count - 1; i++)
-        {
-            if (targetModuleValue.Type == AdhocVariableType.Unknown)
-                break;
-
-            if (targetModuleValue is DeclModule module)
-            {
-                if (module.Variables.TryGetValue(path[i].Name, out DeclValue? moduleValue))
-                    targetModuleValue = moduleValue;
-                else
-                    return null; // Sub-module not found.
-            }
-            else
-                throw new Exception($"{targetModuleValue.Name} is not a module name. (in {path[^1].Name})");
-        }
-
-        return targetModuleValue;
-    }
-
-    // GT7 1.00: 30D76D0 (mCompiler::DefineScopeVariablesFromImport)
-    private void DefineScopeVariablesFromImport(List<AdhocSymbol> path, AdhocSymbol target, AdhocSymbol? alias = null)
-    {
-        alias ??= target;
-
-        DeclValue? moduleValue = GetModuleVariableFromPath(path);
-        if (moduleValue is not null)
-        {
-            if (moduleValue is DeclModule module)
-            {
-                if (target.Name == "__mul__")
-                {
-                    foreach (var variable in module.Variables)
-                        DefineVariableInCurrentScope(SymbolMap.RegisterSymbol(variable.Value.Name), variable.Value.Type);
-                }
-                else
-                {
-                    if (module.Variables.TryGetValue(target.Name, out DeclValue? targetValue))
-                        DefineVariableInCurrentScope(alias, targetValue.Type);
-                    else
-                        DefineVariableInCurrentScope(alias, AdhocVariableType.Unknown);
-                }
-            }
-        }
-        else if (target.Name != "__mul__")
-        {
-            DefineVariableInCurrentScope(alias, AdhocVariableType.Unknown);
-        }
-    }
-
-    // GT7 1.00: 305F0C0 (mParser::AddModuleVariablesFromImport)
-    public void AddModuleVariablesFromImport(List<AdhocSymbol> path, AdhocSymbol target, AdhocSymbol? alias = null)
-    {
-        alias ??= target;
-
-        DeclValue? moduleValue = GetModuleVariableFromPath(path);
-        if (moduleValue is not null)
-        {
-            if (moduleValue is DeclModule module)
-            {
-                if (target.Name == "__mul__")
-                {
-                    foreach (var variable in module.Variables)
-                    {
-                        CurrentModule.AddVariable(variable.Key, variable.Value);
-                    }
-                }
-                else
-                {
-                    if (module.Variables.TryGetValue(alias.Name, out DeclValue? targetValue))
-                    {
-                        CurrentModule.AddVariable(alias.Name, targetValue);
-                    }
-                    else
-                    {
-                        if (false /* TODO: Strict mode */)
-                            ThrowStrictCheckError($"undefined variable {path[^1].Name}::{target.Name}.");
-                    }
-                }
-            }
-            else
-            {
-                if (false /* TODO: Strict mode */)
-                    ThrowStrictCheckError($"{moduleValue.Name} is not a module name. (in {path[^1].Name}).");
-            }
-        }
-        else
-        {
-            if (false /* TODO: Strict mode */)
-                ThrowStrictCheckError($"undefined module variable '{path[^1]}'.");
-        }
-    }
-
-    /// <summary>
-    /// Sets the current module to the specified path.
-    /// </summary>
-    /// <param name="path"></param>
-    /// <param name="variableType"></param>
-    /// <exception cref="Exception"></exception>
-    // GT7 1.00: 305D320 (hParser::SetCurrentModule)
-    private void SetCurrentModulePath(List<AdhocSymbol> path, AdhocVariableType variableType)
-    {
-        // Try finding an existing starting scope path based on our input path
-        DeclValue? baseModule = null;
-        if (path[0].Name == "__toplevel__")
-        {
-            baseModule = TopLevel;
-        }
-        else if (path[0].Name == "__module__")
-        {
-            baseModule = CurrentModule;
-        }
-        else
-        {
-            // Go up in module scopes until we find a matching starting path
-            for (var currentModule = CurrentModule; currentModule != null; currentModule = currentModule.ParentModule)
-            {
-                if (currentModule.Variables.TryGetValue(path[0].Name, out DeclValue? moduleVariable))
-                {
-                    // Found a module scope that starts with what we expect
-                    if (moduleVariable.Type != AdhocVariableType.Unknown)
-                        baseModule = moduleVariable;
-                    else
-                        baseModule = (DeclModule)GetOrDefineModuleAttribute(currentModule, path[0].Name, variableType); // Redefine if there's any ambiguity.
-                    break;
-                }
-
-                if (path.Count <= 1)
-                    break;
-            }
-        }
-
-        // Did we find a matching starting module that matches our path?
-        if (baseModule is null)
-        {
-            // Nope, so declare the path entirely.
-            baseModule = CurrentModule;
-            for (int i = 0; i < Math.Max(path.Count - 1, 1); i++)
-            {
-                baseModule = GetOrDefineModuleAttribute((DeclModule)baseModule, path[i].Name, variableType);
-            }
-        }
-        else
-        {
-            // We did, so simply define the path starting from the starting module.
-            for (int i = 1; i < path.Count - 1; i++)
-            {
-                if (baseModule is not DeclModule declModule)
-                {
-                    ThrowNameError($"'{baseModule.Name}' is not a module name (in {path[^1]}"); // '%s' is not a module name. (in %s)
-                    return;
-                }
-
-                if (declModule.Variables.TryGetValue(path[i].Name, out DeclValue? moduleVariable))
-                {
-                    if (moduleVariable.Type != AdhocVariableType.Unknown)
-                        baseModule = moduleVariable;
-                    else
-                        baseModule = GetOrDefineModuleAttribute((DeclModule)baseModule, path[i].Name, variableType); // Redefine if there's any ambiguity.
-                }
-                else
-                {
-                    baseModule = GetOrDefineModuleAttribute((DeclModule)baseModule, path[i].Name, variableType);
-                }
-            }
-        }
-
-        if (baseModule is not null)
-        {
-            CurrentModule = (DeclModule)baseModule;
-        }
-        else
-            ThrowNameError($"cannot set current module {path[^1]}"); // cannot set current module %s
-    }
-
-    /// <summary>
-    /// Defines a variable within the current scope.
-    /// </summary>
-    /// <param name="name"></param>
-    /// <param name="variableType"></param>
-    /// <param name="location"></param>
-    // GT7 1.00: 30D5320 (mCompiler::DefineVariableInCurrentScope)
-    private void DefineVariableInCurrentScope(AdhocSymbol name, AdhocVariableType variableType, Location? location = null)
-    {
-        if (variableType == AdhocVariableType.Undef)
-        {
-            UndefSymbol(name);
-            return;
-        }
-
-        if (false /* TODO strict mode */ && variableType <= AdhocVariableType.Static)
-        {
-            if (variableType != AdhocVariableType.LocalVariable)
-            {
-                // Look up the symbol in the parser's declaration table
-                DeclValue value = null;
-
-                if (value is not null)
-                {
-                    if (value.Type == AdhocVariableType.Delegate || value.Type == variableType)
-                    {
-                        //value->byte54 = 1;
-                        value.Location = location.Value;
-                    }
-                    else
-                    {
-                        ThrowStrictCheckError($"{variableType} '{value.Name}' is already defined as {value.Type} at {value.Location.Value.Source}:{value.Location.Value.Start.Line}.");
-                    }
-                }
-                else
-                {
-                    ThrowStrictCheckError($"'{name.Name}' is not declared in this scope.");
-                }
-            }
-        }
-
-        Variable? variable;
-        switch (variableType)
-        {
-            case AdhocVariableType.LocalVariable:
-                if (!CurrentLocalScope.Variables.TryGetValue(name, out variable))
-                {
-                    DefineLocalVariable(name, location);
-                    return;
-                }
-                break;
-
-            default:
-                if (!CurrentModuleOrClassScope.Variables.TryGetValue(name, out variable))
-                {
-                    DefineStaticVariable(variableType, name, location);
-                    return;
-                }
-                break;
-        }
-
-        // Check redefinition types
-        switch (variable.Type)
-        {
-            case AdhocVariableType.Attribute:
-            case AdhocVariableType.Function:
-            case AdhocVariableType.Method:
-            case AdhocVariableType.Static:
-                if (variable.Type == variableType)
-                    return; // Redeclaring to same type, no problems
-                break;
-
-            case AdhocVariableType.Class:
-                if (variableType == AdhocVariableType.Class || variableType == AdhocVariableType.Module)
-                    return; // Redeclaring to already module or class type, no problems
-                break;
-
-            case AdhocVariableType.Module:
-                if (variableType == AdhocVariableType.Module)
-                    return; // Redeclaring to already module type, no problems
-                break;
-
-            case AdhocVariableType.LocalVariable:
-                break; // Local is being redeclared, not good.
-
-            default:
-                return;
-        }
-
-        // %s '%s' is already defined as %s at %s:%d.
-        ThrowNameError($"{location?.Source}:{location?.Start.Line ?? 0}: {variableType} '{name.Name}' is already defined as {variable.Type} at {variable.DeclarationSourceFileName}:{variable.DeclarationLineNumber}.");
-    }
-
-    /// <summary>
-    /// Defines a static variable within the current scope.
-    /// </summary>
-    /// <param name="type"></param>
-    /// <param name="name"></param>
-    /// <param name="location"></param>
-    /// <returns></returns>
-    private int DefineStaticVariable(AdhocVariableType type, AdhocSymbol name, Location? location)
-    {
-        int staticIndex;
-        if (CurrentFrame.Version.UsesNewSplitStack())
-        {
-            if (CurrentModuleOrClassScope.Variables.TryGetValue(name, out Variable? definedVariable))
-            {
-                return definedVariable.StackIndex;
-            }
-            
-            staticIndex = CurrentFrame.StaticCount++;
-
-            CurrentModuleOrClassScope.Variables.Add(name, new Variable(name, type, staticIndex, location));
-            return staticIndex;
-        }
-        else
-        {
-            // GT4/TT and earlier
-
-            // Functions don't count as a variable.
-            if (type == AdhocVariableType.Function || type == AdhocVariableType.Method)
-                return 0;
-
-            if (CurrentModuleOrClassScope.Variables.TryGetValue(name, out Variable? definedVariable))
-            {
-                return definedVariable.StackIndex;
-            }
-
-            staticIndex = CurrentFrame.LocalCount++;
-            CurrentModuleOrClassScope.Variables.Add(name, new Variable(name, type, staticIndex, location));
-        }
-
-        return staticIndex;
-    }
-
-
-    /// <summary>
-    /// Defines a local variable within the current scope.
-    /// </summary>
-    /// <param name="name"></param>
-    /// <param name="location"></param>
-    /// <returns></returns>
-    // GT7 1.00: 30D5DC0 (mCompiler::DefineLocalVariable)
-    private int DefineLocalVariable(AdhocSymbol name, Location? location = null)
-    {
-        int localIndex;
-        if (CurrentFrame.Version.UsesNewSplitStack())
-        {
-            if (CurrentLocalScope.Variables.TryGetValue(name, out Variable? definedVariable))
-            {
-                return definedVariable.StackIndex;
-            }
-
-            localIndex = CurrentLocalScope.NumLocals;
-            CurrentLocalScope.NumLocals++;
-            if (CurrentLocalScope.NumLocals > CurrentFrame.LocalCount)
-                CurrentFrame.LocalCount = CurrentLocalScope.NumLocals;
-
-            CurrentLocalScope.CleanupOnExit = true;
-            CurrentLocalScope.Variables.Add(name, new Variable(name, AdhocVariableType.LocalVariable, localIndex, location));
-        }
-        else
-        {
-            // GT4/TT and earlier
-            if (CurrentLocalScope.Variables.TryGetValue(name, out Variable? definedVariable))
-            {
-                return definedVariable.StackIndex;
-            }
-
-            localIndex = CurrentFrame.LocalCount++;
-            CurrentLocalScope.Variables.Add(name, new Variable(name, AdhocVariableType.LocalVariable, localIndex, location));
-        }
-        
-        return localIndex;
-    }
-
     private void AddInstruction(InstructionBase instruction, Location? location = null, bool useEndLineNumber = false)
     {
         // Set up some stack utilities
@@ -4495,30 +3961,32 @@ public class AdhocScriptCompiler
                 DecrementStackCounter();
                 break;
             case AdhocInstructionType.BINARY_OPERATOR:
-                DecrementStackCounter();
+                DecrementStackCounter(); // Pop Value 1
+                DecrementStackCounter(); // Pop Value 2
+                IncrementStackCounter(); // Push Return
                 break;
             case AdhocInstructionType.JUMP_IF_TRUE:
-                DecrementStackCounter();
+                DecrementStackCounter(); // Pop & check
                 break;
             case AdhocInstructionType.JUMP_IF_FALSE:
-                DecrementStackCounter();
+                DecrementStackCounter(); // Pop & check
                 break;
             case AdhocInstructionType.POP_OLD:
-                DecrementStackCounter();
+                DecrementStackCounter(); 
                 break;
             case AdhocInstructionType.REQUIRE:
                 DecrementStackCounter();
                 break;
             case AdhocInstructionType.THROW:
-                DecrementStackCounter();
+                DecrementStackCounter(); // Pop & throw value
                 break;
             case AdhocInstructionType.ASSIGN:
                 DecrementStackCounter();
                 break;
-            case AdhocInstructionType.ARRAY_PUSH:
+            case AdhocInstructionType.OBJECT_SELECTOR:
                 DecrementStackCounter();
                 break;
-            case AdhocInstructionType.OBJECT_SELECTOR:
+            case AdhocInstructionType.ARRAY_PUSH:
                 DecrementStackCounter();
                 break;
             case AdhocInstructionType.POP:
@@ -4759,39 +4227,452 @@ public class AdhocScriptCompiler
         CurrentFrame.Instructions.Add(instruction);
     }
 
-    private void RegisterLoopLabelForContinue(string symbol)
-    {
-        Continues.Add((symbol, []));
-    }
+    #endregion
 
-    private void RegisterLoopLabelForBreak(string symbol)
+    #region Variables/Module Management
+    /// <summary>
+    /// Gets or define a new attribute within a module.
+    /// </summary>
+    /// <param name="module"></param>
+    /// <param name="attributeName"></param>
+    /// <param name="newVariableType"></param>
+    /// <returns></returns>
+    // GT7 1.00: 305CB40 (hParser::GetOrDefineModuleVariable)
+    private DeclValue GetOrDefineModuleVariable(DeclModule module, string attributeName, AdhocVariableType newVariableType, Location? location = null)
     {
-        Breaks.Add((symbol, []));
-    }
-
-    // GT7 1.00: 30DAB90 (mCompiler::ProcessContinues)
-    private void ProcessContinues(int index)
-    {
-        var list = Continues[^1];
-        for (int i = 0; i < list.Jumps.Count; i++)
+        if (module.Variables.TryGetValue(attributeName, out DeclValue? value))
         {
-            var prevJump = (InsJump)CurrentFrame.Instructions[list.Jumps[i]];
-            prevJump.JumpInstructionIndex = index;
+            // Found something.
+
+            // If our expected type, or the value type is unknown, it is removed
+            if (newVariableType == AdhocVariableType.Unknown || value.Type == AdhocVariableType.Unknown)
+                module.Variables.Remove(attributeName); // Undef, just to make sure.
+            else
+                return value; // This will be returned regardless of expected type
         }
 
-        Continues.Remove(list);
+        // Define new one
+        DeclValue newModule;
+        if (newVariableType == AdhocVariableType.Module || newVariableType == AdhocVariableType.Class)
+            newModule = new DeclModule(parent: module, attributeName, newVariableType, location);
+        else
+            newModule = new DeclValue(parent: module, attributeName, newVariableType, location);
+
+        module.AddVariable(attributeName, newModule);
+        return newModule;
     }
 
-    private void ProcessBreaks(int index)
+    /// <summary>
+    /// Returns the last module value from a path.
+    /// </summary>
+    /// <param name="path"></param>
+    /// <returns></returns>
+    /// <exception cref="Exception"></exception>
+    // GT7 1.00: 305C090 (hParser::GetModuleVariableFromPath)
+    private DeclValue? GetModuleVariableFromPath(List<AdhocSymbol> path)
     {
-        var list = Breaks[^1];
-        for (int i = 0; i < list.Jumps.Count; i++)
+        // Determine root.
+        DeclValue? targetModuleValue = null;
+
+        var pathStart = path[0];
+        if (path.Count == 0)
         {
-            var prevJump = (InsJump)CurrentFrame.Instructions[list.Jumps[i]];
-            prevJump.JumpInstructionIndex = index;
+            if (TopLevel is not null)
+                targetModuleValue = TopLevel;
+            else
+                targetModuleValue = CurrentModule;
+        }
+        else if (pathStart.Name == "__toplevel__")
+        {
+            targetModuleValue = TopLevel;
+        }
+        else if (pathStart.Name == "__module__")
+        {
+            targetModuleValue = CurrentModule;
+        }
+        else
+        {
+            // Climb current module to top level for potential module start matches
+            for (var module = CurrentModule; module != null; module = module.ParentModule)
+            {
+                if (module.Variables.TryGetValue(pathStart.Name, out DeclValue? moduleValue))
+                {
+                    targetModuleValue = moduleValue;
+                    break;
+                }
+            }
         }
 
-        Breaks.Remove(list);
+        // No valid root found in existing scopes.
+        if (targetModuleValue is null)
+            return null;
+
+        // Navigate from base module to specific module.
+        for (int i = 1; i < path.Count - 1; i++)
+        {
+            if (targetModuleValue.Type == AdhocVariableType.Unknown)
+                break;
+
+            if (targetModuleValue is DeclModule module)
+            {
+                if (module.Variables.TryGetValue(path[i].Name, out DeclValue? moduleValue))
+                    targetModuleValue = moduleValue;
+                else
+                    return null; // Sub-module not found.
+            }
+            else
+                throw new Exception($"{targetModuleValue.Name} is not a module name. (in {path[^1].Name})");
+        }
+
+        return targetModuleValue;
+    }
+
+    // GT7 1.00: 30D76D0 (mCompiler::DefineScopeVariablesFromImport)
+    private void DefineScopeVariablesFromImport(List<AdhocSymbol> path, AdhocSymbol target, AdhocSymbol? alias = null)
+    {
+        alias ??= target;
+
+        DeclValue? moduleValue = GetModuleVariableFromPath(path);
+        if (moduleValue is not null)
+        {
+            if (moduleValue is DeclModule module)
+            {
+                if (target.Name == "__mul__")
+                {
+                    foreach (var variable in module.Variables)
+                        DefineVariableInCurrentScope(SymbolMap.RegisterSymbol(variable.Value.Name), variable.Value.Type);
+                }
+                else
+                {
+                    if (module.Variables.TryGetValue(target.Name, out DeclValue? targetValue))
+                        DefineVariableInCurrentScope(alias, targetValue.Type);
+                    else
+                        DefineVariableInCurrentScope(alias, AdhocVariableType.Unknown);
+                }
+            }
+        }
+        else if (target.Name != "__mul__")
+        {
+            DefineVariableInCurrentScope(alias, AdhocVariableType.Unknown);
+        }
+    }
+
+    // GT7 1.00: 305F0C0 (mParser::AddModuleVariablesFromImport)
+    public void AddModuleVariablesFromImport(List<AdhocSymbol> path, AdhocSymbol target, AdhocSymbol? alias = null)
+    {
+        alias ??= target;
+
+        DeclValue? moduleValue = GetModuleVariableFromPath(path);
+        if (moduleValue is not null)
+        {
+            if (moduleValue is DeclModule module)
+            {
+                if (target.Name == "__mul__")
+                {
+                    foreach (var variable in module.Variables)
+                    {
+                        CurrentModule.AddVariable(variable.Key, variable.Value);
+                    }
+                }
+                else
+                {
+                    if (module.Variables.TryGetValue(alias.Name, out DeclValue? targetValue))
+                    {
+                        CurrentModule.AddVariable(alias.Name, targetValue);
+                    }
+                    else
+                    {
+                        if (false /* TODO: Strict mode */)
+                            ThrowStrictCheckError($"undefined variable {path[^1].Name}::{target.Name}.");
+                    }
+                }
+            }
+            else
+            {
+                if (false /* TODO: Strict mode */)
+                    ThrowStrictCheckError($"{moduleValue.Name} is not a module name. (in {path[^1].Name}).");
+            }
+        }
+        else
+        {
+            if (false /* TODO: Strict mode */)
+                ThrowStrictCheckError($"undefined module variable '{path[^1]}'.");
+        }
+    }
+
+    // GT7 1.00: 305E970 (hParser::LeaveCurrentModule)
+    private void LeaveCurrentModule()
+    {
+        if (CurrentModule != ParentModules[^1])
+            CurrentModule = ParentModules[^1];
+
+        if (ParentModules.Count != 0)
+            ParentModules.Remove(ParentModules[^1]);
+    }
+
+    // GT7 1.00 - 305E8E0 (hParser::SetCurrentClass)
+    private void SetCurrentClass(AdhocSymbol symbol)
+    {
+        ParentModules.Add(CurrentModule);
+        SetCurrentModulePath([symbol], AdhocVariableType.Class);
+    }
+
+    /// <summary>
+    /// Sets the current module to the specified path.
+    /// </summary>
+    /// <param name="path"></param>
+    /// <param name="variableType"></param>
+    /// <exception cref="Exception"></exception>
+    // GT7 1.00: 305D320 (hParser::SetCurrentModule)
+    private void SetCurrentModulePath(List<AdhocSymbol> path, AdhocVariableType variableType)
+    {
+        // Try finding an existing starting scope path based on our input path
+        DeclValue? baseModule = null;
+        if (path[0].Name == "__toplevel__")
+        {
+            baseModule = TopLevel;
+        }
+        else if (path[0].Name == "__module__")
+        {
+            baseModule = CurrentModule;
+        }
+        else
+        {
+            // Go up in module scopes until we find a matching starting path
+            for (var currentModule = CurrentModule; currentModule != null; currentModule = currentModule.ParentModule)
+            {
+                if (currentModule.Variables.TryGetValue(path[0].Name, out DeclValue? moduleVariable))
+                {
+                    // Found a module scope that starts with what we expect
+                    if (moduleVariable.Type != AdhocVariableType.Unknown)
+                        baseModule = moduleVariable;
+                    else
+                        baseModule = (DeclModule)GetOrDefineModuleVariable(currentModule, path[0].Name, variableType); // Redefine if there's any ambiguity.
+                    break;
+                }
+
+                if (path.Count <= 1)
+                    break;
+            }
+        }
+
+        // Did we find a matching starting module that matches our path?
+        if (baseModule is null)
+        {
+            // Nope, so declare the path entirely.
+            baseModule = CurrentModule;
+            for (int i = 0; i < Math.Max(path.Count - 1, 1); i++)
+            {
+                baseModule = GetOrDefineModuleVariable((DeclModule)baseModule, path[i].Name, variableType);
+            }
+        }
+        else
+        {
+            // We did, so simply define the path starting from the starting module.
+            for (int i = 1; i < path.Count - 1; i++)
+            {
+                if (baseModule is not DeclModule declModule)
+                {
+                    ThrowNameError($"'{baseModule.Name}' is not a module name (in {path[^1]}"); // '%s' is not a module name. (in %s)
+                    return;
+                }
+
+                if (declModule.Variables.TryGetValue(path[i].Name, out DeclValue? moduleVariable))
+                {
+                    if (moduleVariable.Type != AdhocVariableType.Unknown)
+                        baseModule = moduleVariable;
+                    else
+                        baseModule = GetOrDefineModuleVariable((DeclModule)baseModule, path[i].Name, variableType); // Redefine if there's any ambiguity.
+                }
+                else
+                {
+                    baseModule = GetOrDefineModuleVariable((DeclModule)baseModule, path[i].Name, variableType);
+                }
+            }
+        }
+
+        if (baseModule is not null)
+        {
+            CurrentModule = (DeclModule)baseModule;
+        }
+        else
+            ThrowNameError($"cannot set current module {path[^1]}"); // cannot set current module %s
+    }
+
+    /// <summary>
+    /// Defines a variable within the current scope.
+    /// </summary>
+    /// <param name="name"></param>
+    /// <param name="variableType"></param>
+    /// <param name="location"></param>
+    // GT7 1.00: 30D5320 (mCompiler::DefineVariableInCurrentScope)
+    private void DefineVariableInCurrentScope(AdhocSymbol name, AdhocVariableType variableType, Location? location = null)
+    {
+        if (variableType == AdhocVariableType.Undef)
+        {
+            UndefSymbol(name);
+            return;
+        }
+
+        if (false /* TODO strict mode */ && variableType <= AdhocVariableType.Static)
+        {
+            if (variableType != AdhocVariableType.LocalVariable)
+            {
+                // Look up the symbol in the parser's declaration table
+                DeclValue value = null;
+
+                if (value is not null)
+                {
+                    if (value.Type == AdhocVariableType.Delegate || value.Type == variableType)
+                    {
+                        //value->byte54 = 1;
+                        value.Location = location.Value;
+                    }
+                    else
+                    {
+                        ThrowStrictCheckError($"{variableType} '{value.Name}' is already defined as {value.Type} at {value.Location.Value.Source}:{value.Location.Value.Start.Line}.");
+                    }
+                }
+                else
+                {
+                    ThrowStrictCheckError($"'{name.Name}' is not declared in this scope.");
+                }
+            }
+        }
+
+        Variable? variable;
+        switch (variableType)
+        {
+            case AdhocVariableType.LocalVariable:
+                if (!CurrentLocalScope.Variables.TryGetValue(name, out variable))
+                {
+                    DefineLocalVariable(name, location);
+                    return;
+                }
+                break;
+
+            default:
+                if (!CurrentModuleOrClassScope.Variables.TryGetValue(name, out variable))
+                {
+                    DefineStaticVariable(variableType, name, location);
+                    return;
+                }
+                break;
+        }
+
+        // Check redefinition types
+        switch (variable.Type)
+        {
+            case AdhocVariableType.Attribute:
+            case AdhocVariableType.Function:
+            case AdhocVariableType.Method:
+            case AdhocVariableType.Static:
+                if (variable.Type == variableType)
+                    return; // Redeclaring to same type, no problems
+                break;
+
+            case AdhocVariableType.Class:
+                if (variableType == AdhocVariableType.Class || variableType == AdhocVariableType.Module)
+                    return; // Redeclaring to already module or class type, no problems
+                break;
+
+            case AdhocVariableType.Module:
+                if (variableType == AdhocVariableType.Module)
+                    return; // Redeclaring to already module type, no problems
+                break;
+
+            case AdhocVariableType.LocalVariable:
+                break; // Local is being redeclared, not good.
+
+            default:
+                return;
+        }
+
+        // %s '%s' is already defined as %s at %s:%d.
+        ThrowNameError($"{location?.Source}:{location?.Start.Line ?? 0}: {variableType} '{name.Name}' is already defined as {variable.Type} at {variable.DeclarationSourceFileName}:{variable.DeclarationLineNumber}.");
+    }
+
+    /// <summary>
+    /// Defines a static variable within the current scope.
+    /// </summary>
+    /// <param name="type"></param>
+    /// <param name="name"></param>
+    /// <param name="location"></param>
+    /// <returns></returns>
+    private int DefineStaticVariable(AdhocVariableType type, AdhocSymbol name, Location? location)
+    {
+        int staticIndex;
+        if (CurrentFrame.Version.UsesNewSplitStack())
+        {
+            if (CurrentModuleOrClassScope.Variables.TryGetValue(name, out Variable? definedVariable))
+            {
+                return definedVariable.StackIndex;
+            }
+
+            staticIndex = CurrentFrame.StaticCount++;
+
+            CurrentModuleOrClassScope.Variables.Add(name, new Variable(name, type, staticIndex, location));
+            return staticIndex;
+        }
+        else
+        {
+            // GT4/TT and earlier
+
+            // Functions don't count as a variable.
+            if (type == AdhocVariableType.Function || type == AdhocVariableType.Method)
+                return 0;
+
+            if (CurrentModuleOrClassScope.Variables.TryGetValue(name, out Variable? definedVariable))
+            {
+                return definedVariable.StackIndex;
+            }
+
+            staticIndex = CurrentFrame.LocalCount++;
+            CurrentModuleOrClassScope.Variables.Add(name, new Variable(name, type, staticIndex, location));
+        }
+
+        return staticIndex;
+    }
+
+
+    /// <summary>
+    /// Defines a local variable within the current scope.
+    /// </summary>
+    /// <param name="name"></param>
+    /// <param name="location"></param>
+    /// <returns></returns>
+    // GT7 1.00: 30D5DC0 (mCompiler::DefineLocalVariable)
+    private int DefineLocalVariable(AdhocSymbol name, Location? location = null)
+    {
+        int localIndex;
+        if (CurrentFrame.Version.UsesNewSplitStack())
+        {
+            if (CurrentLocalScope.Variables.TryGetValue(name, out Variable? definedVariable))
+            {
+                return definedVariable.StackIndex;
+            }
+
+            localIndex = CurrentLocalScope.NumLocals;
+            CurrentLocalScope.NumLocals++;
+            if (CurrentLocalScope.NumLocals > CurrentFrame.LocalCount)
+                CurrentFrame.LocalCount = CurrentLocalScope.NumLocals;
+
+            CurrentLocalScope.CleanupOnExit = true;
+            CurrentLocalScope.Variables.Add(name, new Variable(name, AdhocVariableType.LocalVariable, localIndex, location));
+        }
+        else
+        {
+            // GT4/TT and earlier
+            if (CurrentLocalScope.Variables.TryGetValue(name, out Variable? definedVariable))
+            {
+                return definedVariable.StackIndex;
+            }
+
+            localIndex = CurrentFrame.LocalCount++;
+            CurrentLocalScope.Variables.Add(name, new Variable(name, AdhocVariableType.LocalVariable, localIndex, location));
+        }
+
+        return localIndex;
     }
 
     /// <summary>
@@ -4908,6 +4789,165 @@ public class AdhocScriptCompiler
                 return DefineStaticVariable(varType, fullSymbolPath, location);
         }
     }
+    #endregion
+
+    #region Utils
+
+    private static string? AssignOperatorToString(AssignmentOperator op)
+    {
+        return op switch
+        {
+            AssignmentOperator.PlusAssign => AdhocConstants.OPERATOR_ADD,
+            AssignmentOperator.MinusAssign => AdhocConstants.OPERATOR_SUBTRACT,
+            AssignmentOperator.TimesAssign => AdhocConstants.OPERATOR_MULTIPLY,
+            AssignmentOperator.DivideAssign => AdhocConstants.OPERATOR_DIVIDE,
+            AssignmentOperator.ModuloAssign => AdhocConstants.OPERATOR_MODULO,
+            AssignmentOperator.BitwiseAndAssign => AdhocConstants.OPERATOR_BITWISE_AND,
+            AssignmentOperator.BitwiseOrAssign => AdhocConstants.OPERATOR_BITWISE_OR,
+            AssignmentOperator.BitwiseXOrAssign => AdhocConstants.OPERATOR_BITWISE_XOR,
+            AssignmentOperator.ExponentiationAssign => AdhocConstants.OPERATOR_POWER,
+            AssignmentOperator.RightShiftAssign => AdhocConstants.OPERATOR_RIGHT_SHIFT,
+            AssignmentOperator.LeftShiftAssign => AdhocConstants.OPERATOR_LEFT_SHIFT,
+            _ => null
+        };
+    }
+
+
+    private static bool IsAdhocAssignWithOperandOperator(AssignmentOperator op)
+    {
+        switch (op)
+        {
+            case AssignmentOperator.PlusAssign:
+            case AssignmentOperator.MinusAssign:
+            case AssignmentOperator.TimesAssign:
+            case AssignmentOperator.DivideAssign:
+            case AssignmentOperator.ModuloAssign:
+            case AssignmentOperator.BitwiseAndAssign:
+            case AssignmentOperator.BitwiseOrAssign:
+            case AssignmentOperator.BitwiseXOrAssign:
+            case AssignmentOperator.ExponentiationAssign:
+            case AssignmentOperator.RightShiftAssign:
+            case AssignmentOperator.LeftShiftAssign:
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Returns whether an expression is an identifier mapping to base numeric types.
+    /// </summary>
+    /// <param name="expression"></param>
+    /// <returns></returns>
+    private static bool IsNumberTypeIdentifier(Expression expression)
+    {
+        if (expression is Identifier identifier)
+        {
+            switch (identifier.Name)
+            {
+                case "Byte":
+                case "UByte":
+                case "Short":
+                case "UShort":
+                case "Int":
+                case "UInt":
+                case "Long":
+                case "ULong":
+                case "Float":
+                case "Double":
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Returns whether the provided expression is an unary indirection of expression (i.e *myObj).
+    /// </summary>
+    /// <param name="exp"></param>
+    /// <returns></returns>
+    private static bool IsUnaryIndirection(Expression exp)
+    {
+        return exp is UnaryExpression unaryExp && unaryExp.Operator == UnaryOperator.Indirection;
+    }
+
+    /// <summary>
+    /// Returns whether the provided expression is an unary reference of expression (i.e &myObj).
+    /// </summary>
+    /// <param name="exp"></param>
+    /// <returns></returns>
+    private static bool IsUnaryReferenceOfExpression(Expression exp)
+    {
+        return exp is UnaryExpression unaryExp && unaryExp.Operator == UnaryOperator.ReferenceOf;
+    }
+
+    private void BuildStaticPath(StaticMemberExpression exp, ref List<AdhocSymbol> pathParts)
+    {
+        BuildStaticPathChild(exp, ref pathParts);
+
+        string fullPath = string.Join(AdhocConstants.OPERATOR_STATIC, pathParts.Select(e => e.Name));
+        AdhocSymbol fullPathSymb = SymbolMap.RegisterSymbol(fullPath);
+        pathParts.Add(fullPathSymb);
+    }
+
+    private void BuildStaticPathChild(StaticMemberExpression exp, ref List<AdhocSymbol> pathParts)
+    {
+        if (exp.Object is StaticMemberExpression obj)
+        {
+            BuildStaticPathChild(obj, ref pathParts);
+        }
+        else if (exp.Object is Identifier identifier)
+        {
+            pathParts.Add(SymbolMap.RegisterSymbol(identifier.Name!));
+        }
+
+        if (exp.Property is Identifier propIdentifier)
+        {
+            pathParts.Add(SymbolMap.RegisterSymbol(propIdentifier.Name!));
+        }
+    }
+
+    #endregion
+
+    #region Warning/Error Handling Methods
+    private void PrintPostCompilationWarnings()
+    {
+        foreach (var warn in PostCompilationWarnings)
+            Logger.Warn($"Feature Warning: {CompilationMessages.Warnings[warn]}. This may crash older game builds.");
+    }
+
+    private void AddPostCompilationWarning(string warningCode)
+    {
+        PostCompilationWarnings.Add(warningCode);
+    }
+
+    private void PrintCompilationWarning(Node node, string message)
+    {
+        Logger.Warn(GetSourceNodeString(node, message));
+    }
+
+    [DoesNotReturn]
+    private void ThrowCompilationError(Node node, string message)
+    {
+        throw GetCompilationError(node, message);
+    }
+
+    /// <summary>
+    /// Gets a new compilation exception.
+    /// </summary>
+    /// <param name="node"></param>
+    /// <param name="message"></param>
+    /// <returns></returns>
+    private AdhocCompilationException GetCompilationError(Node node, string message)
+    {
+        return new AdhocCompilationException(GetSourceNodeString(node, message));
+    }
+
+    private static string GetSourceNodeString(Node node, string message)
+    {
+        return $"{message} at {node.Location.Source}:{node.Location.Start.Line}";
+    }
 
     [DoesNotReturn]
     private void ThrowNameError(string message)
@@ -4921,10 +4961,10 @@ public class AdhocScriptCompiler
         throw new StrictCheckException(message);
     }
 
-    // GT7 1.00: 305D2C0 hParser::DefineAttributeForCurrentModule
-    private void DefineAttributeForCurrentModule(string name, AdhocVariableType type, Location location)
+    // GT7 1.00: 305D2C0 hParser::DefineVariableForCurrentModule
+    private void DefineVariableForCurrentModule(string name, AdhocVariableType type, Location location)
     {
-        GetOrDefineModuleAttribute(CurrentModule, name, type, location);
+        GetOrDefineModuleVariable(CurrentModule, name, type, location);
     }
 
     public class NameErrorException : Exception
@@ -4933,11 +4973,10 @@ public class AdhocScriptCompiler
             : base(message) { }
     }
 
-    public class StrictCheckException : Exception 
+    public class StrictCheckException : Exception
     {
         public StrictCheckException(string message)
             : base(message) { }
     }
-
     #endregion
 }

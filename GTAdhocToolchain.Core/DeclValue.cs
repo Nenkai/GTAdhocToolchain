@@ -30,20 +30,6 @@ public class DeclValue
         if (depth > 0)
             sb.Append(' ', depth * 2);
 
-        sb.Append($"@{VariableTypeToKeyword[Type]} {Name};\n");
+        sb.Append($"@{Utils.VariableTypeToKeyword[Type]} {Name};\n");
     }
-
-    public static readonly FrozenDictionary<AdhocVariableType, string> VariableTypeToKeyword = new Dictionary<AdhocVariableType, string>
-    {
-        [AdhocVariableType.Attribute] = "attribute",
-        [AdhocVariableType.Class] = "class",
-        [AdhocVariableType.Delegate] = "delegate",
-        [AdhocVariableType.Function] = "function",
-        [AdhocVariableType.LocalVariable] = "var",
-        [AdhocVariableType.Method] = "method",
-        [AdhocVariableType.Static] = "static",
-        [AdhocVariableType.Module] = "module",
-        [AdhocVariableType.Undef] = "undef",
-        [AdhocVariableType.Unknown] = "unknown",
-    }.ToFrozenDictionary();
 }

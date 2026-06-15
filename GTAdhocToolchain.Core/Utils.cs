@@ -1,19 +1,46 @@
 ﻿// Copyright (c) 2026 Nenkai
 // SPDX-License-Identifier: MIT
 
+using Syroot.BinaryData;
+using Syroot.BinaryData.Memory;
+
 using System;
+using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-using Syroot.BinaryData;
-using Syroot.BinaryData.Memory;
-
 namespace GTAdhocToolchain.Core;
 
 public static class Utils
 {
+    public static readonly FrozenDictionary<AdhocVariableType, string> VariableTypeToKeyword = new Dictionary<AdhocVariableType, string>
+    {
+        [AdhocVariableType.Attribute] = "attribute",
+        [AdhocVariableType.Class] = "class",
+        [AdhocVariableType.Delegate] = "delegate",
+        [AdhocVariableType.Function] = "function",
+        [AdhocVariableType.LocalVariable] = "var",
+        [AdhocVariableType.Method] = "method",
+        [AdhocVariableType.Static] = "static",
+        [AdhocVariableType.Module] = "module",
+        [AdhocVariableType.Undef] = "undef",
+        [AdhocVariableType.Unknown] = "unknown",
+    }.ToFrozenDictionary();
+
+    public static readonly FrozenDictionary<string, AdhocVariableType> KeywordToVariableType;
+
+    static Utils()
+    {
+        var dict = new Dictionary<string, AdhocVariableType>();
+        foreach (var (k, v) in VariableTypeToKeyword)
+        {
+            dict.Add(v, k);
+        }
+        KeywordToVariableType = dict.ToFrozenDictionary();
+    }
+
     public static string OperatorNameToPunctuator(string @operator)
     {
         if (string.IsNullOrEmpty(@operator))

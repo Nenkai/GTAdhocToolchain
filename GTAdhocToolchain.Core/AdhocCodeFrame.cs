@@ -271,6 +271,7 @@ public class AdhocCodeFrame
         sb.AppendLine();
 
         sb.Append($"  > Stack Size: {MaxStackSize} - LocalCount: {LocalCount} - StaticCount: {(!Version.UsesNewSplitStack() ? "=MaxLocalIndex" : $"{StaticCount}")}");
+        sb.AppendLine();
 
         return sb.ToString();
     }
