@@ -18,16 +18,16 @@ public class InsAttributeEvaluation : InstructionBase
 
     public override string InstructionName => "ATTRIBUTE_EVAL";
 
-    public List<AdhocSymbol> AttributeSymbols { get; set; } = [];
+    public List<AdhocSymbol> Path { get; set; } = [];
 
     public override void Serialize(AdhocStream stream)
     {
-        stream.WriteSymbols(AttributeSymbols);
+        stream.WriteSymbols(Path);
     }
 
     public override void Deserialize(AdhocStream stream)
     {
-        AttributeSymbols = stream.ReadSymbols();
+        Path = stream.ReadSymbols();
     }
 
     public override string ToString()
@@ -36,5 +36,5 @@ public class InsAttributeEvaluation : InstructionBase
     }
 
     public override string Disassemble(bool asCompareMode = false)
-        => $"{InstructionType}: {string.Join(',', AttributeSymbols.Select(e => e.Name))}";
+        => $"{InstructionType}: {string.Join(',', Path.Select(e => e.Name))}";
 }

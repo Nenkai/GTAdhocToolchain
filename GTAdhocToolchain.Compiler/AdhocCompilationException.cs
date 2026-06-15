@@ -11,6 +11,12 @@ namespace GTAdhocToolchain.Compiler;
 
 public class AdhocCompilationException : Exception
 {
+    public AdhocCompilationException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+
+    }
+
     public AdhocCompilationException(string message)
         : base(message)
     {

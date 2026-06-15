@@ -10,7 +10,6 @@ using System.Reflection;
 using System.CommandLine;
 
 using Esprima;
-using Esprima.Ast;
 
 using NLog;
 
@@ -24,6 +23,7 @@ using GTAdhocToolchain.Menu.Resources;
 using GTAdhocToolchain.Packaging;
 using GTAdhocToolchain.Preprocessor;
 using GTAdhocToolchain.Project;
+using GTAdhocToolchain.Core;
 
 namespace GTAdhocToolchain.CLI;
 
@@ -471,14 +471,13 @@ public class Program
             {
                 compiler.SetBaseIncludeFolder(absoluteIncludePath);
             }
-            compiler.SetSourcePath(inputPath);
 
             if (debugExceptions)
                 compiler.BuildTryCatchDebugStatements();
 
-            compiler.CompileScript(program);
+            AdhocCodeFrame codeFrame = compiler.CompileScript(program, inputPath);
 
-            AdhocCodeGen codeGen = new AdhocCodeGen(compiler.MainFrame, compiler.SymbolMap);
+            AdhocCodeGen codeGen = new AdhocCodeGen(codeFrame, compiler.SymbolMap);
             codeGen.Generate();
             codeGen.SaveTo(output);
 
@@ -495,7 +494,10 @@ public class Program
         }
         catch (AdhocCompilationException compileException)
         {
-            Logger.Error($"Compilation error: {compileException.Message}");
+            if (compileException.InnerException is not null)
+                Logger.Error($"Compilation error: {compileException.Message} - {compileException.InnerException.Message}");
+            else
+                Logger.Error($"Compilation error: {compileException.Message}");
         }
         catch (Exception e)
         {
@@ -522,8 +524,8 @@ public class Program
 
             if (line.StartsWith("/?"))
             {
-                Logger.Error("/clear - Clears the console");
-                Logger.Error("/version - Sets adhoc version");
+                Console.WriteLine("/clear - Clears the console");
+                Console.WriteLine("/version - Sets adhoc version");
                 continue;
             }
             else if (line.StartsWith("/clear"))
@@ -536,15 +538,15 @@ public class Program
                 ReadOnlySpan<char> range = line.AsSpan()["/version".Length..].Trim();
                 if (range.IsEmpty)
                 {
-                    Logger.Error($"Current adhoc version is set to {version}.");
+                    Console.WriteLine($"Current adhoc version is set to {version}.");
                 }
                 else if (uint.TryParse(range, out version))
                 {
-                    Logger.Error($"Now compiling for adhoc version {version}");
+                    Console.WriteLine($"Now compiling for adhoc version {version}");
                 }
                 else
                 {
-                    Logger.Error("Invalid version. Usage: /version <adhoc version>");
+                    Console.WriteLine("Invalid version. Usage: /version <adhoc version>");
                 }
 
                 continue;
@@ -574,10 +576,9 @@ public class Program
                 try
                 {
                     var compiler = new AdhocScriptCompiler(version);
-                    compiler.SetSourcePath("test.ad");
-                    compiler.CompileScript(program);
+                    AdhocCodeFrame codeFrame = compiler.CompileScript(program, "test.ad");
 
-                    AdhocCodeGen codeGen = new AdhocCodeGen(compiler.MainFrame, compiler.SymbolMap);
+                    AdhocCodeGen codeGen = new AdhocCodeGen(codeFrame, compiler.SymbolMap);
                     codeGen.Generate();
 
                     for (int i = 0; i < codeGen.Frame.Instructions.Count; i++)
@@ -588,7 +589,7 @@ public class Program
 
                     void Dissasemble(InstructionBase inst, int instNumber, int depth)
                     {
-                        Logger.Error($"{new string(' ', depth * 2)} {instNumber, 3} | {inst}");
+                        Console.WriteLine($"{new string(' ', depth * 2)} {instNumber,3} | {inst}");
                         if (inst.IsFunctionOrMethod())
                         {
                             SubroutineBase subroutine = (SubroutineBase)inst;
@@ -610,7 +611,10 @@ public class Program
                 }
                 catch (AdhocCompilationException compileException)
                 {
-                    Logger.Error($"Compilation error: {compileException.Message}");
+                    if (compileException.InnerException is not null)
+                        Logger.Error($"Compilation error: {compileException.Message} - {compileException.InnerException.Message}");
+                    else
+                        Logger.Error($"Compilation error: {compileException.Message}");
                 }
                 catch (Exception e)
                 {
@@ -638,7 +642,7 @@ public class Program
         string outputPath = parseResult.GetRequiredValue<string>("--output");
 
         var mbin = new MBinaryIO(inputPath);
-        mNode rootNode = mbin.Read();
+        mNode? rootNode = mbin.Read();
 
         if (rootNode is null)
         {
@@ -675,7 +679,7 @@ public class Program
         bool debug = parseResult.GetValue<bool>("--debug");
 
         var mbin = new MBinaryIO(inputPath);
-        mNode rootNode = mbin.Read();
+        mNode? rootNode = mbin.Read();
 
         if (rootNode is null)
         {

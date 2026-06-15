@@ -11,7 +11,7 @@ RE_ROOT_INSTRUCTIONS = r"Root Instructions: (\d*)"
 RE_STACK_SETUP = r"Stack Size: (\d*) - Variable Heap Size: (\d*) - Variable Heap Size Static: (\d*)"
 RE_LEAVE = r"\| LEAVE:.*"
 RE_INSTRUCTION = r"\d*\| *\d*\| *\d*\| *(.*)"
-RE_INSTRUCTION_COMPONENTS_TO_DROP = r", (?:Index:|Local:|Static:|PushAt:)(\d*)"
+RE_INSTRUCTION_COMPONENTS_TO_DROP = r""
 RE_INSTRUCTION_JUMP = r"(?:Jump To Func Ins |Jump(?:To)?=)(\d*)"
 
 HTML_STYLING = """

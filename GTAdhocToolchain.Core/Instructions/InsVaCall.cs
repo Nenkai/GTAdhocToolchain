@@ -23,16 +23,16 @@ namespace GTAdhocToolchain.Core.Instructions
         /// <summary>
         /// Should always be two. (function object + unique & single spread expression)
         /// </summary>
-        public uint PopObjectCount { get; set; }
+        public int PopObjectCount { get; set; }
 
         public override void Serialize(AdhocStream stream)
         {
-            stream.WriteUInt32(PopObjectCount);
+            stream.WriteInt32(PopObjectCount);
         }
 
         public override void Deserialize(AdhocStream stream)
         {
-            PopObjectCount = stream.ReadUInt32();
+            PopObjectCount = stream.ReadInt32();
         }
 
         public override string ToString()

@@ -36,7 +36,7 @@ public class CompilationMessages
 
     public const string Error_TryClauseNotBody = "Try clause must contain a body statement.";
     public const string Error_CatchClauseNotBody = "Catch clause must contain a body statement.";
-    public const string Error_CatchClauseParameterNotIdentifier = "Catch clause parameter must be an identifier.";
+    public const string Error_CatchClauseParameterNotIdentifier = "Catch clause parameter must be an identifier (anything else is not currently supported).";
 
     public const string Error_ForLoopInitializationType = "Unsupported for loop inititialization type";
     public const string Error_ForeachDeclarationNotDeclarationOrExpression = "Expected foreach to have a variable declaration, left-hand side expression.";

@@ -145,4 +145,6 @@ public class AdhocConstants
     public const string OBJECT = "Object";
     public const string SYSTEM = "System";
     public const string ITERATOR = "iterator";
+
+    public const string FUNCTION = "__function__";
 }

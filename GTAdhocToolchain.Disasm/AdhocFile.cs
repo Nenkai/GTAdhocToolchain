@@ -86,8 +86,8 @@ public class AdhocFile
         if (SymbolTable != null)
             sw.WriteLine($"({SymbolTable.Count} strings)");
         sw.WriteLine($"Root Instructions: {TopLevelFrame.Instructions.Count}");
-        sw.Write($"  > Stack Size: {TopLevelFrame.Stack.GetStackSize()} - Variable Storage Size: {TopLevelFrame.Stack.GetLocalVariableStorageSize()} - " +
-            $"Variable Storage Size Static: {(!TopLevelFrame.Version.UsesNewSplitStack() ? "=Variable Storage Size" : $"{TopLevelFrame.Stack.GetStaticVariableStorageSize()}")}");
+        sw.Write($"  > Stack Size: {TopLevelFrame.MaxStackSize} - LocalCount: {TopLevelFrame.LocalCount} - " +
+            $"StaticCount: {(!TopLevelFrame.Version.UsesNewSplitStack() ? "=LocalCount" : $"{TopLevelFrame.StaticCount}")}");
         sw.WriteLine();
 
         Stack<object> modOrClass = new Stack<object>();
@@ -127,7 +127,7 @@ public class AdhocFile
             else if (inst.InstructionType == AdhocInstructionType.JUMP && Version < 10)
                 ifdepth--;
             else if (inst.InstructionType == AdhocInstructionType.MODULE_DEFINE)
-                modOrClass.Push((inst as InsModuleDefine).Names[^1].Name);
+                modOrClass.Push((inst as InsModuleDefine).Path[^1].Name);
             else if (inst.InstructionType == AdhocInstructionType.CLASS_DEFINE)
                 modOrClass.Push((inst as InsClassDefine).Name.Name);
             else if (inst.InstructionType == AdhocInstructionType.TRY_CATCH)
@@ -202,7 +202,7 @@ public class AdhocFile
             else if (inst.InstructionType == AdhocInstructionType.JUMP && Version < 10)
                 ifdepth--;
             else if (inst.InstructionType == AdhocInstructionType.MODULE_DEFINE)
-                modOrClass.Push((inst as InsModuleDefine).Names[^1].Name);
+                modOrClass.Push((inst as InsModuleDefine).Path[^1].Name);
             else if (inst.InstructionType == AdhocInstructionType.CLASS_DEFINE)
                 modOrClass.Push((inst as InsClassDefine).Name.Name);
             else if (inst.InstructionType == AdhocInstructionType.TRY_CATCH)

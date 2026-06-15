@@ -19,6 +19,12 @@ public class InsFunctionDefine : SubroutineBase
     public override string InstructionName => "FUNCTION_DEFINE";
 
     public InsFunctionDefine() : base() { }
+
+    public InsFunctionDefine(AdhocCodeFrame frame)
+    {
+        CodeFrame = frame;
+    }
+
     public InsFunctionDefine(AdhocVersion version) : base(version)
     {
     }

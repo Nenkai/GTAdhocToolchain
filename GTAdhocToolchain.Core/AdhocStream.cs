@@ -70,14 +70,18 @@ public class AdhocStream : BinaryStream
 
     public void WriteSymbol(AdhocSymbol symbol)
     {
-        if (!Version.HasSymbolTable())
+        ArgumentNullException.ThrowIfNull(symbol, nameof(symbol));
+
+        if (Version.HasSymbolTable())
+        {
+            WriteVarInt(symbol.Id);
+        }
+        else
         {
             WriteInt16((short)Encoding.GetByteCount(symbol.Name));
             WriteBytes(Encoding.GetBytes(symbol.Name));
         }
-        else
-            WriteVarInt(symbol.Id);
-                
+
     }
 
     public List<AdhocSymbol> ReadSymbols()

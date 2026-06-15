@@ -18,10 +18,10 @@ public class InsVariableEvaluation : InstructionBase
 
     public override string InstructionName => "VARIABLE_EVAL";
 
-    public List<AdhocSymbol> VariableSymbols { get; set; } = [];
+    public List<AdhocSymbol> Path { get; set; } = [];
 
     public int VariableStorageIndex { get; set; }
-    public bool IsStatic => VariableSymbols.Count > 1;
+    public bool IsStatic => Path.Count > 1;
 
     public InsVariableEvaluation(int index)
     {
@@ -35,13 +35,13 @@ public class InsVariableEvaluation : InstructionBase
 
     public override void Serialize(AdhocStream stream)
     {
-        stream.WriteSymbols(VariableSymbols);
+        stream.WriteSymbols(Path);
         stream.WriteInt32(VariableStorageIndex);
     }
 
     public override void Deserialize(AdhocStream stream)
     {
-        VariableSymbols = stream.ReadSymbols();
+        Path = stream.ReadSymbols();
         VariableStorageIndex = stream.ReadInt32();
     }
 
@@ -55,16 +55,16 @@ public class InsVariableEvaluation : InstructionBase
         if (asCompareMode)
         {
             if (IsStatic)
-                return $"{InstructionType}: {string.Join(',', VariableSymbols.Select(e => e.Name.Split("#")[0]))}, Static:{VariableStorageIndex}";
+                return $"{InstructionType}: {string.Join(',', Path.Select(e => e.Name.Split("#")[0]))}, Static:{VariableStorageIndex}";
             else
-                return $"{InstructionType}: {string.Join(',', VariableSymbols.Select(e => e.Name.Split("#")[0]))}, Local:{VariableStorageIndex}";
+                return $"{InstructionType}: {string.Join(',', Path.Select(e => e.Name.Split("#")[0]))}, Local:{VariableStorageIndex}";
         }
         else
         {
             if (IsStatic)
-                return $"{InstructionType}: {string.Join(',', VariableSymbols.Select(e => e.Name))}, Static:{VariableStorageIndex}";
+                return $"{InstructionType}: {string.Join(',', Path.Select(e => e.Name))}, Static:{VariableStorageIndex}";
             else
-                return $"{InstructionType}: {string.Join(',', VariableSymbols.Select(e => e.Name))}, Local:{VariableStorageIndex}";
+                return $"{InstructionType}: {string.Join(',', Path.Select(e => e.Name))}, Local:{VariableStorageIndex}";
         }
     }
 }
