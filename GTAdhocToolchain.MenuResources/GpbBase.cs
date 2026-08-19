@@ -58,9 +58,10 @@ public abstract class GpbBase
             Console.WriteLine($"[:] GPB: Unpack -> {file.FileName}");
 
             string path;
-            if (this is GpbData2)
+            if (this is GpbData2 || (this is GpbData3 && file.FileName[0] != '/'))
                 path = file.FileName;
             else
+                // GT6 and later use starting /s
                 path = Path.Combine(file.FileName[1..]);
 
             string outputFile = Path.Combine(outputFolder, path);

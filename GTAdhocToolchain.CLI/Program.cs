@@ -106,7 +106,7 @@ public class Program
 
         var unpackCommand = new Command("unpack", "Unpack files like gpb's, or mpackage's.")
         {
-            new Option<FileInfo>("--input", aliases: ["-i"]) { Required = true, Description = "Input file. (GPB's, mPackages)" },
+            new Option<string>("--input", aliases: ["-i"]) { Required = true, Description = "Input file. (GPB's, mPackages)" },
             new Option<string>("--output", aliases: ["-o"]) { Description = "Output folder for unpacked files." },
             new Option<bool>("--convert-gpb-files") { Description = "Whether to convert GPB texture files to their original formats (png, dds)." }
         };
