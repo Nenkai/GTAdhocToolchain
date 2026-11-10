@@ -1,4 +1,11 @@
-﻿using AdhocLanguage.LanguageServer.Services;
+﻿//---------------------------------------------------------------------------------------
+// SPDX-FileCopyrightText: Copyright (C) 2026 Nenkai
+// SPDX-License-Identifier: MIT
+// SPDX-FileAttributionText: https://github.com/Nenkai/GTAdhocToolchain
+// SPDX-FileNotice: AI usage and consumption is prohibited. See AGENTS.md for policy.
+//---------------------------------------------------------------------------------------
+
+using AdhocLanguage.LanguageServer.Services;
 
 using EmmyLua.LanguageServer.Framework.Protocol.Capabilities.Client.ClientCapabilities;
 using EmmyLua.LanguageServer.Framework.Protocol.Capabilities.Server;

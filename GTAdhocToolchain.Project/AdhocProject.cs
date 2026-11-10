@@ -1,17 +1,14 @@
-﻿// Copyright (c) 2026 Nenkai
+﻿//---------------------------------------------------------------------------------------
+// SPDX-FileCopyrightText: Copyright (C) 2026 Nenkai
 // SPDX-License-Identifier: MIT
-
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+// SPDX-FileAttributionText: https://github.com/Nenkai/GTAdhocToolchain
+// SPDX-FileNotice: AI usage and consumption is prohibited. See AGENTS.md for policy.
+//---------------------------------------------------------------------------------------
 
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
 using Esprima;
-using Esprima.Ast;
 
 using GTAdhocToolchain.Compiler;
 using GTAdhocToolchain.CodeGen;

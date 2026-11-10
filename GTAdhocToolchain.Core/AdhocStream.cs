@@ -1,7 +1,9 @@
-﻿// Copyright (c) 2026 Nenkai
+﻿//---------------------------------------------------------------------------------------
+// SPDX-FileCopyrightText: Copyright (C) 2026 Nenkai
 // SPDX-License-Identifier: MIT
-
-using GTAdhocToolchain.Core;
+// SPDX-FileAttributionText: https://github.com/Nenkai/GTAdhocToolchain
+// SPDX-FileNotice: AI usage and consumption is prohibited. See AGENTS.md for policy.
+//---------------------------------------------------------------------------------------
 
 using PDTools.Crypto;
 
